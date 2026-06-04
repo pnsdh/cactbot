@@ -29,3 +29,6 @@ npm-package/
 
 ui/raidboss/data/99-custom/*
 !ui/raidboss/data/99-custom/readme.txt
+
+# 개인용 번역 참고자료 (EXD CSV 덤프 등) — 배포본 비포함
+ref/

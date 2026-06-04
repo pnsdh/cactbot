@@ -12,3 +12,8 @@
 # Set the language for these files to jsonc to ensure GitHub doesn't show the comments as errors
 .vscode/*.json         linguist-language=jsonc
 tsconfig*.json         linguist-language=jsonc
+
+# 개인 KR 버전 유지: 업스트림 머지 시 이 파일들은 항상 내 버전 보존
+# (merge.ours.driver=true 필요 — `git config merge.ours.driver true`. 업스트림 개선은 diff로 수동 반영.)
+ui/raidboss/data/07-dt/ultimate/dancing_mad.ts  merge=ours
+ui/raidboss/data/07-dt/ultimate/dancing_mad.txt merge=ours

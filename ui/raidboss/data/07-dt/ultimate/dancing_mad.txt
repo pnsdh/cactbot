@@ -1,9 +1,10 @@
-### DANCING MAD (ULTIMATE)
+### 절 요성난무
 # ZoneId: 1363
 
-# -ii C250 C252 BA9E BAA0 BAAB BA95 BAAF BAAD BAD6 BAD8 BAD7 BAD9
-# -p C403:15.6 C24C:216.5 C3F7:500.0
-# -it Kefka Chaos Exdeath
+# -ii C250 C252 BA9E BAA0 BAAB BA95 BAAF BAAD BAD6 BAD7 BAD8 BAD9
+# -ic "세라핌" "영웅의 환영" "지상의 별" "카벙클"
+# -it "케프카" "카오스" "엑스데스"
+# (영웅의 환영 = 암흑기사 리빙 섀도우 펫 / 카벙클·세라핌·지상의 별 = 서모너·학자·점성 펫 → 모두 제외)
 
 hideall "--Reset--"
 hideall "--sync--"
@@ -12,261 +13,213 @@ hideall "--sync--"
 
 0.0 "--sync--" InCombat { inGameCombat: "1" } window 0,1
 
-### Phase 1 - Kefka
-# TODO: Add voiceline sync?
-# en (auto-translate): 'This is my first time, so please take it easy!'
-10.6 "--sync--" StartsUsing { id: "C403", source: "Kefka" } window 20,10
-15.6 "Revolting Ruin III 1" Ability { id: "C403", source: "Kefka" }
-18.7 "Revolting Ruin III 2" Ability { id: "C4E1", source: "Kefka" }
-24.8 "--middle--" Ability { id: "C3FD", source: "Kefka" }
+# === P1: 케프카 ===
+# 오프닝 재동기화: 첫 파삭파삭 루인가(C403) 시전 시작. 넓은 window로 풀 초반 드리프트 보정.
+10.6 "--sync--" StartsUsing { id: "C403", source: "케프카" } window 20,10
+15.7 "파삭파삭 루인가" Ability { id: "C403", source: "케프카" }
+18.8 "파삭파삭 루인가" Ability { id: "C4E1", source: "케프카" }
+24.9 "--sync--" Ability { id: "C3FD", source: "케프카" }
 
-29.2 "Graven Image 1" Ability { id: "BCF2", source: "Kefka" }
-35.1 "Pulse Wave" Ability { id: "BAA9", source: "Graven Image" }
-37.4 "Mystery Magic" Ability { id: "BA94", source: "Kefka" }
-37.4 "Blizzard III Blowout" #Ability { id: ["BA9B", "BA98"], source: "Kefka" }
-38.3 "Flagrant Fire III" Ability { id: ["BAA2", "BAA3"], source: "Kefka" }
-42.5 "Wave Cannon" Ability { id: "BAA8", source: "Graven Image" }
-44.6 "Double-trouble Trap" Ability { id: "BAA6", source: "Kefka" }
-46.0 "Explosion" Ability { id: "BAAA", source: "Kefka" }
-49.7 "Double-trouble Trap" Ability { id: "BAA7", source: "Kefka" }
-53.7 "Mystery Magic" Ability { id: "BA94", source: "Kefka" }
-53.7 "Thrumming Thunder III" #Ability { id: ["BAA1", "BA9F"], source: "Kefka" }
-53.7 "Blizzard III Blowout" #Ability { id: ["BA9B", "BA98"], source: "Kefka" }
-62.7 "Light of Judgment" Ability { id: "C622", source: "Kefka" }
-65.8 "Hyperdrive 1" #Ability { id: "C24B", source: "Kefka" }
-67.8 "Hyperdrive 2" #Ability { id: "C24B", source: "Kefka" }
-69.8 "Hyperdrive 3" #Ability { id: "C24B", source: "Kefka" }
-75.6 "--middle--" Ability { id: "C3FD", source: "Kefka" }
+# --- 신들의 상 소환 (1번째) ---
+29.3 "신들의 상" Ability { id: "BCF2", source: "케프카" }
+35.2 "파동탄" Ability { id: "BAA9", source: "신들의 상" }
+# NOTE: 알쏭달쏭 마법(BA94)에 딸려오는 원소는 풀마다 랜덤 (블리자가 BA9B/9E / 파이가 BAA3 / 선더가 BA9F)
+37.5 "알쏭달쏭 마법" Ability { id: "BA94", source: "케프카" }
+37.5 "널리널리 블리자가" Ability { id: ["BA9B", "BA9E"], source: "케프카" }
+38.4 "이글이글 파이가" Ability { id: "BAA3", source: "케프카" }
+42.6 "파동포" Ability { id: "BAA8", source: "신들의 상" }
+44.7 "줄줄이 함정 (부착)" Ability { id: "BAA6", source: "케프카" }
+46.1 "폭발 (탑 처리)" Ability { id: "BAAA", source: "케프카" }
+49.8 "줄줄이 함정 (발동)" Ability { id: "BAA7", source: "케프카" }
+53.8 "알쏭달쏭 마법" Ability { id: "BA94", source: "케프카" }
+53.8 "찌릿찌릿 선더가" Ability { id: "BA9F", source: "케프카" }
+53.8 "널리널리 블리자가" Ability { id: "BA98", source: "케프카" }
+62.8 "심판의 빛" Ability { id: "C622", source: "케프카" }
+65.9 "하이퍼드라이브 x3" Ability { id: "C24B", source: "케프카" } duration 4.2 window 2.5,1.5
+#67.9 "하이퍼드라이브" Ability { id: "C24B", source: "케프카" }
+#69.9 "하이퍼드라이브" Ability { id: "C24B", source: "케프카" }
+75.7 "--sync--" Ability { id: "C3FD", source: "케프카" }
 
-80.0 "Graven Image 2" Ability { id: "BCF2", source: "Kefka" }
-87.1 "Blizzard III Blowout" #Ability { id: ["BA9B", "BA98"], source: "Kefka" }
-87.2 "Gravitas" Ability { id: "BAAC", source: "Graven Image" }
-91.2 "Vitrophyre" Ability { id: "BAB0", source: "Graven Image" }
-97.1 "Revolting Ruin III 1" Ability { id: "C403", source: "Kefka" }
-100.2 "Revolting Ruin III 2" Ability { id: "C4E1", source: "Kefka" }
-101.1 "Intemperate Will/Gravitational Wave" Ability { id: ["BAB2", "BAB1"], source: "Graven Image" }
-105.8 "Gravitas" Ability { id: "BAAC", source: "Graven Image" }
-109.8 "Vitrophyre" Ability { id: "BAB0", source: "Graven Image" }
-114.4 "Intemperate Will/Gravitational Wave" Ability { id: ["BAB2", "BAB1"], source: "Graven Image" }
-118.9 "Double-Trouble Trap" Ability { id: "BAA7", source: "Kefka" } # NOTE: If it was passed after first set.
-121.3 "Gravity III" #Ability { id: "BAAF", source: "Kefka" } # TODO: Adjust timing/wording to puddles safe to pop, make it a duration?
-132.4 "Light of Judgment" Ability { id: "C622", source: "Kefka" }
-135.6 "Hyperdrive 1" #Ability { id: "C24B", source: "Kefka" }
-137.7 "Hyperdrive 2" #Ability { id: "C24B", source: "Kefka" }
-139.7 "Hyperdrive 3" #Ability { id: "C24B", source: "Kefka" }
-151.5 "Tele-trouncing (castbar)" Ability { id: "BAB9", source: "Kefka" }
-159.4 "Tele-trouncing 1" Ability { id: "BABA", source: "Kefka" }
-162.4 "Tele-trouncing 2" Ability { id: "BABA", source: "Kefka" }
+# --- 신들의 상 소환 (2번째): 중력탄/암석탄 + 신기 ---
+# NOTE: 신기(神技)는 풀마다 랜덤 - 박살 BAB2 / 성모 BAB5 / 수마 BAB6 / 태만 BAB4
+80.1 "신들의 상" Ability { id: "BCF2", source: "케프카" }
+87.2 "널리널리 블리자가" Ability { id: ["BA95", "BA9B", "BA9E"], source: "케프카" }
+87.3 "중력탄" Ability { id: "BAAC", source: "신들의 상" }
+91.3 "암석탄" Ability { id: "BAB0", source: "신들의 상" }
+97.2 "파삭파삭 루인가" Ability { id: "C403", source: "케프카" }
+100.3 "파삭파삭 루인가" Ability { id: "C4E1", source: "케프카" }
+# 중력파(BAB1, 왼쪽)/박살의 신기(BAB2, 오른쪽) 좌우+순서 랜덤 → 둘 중 아무거나 동기화
+101.2 "중력파/박살의 신기" Ability { id: ["BAB1", "BAB2"], source: "신들의 상" }
+105.9 "중력탄" Ability { id: "BAAC", source: "신들의 상" }
+109.9 "암석탄" Ability { id: "BAB0", source: "신들의 상" }
+114.5 "중력파/박살의 신기" Ability { id: ["BAB1", "BAB2"], source: "신들의 상" }
+# 줄줄이 함정(13D6) 68s 타이머 리마인더 — 49.8 발동 기준 +68s, 싱크 없이 표시 전용
+117.8 "줄줄이 함정 (발동)"
+# 그라비가(BAAF): 중력탄 장판 흡수(올바른 타이밍에 밟기). 처리 성공 시에만 발동 → 표시 전용(싱크 X).
+121.3 "그라비가 (장판 흡수)" #Ability { id: "BAAF", source: "케프카" }
+# 114.5(랜덤 순서 sync) → 132.5까지 sync 무음 → 심판의 빛에 넓은 window로 재동기화
+132.5 "심판의 빛" Ability { id: "C622", source: "케프카" } window 20,10
+135.6 "하이퍼드라이브 x3" Ability { id: "C24B", source: "케프카" } duration 4.2 window 2.5,1.5
+#137.6 "하이퍼드라이브" Ability { id: "C24B", source: "케프카" }
+#139.7 "하이퍼드라이브" Ability { id: "C24B", source: "케프카" }
 
-163.6 "Graven Image 3" Ability { id: "BCF2", source: "Kefka" }
-168.7 "--sync--" Ability { id: "C554", source: "Kefka" }
-173.4 "Indulgent Will" Ability { id: "BAB5", source: "Graven Image" }
-173.4 "Idyllic Will" #Ability { id: "BAB6", source: "Graven Image" }
-177.7 "--sync--" Ability { id: "C555", source: "Kefka" }
-179.7 "--middle--" Ability { id: "C3FD", source: "Kefka" }
-186.3 "Mystery Magic" Ability { id: "BA94", source: "Kefka" }
-186.3 "Thrumming Thunder III" #Ability { id: ["BAA1", "BA9F"], source: "Kefka" }
-186.3 "Indolent Will/Ave Maria" #Ability { id: ["BAB4", "BAB3"], source: "Graven Image" }
-187.1 "Flagrant Fire III" Ability { id: ["BAA2", "BAA3"], source: "Kefka" }
-202.5 "Light of Judgment (Enrage)?" Ability { id: "BABB", source: "Kefka" } # Kefka >15% HP
+# --- 성큼성큼 텔레포 (BAB9 시작 / BABA 후속) : 위치·횟수 풀마다 변동 ---
+151.5 "성큼성큼 텔레포 (디버프 부여)" Ability { id: "BAB9", source: "케프카" }
+159.4 "성큼성큼 텔레포 (설치 #1)" Ability { id: "BABA", source: "케프카" }
+162.4 "성큼성큼 텔레포 (설치 #2)" Ability { id: "BABA", source: "케프카" }
 
-### Phase 2 - God Kefka
-# TODO: Update with network log, this uses FFLOGS
-# TODO: Get enrage
-# TODO: Get fake ending route?
-# TODO: Add voiceline sync?
-# en: 'Yes... I am filled with glorious purpose!'
-216.5 "Ultimate Embrace" Ability { id: "C24C", source: "Kefka" } window 220,5
-231.7 "Forsaken" Ability { id: "BABC", source: "Kefka" }
-244.9 "The Path of Light 1" Ability { id: "BABE", source: "Kefka" }
-245.6 "Spelldriver" #Ability { id: "BAC0", source: "Kefka" }
-245.6 "Spellwave" #Ability { id: "BAC2", source: "Kefka" }
-245.6 "Spellscatter" #Ability { id: "BAC1", source: "Kefka" }
-245.6 "Spelldriver" #Ability { id: "BAC0", source: "Kefka" }
-254.3 "Future's End/Past's End" Ability { id: ["BAD2", "BAD3"], source: "Kefka" }
+# --- 신들의 상 소환 (3번째) ---
+163.6 "신들의 상" Ability { id: "BCF2", source: "케프카" }
+168.7 "--sync--" Ability { id: "C554", source: "케프카" }
+173.4 "성모의 신기/수마의 신기" Ability { id: ["BAB5", "BAB6"], source: "신들의 상" }
+177.7 "--sync--" Ability { id: "C555", source: "케프카" }
+179.7 "--sync--" Ability { id: "C3FD", source: "케프카" }
+# 줄줄이 함정(13D6) 68s 타이머 리마인더 — 117.8 기준 +68s, 싱크 없이 표시 전용
+185.8 "줄줄이 함정 (발동)"
+186.1 "알쏭달쏭 마법" Ability { id: "BA94", source: "케프카" }
+186.1 "찌릿찌릿 선더가" Ability { id: "BA9F", source: "케프카" }
+186.3 "태만의 신기/아베 마리아" Ability { id: ["BAB4", "BAB3"], source: "신들의 상" }
+186.9 "이글이글 파이가" Ability { id: "BAA3", source: "케프카" }
 
-255.0 "The Path of Light 2" Ability { id: "BABE", source: "Kefka" }
-255.7 "Spellwave" #Ability { id: "BAC2", source: "Kefka" }
-255.7 "Spellscatter" #Ability { id: "BAC1", source: "Kefka" }
-265.7 "All Things Ending" #Ability { id: ["BACD", "BADD"], source: "Kefka" }
+# === P1 엔레이지 (DPS 부족 시 전멸) ===
+# 푸시 성공 시 BABB 미발동 → 아래 P2로 자연 진행(연속 타이밍). 막히면 전멸기.
+# 케프카 타겟 불가(NameToggle 00)는 전멸기 발동 ~5.1초 전(=시전 시작 직전). 못 때림 = 전멸 확정.
+197.3 "--untargetable--"
+202.4 "심판의 빛 (P1 전멸기)" Ability { id: "BABB", source: "케프카" }
 
-265.9 "The Path of Light 3" Ability { id: "BABE", source: "Kefka" }
-266.4 "Spelldriver" #Ability { id: "BAC0", source: "Kefka" }
-266.4 "Spellwave" #Ability { id: "BAC2", source: "Kefka" }
-266.4 "Spelldriver" #Ability { id: "BAC0", source: "Kefka" }
-266.4 "Spellscatter" #Ability { id: "BAC1", source: "Kefka" }
-275.4 "Future's End/Past's End" Ability { id: ["BAD2", "BAD3"], source: "Kefka" }
 
-275.8 "The Path of Light 4" Ability { id: "BABE", source: "Kefka" }
-276.5 "Spellwave" #Ability { id: "BAC2", source: "Kefka" }
-276.5 "Spellscatter" #Ability { id: "BAC1", source: "Kefka" }
-276.5 "Spellscatter" #Ability { id: "BAC1", source: "Kefka" }
-286.7 "All Things Ending" #Ability { id: ["BACD", "BADD"], source: "Kefka" }
+# =================================== P2: God 케프카 ===================================
+# 업스트림 타임라인(FFLOGS 기반) 번역본. P2 진입은 종말의 포옹(C24C) 넓은 window(220,5)로 동기화.
+# ⚠ P2/P3 타이밍은 FFLOGS 기반이라 미세 오차 가능 → 네트워크 로그로 보정 권장.
+216.5 "종말의 포옹" Ability { id: "C24C", source: "케프카" } window 220,5
+231.7 "행방불명" Ability { id: "BABC", source: "케프카" }
+244.9 "빛의 파동 1" Ability { id: "BABE", source: "케프카" }
+245.6 "위험한 주문: 집중" #Ability { id: "BAC0", source: "케프카" }
+245.6 "위험한 주문: 파동" #Ability { id: "BAC2", source: "케프카" }
+245.6 "위험한 주문: 분산" #Ability { id: "BAC1", source: "케프카" }
+254.3 "미래/과거의 종언" Ability { id: ["BAD2", "BAD3"], source: "케프카" }
+255.0 "빛의 파동 2" Ability { id: "BABE", source: "케프카" }
+255.7 "위험한 주문: 파동" #Ability { id: "BAC2", source: "케프카" }
+255.7 "위험한 주문: 분산" #Ability { id: "BAC1", source: "케프카" }
+265.7 "소멸의 발차기" #Ability { id: ["BACD", "BADD"], source: "케프카" }
+265.9 "빛의 파동 3" Ability { id: "BABE", source: "케프카" }
+266.4 "위험한 주문: 집중" #Ability { id: "BAC0", source: "케프카" }
+266.4 "위험한 주문: 파동" #Ability { id: "BAC2", source: "케프카" }
+266.4 "위험한 주문: 분산" #Ability { id: "BAC1", source: "케프카" }
+275.4 "미래/과거의 종언" Ability { id: ["BAD2", "BAD3"], source: "케프카" }
+275.8 "빛의 파동 4" Ability { id: "BABE", source: "케프카" }
+276.5 "위험한 주문: 파동" #Ability { id: "BAC2", source: "케프카" }
+276.5 "위험한 주문: 분산" #Ability { id: "BAC1", source: "케프카" }
+286.7 "소멸의 발차기" #Ability { id: ["BACD", "BADD"], source: "케프카" }
+286.7 "빛의 파동 5" Ability { id: "BABE", source: "케프카" }
+287.1 "위험한 주문: 집중" #Ability { id: "BAC0", source: "케프카" }
+287.1 "위험한 주문: 파동" #Ability { id: "BAC2", source: "케프카" }
+287.1 "위험한 주문: 분산" #Ability { id: "BAC1", source: "케프카" }
+296.1 "미래/과거의 종언" Ability { id: ["BAD2", "BAD3"], source: "케프카" }
+296.4 "빛의 파동 6" Ability { id: "BABE", source: "케프카" }
+297.1 "위험한 주문: 파동" #Ability { id: "BAC2", source: "케프카" }
+297.1 "위험한 주문: 분산" #Ability { id: "BAC1", source: "케프카" }
+307.5 "빛의 파동 7" Ability { id: "BABE", source: "케프카" }
+307.5 "소멸의 발차기" #Ability { id: ["BACD", "BADD"], source: "케프카" }
+308.0 "위험한 주문: 집중" #Ability { id: "BAC0", source: "케프카" }
+308.0 "위험한 주문: 파동" #Ability { id: "BAC2", source: "케프카" }
+308.0 "위험한 주문: 분산" #Ability { id: "BAC1", source: "케프카" }
+317.0 "미래/과거의 종언" Ability { id: ["BAD2", "BAD3"], source: "케프카" }
+317.4 "빛의 파동 8" Ability { id: "BABE", source: "케프카" }
+318.1 "위험한 주문: 파동" #Ability { id: "BAC2", source: "케프카" }
+318.1 "위험한 주문: 분산" #Ability { id: "BAC1", source: "케프카" }
+328.3 "소멸의 발차기" #Ability { id: ["BACD", "BADD"], source: "케프카" }
+337.4 "심판의 빛" Ability { id: "BABD", source: "케프카" }
+348.6 "트라인" Ability { id: "BADF", source: "케프카" }
+355.7 "파괴의 날개" Ability { id: "BACD", source: "케프카" }
+361.5 "트라인 1" #Ability { id: "BAE0", source: "케프카" }
+363.5 "트라인 2" #Ability { id: "BAE0", source: "케프카" }
+365.5 "트라인 3" #Ability { id: "BAE0", source: "케프카" }
+365.9 "파괴의 날개" Ability { id: "C487", source: "케프카" }
+365.9 "파괴의 날개" #Ability { id: "BACF", source: "케프카" }
+372.9 "종말의 포옹" Ability { id: "C24C", source: "케프카" }
 
-286.7 "The Path of Light 5" Ability { id: "BABE", source: "Kefka" }
-287.1 "Spelldriver" #Ability { id: "BAC0", source: "Kefka" }
-287.1 "Spellwave" #Ability { id: "BAC2", source: "Kefka" }
-287.1 "Spelldriver" #Ability { id: "BAC0", source: "Kefka" }
-287.1 "Spellscatter" #Ability { id: "BAC1", source: "Kefka" }
-296.1 "Future's End/Past's End" Ability { id: ["BAD2", "BAD3"], source: "Kefka" }
-
-296.4 "The Path of Light 6" Ability { id: "BABE", source: "Kefka" }
-297.1 "Spellwave" #Ability { id: "BAC2", source: "Kefka" }
-297.1 "Spellscatter" #Ability { id: "BAC1", source: "Kefka" }
-
-307.5 "The Path of Light 7" Ability { id: "BABE", source: "Kefka" }
-307.5 "All Things Ending" #Ability { id: ["BACD", "BADD"], source: "Kefka" }
-308.0 "Spelldriver" #Ability { id: "BAC0", source: "Kefka" }
-308.0 "Spellwave" #Ability { id: "BAC2", source: "Kefka" }
-308.0 "Spellscatter" #Ability { id: "BAC1", source: "Kefka" }
-308.0 "Spelldriver" #Ability { id: "BAC0", source: "Kefka" }
-317.0 "Future's End/Past's End" Ability { id: ["BAD2", "BAD3"], source: "Kefka" }
-
-317.4 "The Path of Light 8" Ability { id: "BABE", source: "Kefka" }
-318.1 "Spellwave" #Ability { id: "BAC2", source: "Kefka" }
-318.1 "Spellscatter" #Ability { id: "BAC1", source: "Kefka" }
-328.3 "All Things Ending" #Ability { id: ["BACD", "BADD"], source: "Kefka" }
-
-337.4 "Light of Judgment" Ability { id: "BABD", source: "Kefka" }
-348.6 "Trine" Ability { id: "BADF", source: "Kefka" }
-355.7 "Wings of Destruction" Ability { id: "BACD", source: "Kefka" }
-361.5 "Trine 1" #Ability { id: "BAE0", source: "Kefka" }
-363.5 "Trine 2" #Ability { id: "BAE0", source: "Kefka" }
-365.5 "Trine 3" #Ability { id: "BAE0", source: "Kefka" }
-365.9 "Wings of Destruction" Ability { id: "C487", source: "Kefka" }
-365.9 "Wings of Destruction" #Ability { id: "BACF", source: "Kefka" }
-372.9 "Ultimate Embrace" Ability { id: "C24C", source: "Kefka" }
-
-376.2 "--sync--" StartsUsing { id: "BAE1", source: "Kefka" } jump "p2-enrage"
-379.3 "--sync--" StartsUsing { id: "C3F7", source: "Kefka" } jump "p2-success"
-381.2 "Light of Judgment (Enrage)?" #Ability { id: "BAE1", source: "Kefka" } # Kefka > 0% HP
-382.3 "Aero III Assault?" Ability { id: "C3F7", source: "Kefka" } forcejump "p2-success"
+# P2 분기: 전멸기(BAE1) vs 성공(C3F7 갈기갈기 에어로가 → P3)
+376.2 "--sync--" StartsUsing { id: "BAE1", source: "케프카" } jump "p2-enrage"
+379.3 "--sync--" StartsUsing { id: "C3F7", source: "케프카" } jump "p2-success"
+381.2 "심판의 빛 (P2 전멸기)" #Ability { id: "BAE1", source: "케프카" }
+382.3 "갈기갈기 에어로가" Ability { id: "C3F7", source: "케프카" } forcejump "p2-success"
 
 497.0 label "p2-success"
-500.0 "Aero III Assault" Ability { id: "C3F7", source: "Kefka" } window 500,20
+500.0 "갈기갈기 에어로가" Ability { id: "C3F7", source: "케프카" } window 500,20
 
-### Phase 3 - Chaos and Exdeath
-# TODO: Update with network log
-# TODO: Add voiceline sync?
-537.6 "Definition of Insanity" Ability { id: "BAE2", source: "Kefka" }
-543.7 "the Decisive Battle" Ability { id: "C2E3", source: "Exdeath" }
-543.7 "the Decisive Battle" #Ability { id: "C2E2", source: "Chaos" }
-547.8 "--sync--" Ability { id: "C554", source: "Kefka" }
-562.9 "Bowels of Agony" Ability { id: "BAF2", source: "Chaos" }
-581.9 "Thunder III" #Ability { id: "BB12", source: "Exdeath" }
-581.9 "Stray Flames" #Ability { id: "BAF3", source: "Kefka" }
-582.9 "Inferno" Ability { id: "BAF4", source: "Chaos" }
-584.6 "Cyclone" Ability { id: "BAF8", source: "Chaos" }
-590.9 "Thunder III" #Ability { id: "BB09", source: "Exdeath" }
-590.9 "Thunder III" #Ability { id: "BB0C", source: "Exdeath" }
-592.1 "Cyclone" Ability { id: "BAF8", source: "Chaos" }
-593.9 "Thunder III" Ability { id: "BB0C", source: "Exdeath" }
-595.1 "Cyclone" #Ability { id: "BAF8", source: "Chaos" }
-596.5 "--sync--" Ability { id: "C555", source: "Kefka" }
-596.7 "Cyclone" #Ability { id: "BAF8", source: "Chaos" }
-599.6 "Stray Spray" Ability { id: "BAF6", source: "Chaos" }
-600.6 "Cyclone" #Ability { id: "BAF8", source: "Chaos" }
-600.6 "Tsunami" Ability { id: "BAF5", source: "Chaos" }
-602.3 "Cyclone" #Ability { id: "BAF8", source: "Chaos" }
-602.3 "Trance" Ability { id: "C2D6", source: "Kefka" }
-603.5 "Longitudinal Implosion" Ability { id: "BAFD", source: "Chaos" }
-604.3 "Shockwave" #Ability { id: "BAFF", source: "Chaos" }
-606.3 "Shockwave" #Ability { id: "BAFF", source: "Chaos" }
+# =================================== P3: 카오스 · 엑스데스 ===================================
+# 업스트림 기반(미세 보정 필요). rsv 현지화명 사용(재구성/결전/자아도취 등).
+537.6 "재구성" Ability { id: "BAE2", source: "케프카" }
+543.7 "결전" Ability { id: "C2E3", source: "엑스데스" }
+543.7 "결전" #Ability { id: "C2E2", source: "카오스" }
+547.8 "--sync--" Ability { id: "C554", source: "케프카" }
+562.9 "고통의 심핵" Ability { id: "BAF2", source: "카오스" }
+581.9 "선더가" #Ability { id: "BB12", source: "엑스데스" }
+581.9 "혼돈의 불" #Ability { id: "BAF3", source: "케프카" }
+582.9 "화염" Ability { id: "BAF4", source: "카오스" }
+584.6 "회오리" Ability { id: "BAF8", source: "카오스" }
+590.9 "선더가" #Ability { id: "BB09", source: "엑스데스" }
+590.9 "선더가" #Ability { id: "BB0C", source: "엑스데스" }
+592.1 "회오리" Ability { id: "BAF8", source: "카오스" }
+593.9 "선더가" Ability { id: "BB0C", source: "엑스데스" }
+595.1 "회오리" #Ability { id: "BAF8", source: "카오스" }
+596.5 "--sync--" Ability { id: "C555", source: "케프카" }
+596.7 "회오리" #Ability { id: "BAF8", source: "카오스" }
+599.6 "혼돈의 물" Ability { id: "BAF6", source: "카오스" }
+600.6 "회오리" #Ability { id: "BAF8", source: "카오스" }
+600.6 "해일" Ability { id: "BAF5", source: "카오스" }
+602.3 "회오리" #Ability { id: "BAF8", source: "카오스" }
+602.3 "자아도취" Ability { id: "C2D6", source: "케프카" }
+603.5 "세로 내파" Ability { id: "BAFD", source: "카오스" }
+604.3 "충격파" #Ability { id: "BAFF", source: "카오스" }
+606.3 "충격파" #Ability { id: "BAFF", source: "카오스" }
 
-
-# Phase 2 Enrage Sequence
+# P2 전멸 시퀀스
 10376.2 label "p2-enrage"
-10381.2 "Light of Judgment (Enrage)" #Ability { id: "BAE1", source: "Kefka" } # Kefka > 0% HP
+10381.2 "심판의 빛 (P2 전멸기)" #Ability { id: "BAE1", source: "케프카" }
 
-# IGNORED ABILITIES
-# C252 Attack: P1 Kefka attack and P3 Chaos attack
-# BA9E Blizzard III Blowout: Damage
-# BA95 Blizzard III Blowout: VFX
-# BAA0 Thrumming Thunder III: VFX
-# BAAB Unmitigated Explosion: Failing to soak a tower from BAA8 Wave Cannon
-# BAAD Gravitational Explosion: BAB0 Vitrophyre aoe overlaps with BAAC Gravitas puddle
-# BAAF Gravity III: Soaking the Gravitas puddles at the correct time
-# BAD6 Future's End: Damage (On 1 player)
-# BAD7 Past's End: Damage (On 1 player)
-# BAD8 Future's End: Damage (On 3 players)
-# BAD9 Past's End: Damage (On 3 players)
-# C250 Attack: P3 Exdeath attack
 
-# ALL ENCOUNTER ABILITIES
-# BA94 Mystery Magic
-# BA95 Blizzard III Blowout: VFX (paired with BA98)
-# BA98 Blizzard III Blowout: Damage for Fake? (paired with BA95)
-# BA9B Blizzard III Blowout: VFX (paired with BA9E)
-# BA9E Blizzard III Blowout: Damage (paired with BA9B)
-# BA9F Thrumming Thunder III: Damage for Fake? (No corresponding VFX)
-# BAA0 Thrumming Thunder III: VFX (paired with BAA1)
-# BAA1 Thrumming Thunder III: Damage (paired with BAA0)
-# BAA2 Flagrant Fire III: Spread Damage
-# BAA3 Flagrant Fire III: Stack Damage
-# BAA6 Double-Trouble Trap: VFX
-# BAA7 Double-Trouble Trap
-# BAA8 Wave Cannon
-# BAA9 Pulse Wave
-# BAAA Explosion: Cast by towers that are dropped from getting hit by BAA8 Wave Cannon
-# BAAB Unmitigated Explosion: Failing to soak a tower from BAA8 Wave Cannon
-# BAAC Gravitas
-# BAAF Gravity III: Soaking the Gravitas puddles at the correct time
-# BAAD Gravitational Explosion: BAB0 Vitrophyre aoe overlaps with BAAC Gravitas puddle
-# BAB0 Vitrophyre
-# BAB1 Gravitational Wave
-# BAB2 Intemperate Will
-# BAB3 Ave Maria
-# BAB4 Indolent Will
-# BAB5 Indulgent Will
-# BAB6 Idyllic Will
-# BAB9 Tele-Trouncing: VFX
-# BABA Tele-Trouncing
-# BABB Light of Judgment: P1 Enrage
-# BABC Forsaken
-# BABD Light of Judgment: P2 version
-# BABE The Path of Light
-# BABF The River of Light
-# BAC0 Spelldriver
-# BAC1 Spellscatter
-# BAC2 Spellwave
-# BACE Wings of Destruction
-# BACF Wings of Destruction
-# BAD2 Future's End: VFX
-# BAD3 Past's End: VFX
-# BAD6 Future's End: Damage (On 1 player)
-# BAD7 Past's End: Damage (On 1 player)
-# BAD8 Future's End: Damage (On 3 players)
-# BAD9 Past's End: Damage (On 3 players)
-# BADC All Things Ending
-# BADD All Things Ending
-# BADF Trine
-# BAE0 Trine
-# BAE2 Definition of Insanity
-# BAF2 Bowels of Agony
-# BAF3 Stray Flames
-# BAF4 Inferno
-# BAF5 Tsunami
-# BAF6 Stray Spray
-# BAF8 Cyclone
-# BAFD Longitudinal Implosion
-# BAFF Shockwave
-# BB09 Thunder III
-# BB0C Thunder III
-# BB12 Thunder III
-# BAE1 Light of Judgment: P2 Enrage
-# BCF2 Graven Image
-# C24B Hyperdrive
-# C24C Ultimate Embrace
-# C250 Attack: P3 Exdeath attack
-# C252 Attack: P1 Kefka attack and P3 Chaos attack
-# C2D6 Trance
-# C2E2 the Decisive Battle
-# C2E3 the Decisive Battle
-# C3F7 Aero III Assault
-# C3FD --sync--: Boss jumps to middle
-# C403 Revolting Ruin III
-# C487 Wings of Destruction
-# C4E1 Revolting Ruin III
-# C554 --sync--
-# C555 --sync--
-# C622 Light of Judgment: P1 version
+# ============================================================
+# 스킬 사전 (전 인카운터 ID — 업스트림 ALL ENCOUNTER ABILITIES 번역 + KR명)
+# VFX=시각효과 / 피해=실제 데미지. -ii(무시) 대상은 [무시] 표기.
+# ============================================================
+# --- P1: 케프카 / 신들의 상 ---
+# C403 파삭파삭 루인가(1타) / C4E1 파삭파삭 루인가(2타)
+# C622 심판의 빛(P1 광역) / BABB 심판의 빛(P1 전멸기)
+# C24B 하이퍼드라이브 / BCF2 신들의 상(소환) / C3FD --sync-- 보스 중앙 점프
+# BA94 알쏭달쏭 마법
+# BA95 널리널리 블리자가: VFX(BA98 짝) [무시] / BA98 〃 피해(가짜?)
+# BA9B 널리널리 블리자가: VFX(BA9E 짝)      / BA9E 〃 피해 [무시]
+# BA9F 찌릿찌릿 선더가: 피해(가짜?, VFX 없음) / BAA0 〃 VFX(BAA1 짝) [무시] / BAA1 〃 피해
+# BAA2 이글이글 파이가: 산개 피해 / BAA3 이글이글 파이가: 쉐어 피해 (※ 풀마다 id 갈림)
+# BAA9 파동탄 / BAA8 파동포 / BAAA 폭발(타워 미처리 시) / BAAB 대폭발(타워 미흡수=전멸급) [무시]
+# BAA6 줄줄이 함정: VFX / BAA7 줄줄이 함정
+# BAAC 중력탄 / BAB0 암석탄
+# BAAF 그라비가(중력탄 장판 적기 흡수) [무시] / BAAD 중력 폭발(암석탄·중력탄 장판 겹침) [무시]
+# BAB1 중력파 / BAB2 박살의 신기
+# BAB3 아베 마리아 / BAB4 태만의 신기 / BAB5 성모의 신기 / BAB6 수마의 신기
+# BAB9 성큼성큼 텔레포: VFX / BABA 성큼성큼 텔레포
+# --- P2: God 케프카 ---
+# C24C 종말의 포옹 / BABC 행방불명
+# BABD 심판의 빛(P2) / BAE1 심판의 빛(P2 전멸기)
+# BABE 빛의 파동 / BABF 빛의 대파동
+# BAC0 위험한 주문: 집중(쉐어) / BAC1 위험한 주문: 분산(개인) / BAC2 위험한 주문: 파동(부채꼴)
+# BAD2 미래의 종언: VFX / BAD3 과거의 종언: VFX
+# BAD6 미래의 종언: 피해(1인) [무시] / BAD7 과거의 종언: 피해(1인) [무시]
+# BAD8 미래의 종언: 피해(3인) [무시] / BAD9 과거의 종언: 피해(3인) [무시]
+# BADC / BADD 소멸의 발차기
+# BADF / BAE0 트라인 / BACD · BACE · BACF · C487 파괴의 날개
+# C3F7 갈기갈기 에어로가 (→ P3 진입)
+# --- P3: 카오스 · 엑스데스 ---
+# BAE2 재구성 / C2E2 · C2E3 결전 / C2D6 자아도취
+# BAF2 고통의 심핵 / BAF3 혼돈의 불 / BAF4 화염 / BAF5 해일 / BAF6 혼돈의 물
+# BAF8 회오리 / BAFD 세로 내파 / BAFF 충격파 / BB09 · BB0C · BB12 선더가
+# --- sync/평타 전용(내부) ---
+# C252 케프카 평타(P1)·카오스 평타(P3) [무시] / C250 엑스데스 평타(P3) [무시]
+# C554 · C555 --sync-- / (C3FD는 P1 항목 참조)
+# --- 아군 펫 (타임라인 -ic 제외 대상) ---
+# 322 빛의 치유 / 323 빛의 속삭임 / 325 요정의 광휘 (카벙클)
+# 40A3 위안 / 40A4 세라핌의 보호 / 40A7 세라핌의 광휘 (세라핌)
+# 1D11 지상의 큰별 폭발 (지상의 별)
+# 45F0 심연의 갈증 / 45F4 칠흑검 / 45F5 피보라 / 6519 칠흑 도래 / 9045 경멸 / 9670 그림자 걸음 (영웅의 환영)
