@@ -1,10 +1,17 @@
 import Conditions from '../../../../../resources/conditions';
 import { callOverlayHandler } from '../../../../../resources/overlay_plugin_api';
 import { Responses } from '../../../../../resources/responses';
+import Util from '../../../../../resources/util';
 import ZoneId from '../../../../../resources/zone_id';
 import { RaidbossData } from '../../../../../types/data';
 import { PluginCombatantState } from '../../../../../types/event';
-import { TriggerSet } from '../../../../../types/trigger';
+import { Job } from '../../../../../types/job';
+import { Output, TriggerSet } from '../../../../../types/trigger';
+
+type ForsakenRole = 'stack' | 'cone' | 'spread'; // 쉐어 / 부채꼴 / 산개
+// 09STOP 전용: 처리자의 직전 탑 물리 위치. side=왼/오 탑, vert=상대북 위/아래.
+type ForsakenPos = { side: 'L' | 'R'; vert: 'U' | 'D' };
+type ForsakenMethod = 'jamjam' | '09stop'; // 행방불명 처리법 옵션
 
 // 페이즈 구분(업스트림 방식 채택): 보스 단계. dmStatueCount(P1 세부 단계)와는 별개·보완 관계.
 type Phase = 'p1' | 'p2' | 'p3';
@@ -14,6 +21,7 @@ const phases: { [id: string]: Phase } = {
 };
 
 export interface Data extends RaidbossData {
+  readonly triggerSetConfig: { dmForsakenMethod: ForsakenMethod }; // 행방불명 처리법(잼잼/09STOP)
   phase: Phase | 'unknown';
   combatantData?: PluginCombatantState[];
   dmKnockbackGroup?: boolean;
@@ -28,12 +36,21 @@ export interface Data extends RaidbossData {
   dmGazeType?: 'gaze' | 'look'; // combo3 시선: gaze=태만(뒤돌기) / look=아베(신상 보기)
   dmMarch?: { id: string; dur: number }[]; // 성큼성큼 강제이동 본인 2개 (effectId + 만료초)
   dmTrapMine?: boolean; // 줄줄이 함정(13D6) 이번 부여에 본인 포함 (일반 타이머 중복 억제용)
+  dmForsakenSet?: number; // 행방불명 탑 세트 번호 1~8 (행방불명=1, 빛의 파동마다 ++)
+  dmForsakenMarks?: { [name: string]: ForsakenRole }; // 현 세트 위험한 주문 마커 수집 {이름→역할}
+  dmForsakenGroup?: 'A' | 'B'; // 1238/4567: A=1·2·3·8탑 처리 / B=4·5·6·7탑 처리
+  dmForsakenInitMarks?: { [name: string]: ForsakenRole }; // set1 전체 8명 (B조 4탑 = 초기 마커)
+  dmForsakenAGroup?: string[]; // A조 이름들(1·2·3탑 빛의 파동 피격자 = '조 판정'이 수집)
+  dmForsakenA8Marks?: { [name: string]: ForsakenRole }; // A조 8탑 마커(set4 버스트 = 3탑 처리 후)
+  dmForsakenEndCount?: number; // 종언(분신 설치) 횟수 1~4. 4=8탑(마지막, 다음 홀수탑 없음)
+  dmForsakenCurrent?: { [name: string]: ForsakenRole }; // 8명 현재 마커(매 부여 덮어씀, 리셋X). 홀수탑 위치용
+  dmForsakenPos?: { [name: string]: ForsakenPos }; // 09STOP 전용: 처리자별 직전 탑 위치(스왑 판정용)
 }
 
 // =============================================================================
 // Dancing Mad (Ultimate) / 절 요성난무 — 개인용(한글), P1 중심
 // =============================================================================
-// 진행도: P1(케프카) 완성 / P2 일부. 미구현(개인 판단으로 제외): 미래의 종언·빛의 파동 타워·소멸의 발차기.
+// 진행도: P1(케프카) 완성 / P2 행방불명 운동회 구현(인게임 검증 중) / P3 미착수.
 //
 // [페이즈 구조]  신들의 상(BCF2) 소환 횟수 = dmStatueCount 로 구분:
 //   1상 = 넉백선 + 파동포 / 2상 = 중력탄·암석탄 + 중력파·박살 / 3상↑ = 성모수마 + 태만·아베
@@ -100,9 +117,499 @@ const marchDir = (id: string): 'up' | 'down' | 'right' | 'left' | undefined => {
   return undefined;
 };
 
+// ───── 행방불명(P2) 공통 ─────
+// 탑 시계 위치 라벨 — 공략 표현 바뀌면 여기만 수정. 각 탑 트리거 outputStrings에 spread.
+// 라벨이 탑 종류별로 달라 시계 단위로 정의(왼3/왼9/오5/오6/오7). 매핑은 forsakenSlotText·1탑 트리거 참고.
+const towerClock = {
+  left3: { en: 'Left tower 3:00', ko: '왼쪽 탑 3시' },
+  left9: { en: 'Left tower 9:00', ko: '왼쪽 탑 9시' },
+  right5: { en: 'Right tower 5:00', ko: '오른쪽 탑 5시' },
+  right6: { en: 'Right tower 6:00', ko: '오른쪽 탑 6시' },
+  right7: { en: 'Right tower 7:00', ko: '오른쪽 탑 7시' },
+} as const;
+
+// 위험한 주문 헤드마커 → 역할. 02CB=쉐어 / 02CD=부채꼴 / 02CC=산개.
+const forsakenRole = (id: string): ForsakenRole | undefined => {
+  switch (id) {
+    case '02CB':
+      return 'stack';
+    case '02CD':
+      return 'cone';
+    case '02CC':
+      return 'spread';
+  }
+  return undefined;
+};
+
+// 표준 구성(탱2·힐2·근딜2·원딜2[원딜=물리원딜+캐스터]) 여부. 비표준이면 우선순위 판정 불가 → 상세 생략.
+const isStdComp = (data: Data): boolean => {
+  let t = 0;
+  let h = 0;
+  let m = 0;
+  let r = 0;
+  for (const p of data.party.details) {
+    if (!p.inParty)
+      continue;
+    const job = Util.jobEnumToJob(p.job);
+    if (Util.isTankJob(job))
+      t++;
+    else if (Util.isHealerJob(job))
+      h++;
+    else if (Util.isMeleeDpsJob(job))
+      m++;
+    else if (Util.isRangedDpsJob(job) || Util.isCasterDpsJob(job))
+      r++;
+  }
+  return t === 2 && h === 2 && m === 2 && r === 2;
+};
+
+// 행방불명 우선순위 랭크: 힐0 < 탱1 < 근딜2 < 원딜3 (작을수록 우선순위 높음 = 라인 왼쪽).
+const forsakenRank = (job: Job): number => {
+  if (Util.isHealerJob(job))
+    return 0;
+  if (Util.isTankJob(job))
+    return 1;
+  if (Util.isMeleeDpsJob(job))
+    return 2;
+  return 3; // 원딜(물리원딜/캐스터)
+};
+const forsakenRankByName = (data: Data, name: string): number | undefined => {
+  const p = data.party.details.find((x) => x.name === name);
+  return p === undefined ? undefined : forsakenRank(Util.jobEnumToJob(p.job));
+};
+
+// 같은 조(탱힐 또는 딜러)의 쉐어 대상자 이름. isTh=본인이 탱힐인지.
+const forsakenStackName = (data: Data, isTh: boolean): string | undefined => {
+  for (const [name, role] of Object.entries(data.dmForsakenMarks ?? {})) {
+    if (role !== 'stack')
+      continue;
+    const nameTh = data.party.isTank(name) || data.party.isHealer(name);
+    if (nameTh === isTh)
+      return name;
+  }
+  return undefined;
+};
+
+// 2~8탑 위치 안내 공유 outputStrings (정상 탑 처리 + B조 4탑/A조 8탑 스왑이 공유).
+const forsakenOutputs = {
+  ...towerClock,
+  stack: { en: 'Stack', ko: '쉐어' },
+  cone: { en: 'Cone', ko: '부채' },
+  spread: { en: 'Spread', ko: '산개' },
+  stackAt: { en: 'Stack: ${pos}', ko: '쉐어: ${pos}' },
+  conePair: { en: 'Cone: ${pos} (pair)', ko: '부채: ${pos}, 부+부' },
+  coneBait: { en: 'Cone: ${pos}', ko: '부채: ${pos}' },
+  spreadAt: { en: 'Spread: ${pos}', ko: '산개: ${pos}' },
+  jingOnly: { en: 'Mark: ${role}', ko: '징: ${role}' },
+  // 비처리조(짝수 분신 설치 / 홀수 디버프 유도). 홀수 유도는 머리유도·소멸발차기 통합에서도 재사용.
+  placeClone: { en: 'Go place clone', ko: '분신 설치 위치로' },
+  shareBait: { en: '${pos}, share stack', ko: '${pos}: 쉐어 같이 맞기' },
+  coneBaitDuty: { en: '${pos}, bait cone', ko: '${pos}: 부채꼴 유도' },
+  // 탑 처리인데 본인 마커 판정 실패 시 폴백(위치/종류 생략).
+  soak: { en: 'Tower', ko: '탑' },
+  soakOnly: { en: 'Soak tower', ko: '탑 처리' },
+  // 본인 디버프가 정원 초과로 꼬였을 때 접미(위치는 강행 표시).
+  withTangle: { en: '${text} [conflict]', ko: '${text} [디버프 꼬임]' },
+} as const;
+
+// ───── 09STOP 전용 위치 라벨 + 출력 ─────
+const towerClock09 = {
+  lCenter: { en: 'Left tower center', ko: '왼쪽 탑 중앙' },
+  l4: { en: 'Left tower 4:00', ko: '왼쪽 탑 4시' },
+  l6: { en: 'Left tower 6:00', ko: '왼쪽 탑 6시' },
+  l7: { en: 'Left tower 7:00', ko: '왼쪽 탑 7시' },
+  l9: { en: 'Left tower 9:00', ko: '왼쪽 탑 9시' },
+  l12: { en: 'Left tower 12:00', ko: '왼쪽 탑 12시' },
+  r3: { en: 'Right tower 3:00', ko: '오른쪽 탑 3시' },
+  r5: { en: 'Right tower 5:00', ko: '오른쪽 탑 5시' },
+  r6: { en: 'Right tower 6:00', ko: '오른쪽 탑 6시' },
+  r10: { en: 'Right tower 10:00', ko: '오른쪽 탑 10시' }, // 비처리 근원딜 유도 전용(소악 쉐어 r11과 분리)
+  r11: { en: 'Right tower 11:00', ko: '오른쪽 탑 11시' },
+  r12: { en: 'Right tower 12:00', ko: '오른쪽 탑 12시' },
+} as const;
+
+const forsaken09Outputs = {
+  ...towerClock09,
+  stack: { en: 'Stack', ko: '쉐어' },
+  cone: { en: 'Cone', ko: '부채' },
+  spread: { en: 'Spread', ko: '산개' },
+  posAt: { en: '${role}: ${pos}', ko: '${role}: ${pos}' },
+  withStack: { en: '${role}: ${pos} (stack: ${stack})', ko: '${role}: ${pos}, 쉐어: ${stack}' },
+  jingOnly: { en: 'Mark: ${role}', ko: '징: ${role}' },
+  placeClone: { en: 'Go place clone', ko: '분신 설치 위치로' },
+  shareBaitAt: { en: '${pos}, bait stack', ko: '${pos}: 쉐어 유도' },
+  coneBaitAt: { en: '${pos}, bait cone', ko: '${pos}: 부채 유도' },
+  soak: { en: 'Tower', ko: '탑' },
+  soakOnly: { en: 'Soak tower', ko: '탑 처리' },
+  withTangle: { en: '${text} [conflict]', ko: '${text} [디버프 꼬임]' },
+  unknown: { en: '?', ko: '?' },
+  // 비표준 구성(역할별 자리 불확정) 비처리 폴백.
+  nonSoakGeneric: { en: 'Bait by role', ko: '역할대로 유도' },
+} as const;
+
+// 잼잼+09STOP 양쪽 출력 통합(메서드 분기 트리거 공용). 겹치는 키는 동일 값.
+const forsakenOutputsAll = { ...forsakenOutputs, ...forsaken09Outputs } as const;
+
+const forsakenRoleLabel = (role: ForsakenRole, output: Output): string =>
+  role === 'stack' ? output.stack!() : (role === 'cone' ? output.cone!() : output.spread!());
+
+// 탑 처리자 마커맵(본인 포함)에서 본인 기준 (같은 마커 총원 count, 나보다 우선순위 높은 수 higher) 계산.
+// 선형 [왼탑끝,왼탑아래,우탑아래,우탑끝] + 우선순위(힐0탱1근2원3) → 같은 마커끼리 왼→오.
+const forsakenSlotRank = (
+  role: ForsakenRole,
+  marks: { [name: string]: ForsakenRole },
+  data: Data,
+): { count: number; higher: number } => {
+  const myRank = forsakenRank(data.job);
+  let count = 0;
+  let higher = 0; // 같은 마커 중 나보다 우선순위 높은(rank 작은) 수
+  for (const [name, r] of Object.entries(marks)) {
+    if (r !== role)
+      continue;
+    count++;
+    if (name === data.me)
+      continue;
+    const rk = forsakenRankByName(data, name);
+    if (rk !== undefined && rk < myRank)
+      higher++;
+  }
+  return { count, higher };
+};
+
+// 본인 탑 처리 위치(시계)만 계산. 탑 종류=마커개수로 분기:
+//   쉐어(홀수탑): 선(왼쪽) 왼9시 / 후(오른쪽) 오5시
+//   부채 2명(짝수탑): 선 오6시 / 후 오5시 · 부채 1명(홀수탑): 오7시
+//   산개 2명(짝수탑): 선 왼9시 / 후 왼3시 · 산개 1명(홀수탑): 왼3시
+const forsakenSlotPos = (
+  role: ForsakenRole,
+  marks: { [name: string]: ForsakenRole },
+  data: Data,
+  output: Output,
+): string => {
+  const { count, higher } = forsakenSlotRank(role, marks, data);
+  if (role === 'stack')
+    return higher === 0 ? output.left9!() : output.right5!();
+  if (role === 'cone')
+    return count >= 2 ? (higher === 0 ? output.right6!() : output.right5!()) : output.right7!();
+  return count >= 2 ? (higher === 0 ? output.left9!() : output.left3!()) : output.left3!();
+};
+
+// 마커종류 + 위치를 합친 전체 안내 문자열(부채 2명일 때만 '부+부' 표기).
+const forsakenSlotText = (
+  role: ForsakenRole,
+  marks: { [name: string]: ForsakenRole },
+  data: Data,
+  output: Output,
+): string => {
+  const pos = forsakenSlotPos(role, marks, data, output);
+  if (role === 'stack')
+    return output.stackAt!({ pos });
+  if (role === 'cone')
+    return forsakenSlotRank(role, marks, data).count >= 2
+      ? output.conePair!({ pos })
+      : output.coneBait!({ pos });
+  return output.spreadAt!({ pos });
+};
+
+// 탑 규칙상 해당 마커의 정원 — 홀수탑(1·3·5·7)=쉐산부쉐(쉐2산1부1) / 짝수탑(2·4·6·8)=산산부부(산2부2).
+const forsakenSlotMax = (role: ForsakenRole, isOdd: boolean): number => {
+  if (isOdd) // 쉐2산1부1
+    return role === 'stack' ? 2 : 1;
+  return role === 'stack' ? 0 : 2; // 산2부2 (쉐어 없음)
+};
+
+// 본인 마커 타입이 정원 초과인가(= 본인이 디버프 꼬임에 포함). 같은 타입끼리만 자리가 모자라 꼬임.
+//   (다른 타입이 꼬여도 본인 자리엔 영향 없으니 본인 타입 초과만 검사.) 초과여도 위치는 강행 표시.
+const forsakenTangled = (
+  role: ForsakenRole,
+  marks: { [name: string]: ForsakenRole },
+  data: Data,
+  isOdd: boolean,
+): boolean => forsakenSlotRank(role, marks, data).count > forsakenSlotMax(role, isOdd);
+
+// 처리 위치 안내 + 본인 디버프 꼬였으면 '[디버프 꼬임]' 접미(위치는 강행).
+const forsakenSoakText = (
+  role: ForsakenRole,
+  marks: { [name: string]: ForsakenRole },
+  data: Data,
+  output: Output,
+  isOdd: boolean,
+): string => {
+  const text = forsakenSlotText(role, marks, data, output);
+  return forsakenTangled(role, marks, data, isOdd) ? output.withTangle!({ text }) : text;
+};
+
+// 다음 홀수탑(3·5·7)에서 본인이 탑 처리하는가? 라이브 마커가 아닌 조+종언카운트로 판정.
+//   (마커는 매 탑 재부여 + 미변경자는 로그 미기록 → dmForsakenMarks가 불완전. 조 판정은 결정적이라 신뢰 가능.)
+//   종언 k회 직후 다음 홀수탑 = 2k+1: 3탑(k1)=A조 / 5탑(k2)·7탑(k3)=B조 탑 처리. k4=8탑(다음 없음).
+const forsakenISoakNextOdd = (data: Data): boolean => {
+  const k = data.dmForsakenEndCount ?? 0;
+  if (k === 1)
+    return data.dmForsakenGroup === 'A';
+  if (k === 2 || k === 3)
+    return data.dmForsakenGroup === 'B';
+  return false;
+};
+
+// 다음 홀수탑 탑 처리자(본인 조 4명)의 현재 마커맵. 위치(선/후) 계산용.
+//   A조=AGroup 명단 / B조=그 외. dmForsakenCurrent(리셋X)에서 본인 조만 추림.
+const forsakenSoakGroupMarks = (data: Data): { [name: string]: ForsakenRole } => {
+  const aSet = new Set(data.dmForsakenAGroup ?? []);
+  const wantA = data.dmForsakenGroup === 'A';
+  const marks: { [name: string]: ForsakenRole } = {};
+  for (const [name, r] of Object.entries(data.dmForsakenCurrent ?? {})) {
+    if (aSet.has(name) === wantA)
+      marks[name] = r;
+  }
+  return marks;
+};
+
+// 다음 홀수탑 본인 전체 안내(마커종류+위치). 소멸발차기('홀수탑 안내') 타이밍에 표시.
+const forsakenNextGuidance = (data: Data, output: Output): string => {
+  if (forsakenISoakNextOdd(data)) { // 탑 처리자: 홀수탑 위치
+    const marks = forsakenSoakGroupMarks(data);
+    const myMark = marks[data.me ?? ''];
+    if (myMark === undefined) // 마커 판정 실패 → 탑 처리만
+      return output.soakOnly!();
+    if (!isStdComp(data)) // 비표준 구성 → 우선순위 판정 불가 → 본인 디버프만
+      return output.jingOnly!({ role: forsakenRoleLabel(myMark, output) });
+    return forsakenSoakText(myMark, marks, data, output, true); // 꼬이면 [디버프 꼬임] 접미
+  }
+  // 비처리조: 홀수탑 디버프 유도 (탱힐=왼9 쉐어 / 근딜=오5 쉐어 / 원딜=오7 부채)
+  if (data.role === 'tank' || data.role === 'healer')
+    return output.shareBait!({ pos: output.left9!() });
+  if (Util.isMeleeDpsJob(data.job))
+    return output.shareBait!({ pos: output.right5!() });
+  return output.coneBaitDuty!({ pos: output.right7!() });
+};
+
+// 다음 홀수탑 본인 위치(시계)만 미리 안내. 자세한 마커종류/유도법은 소멸발차기 타이밍에 별도 표시.
+const forsakenNextPos = (data: Data, output: Output): string => {
+  if (forsakenISoakNextOdd(data)) {
+    const marks = forsakenSoakGroupMarks(data);
+    const myMark = marks[data.me ?? ''];
+    if (myMark === undefined)
+      return output.soak!();
+    if (!isStdComp(data)) // 비표준: 위치 불확정 → 마커종류만 (꼬임 표기는 본안내에서)
+      return forsakenRoleLabel(myMark, output);
+    return forsakenSlotPos(myMark, marks, data, output);
+  }
+  // 비처리조 유도 위치(탱힐=왼9 / 근딜=오5 / 원딜=오7)
+  if (data.role === 'tank' || data.role === 'healer')
+    return output.left9!();
+  if (Util.isMeleeDpsJob(data.job))
+    return output.right5!();
+  return output.right7!();
+};
+
+// ===== 09STOP: 상태 기반 위치 모델 (잼잼과 병렬, 위치만 다름) =====
+const forsaken09Opp = (s: 'L' | 'R'): 'L' | 'R' => (s === 'L' ? 'R' : 'L');
+
+// 현재 탑 패리티에서 마커→상대북 vert. 홀수: 쉐어=위, 부/산=아래 / 짝수: 부채=위, 산개=아래.
+const forsaken09Vert = (role: ForsakenRole, isOdd: boolean): 'U' | 'D' => {
+  if (isOdd)
+    return role === 'stack' ? 'U' : 'D';
+  return role === 'cone' ? 'U' : 'D';
+};
+
+// (side, 마커, 패리티) → 시계 라벨. 홀수: 쉐어 L왼중앙/R오11·부채 왼7(고정)·산개 오5(고정) / 짝수: 부채 12·산개 6.
+const forsaken09Clock = (
+  side: 'L' | 'R',
+  role: ForsakenRole,
+  isOdd: boolean,
+  output: Output,
+): string => {
+  if (isOdd) {
+    if (role === 'stack')
+      return side === 'L' ? output.lCenter!() : output.r11!();
+    return role === 'cone' ? output.l7!() : output.r5!();
+  }
+  if (role === 'cone')
+    return side === 'L' ? output.l12!() : output.r12!();
+  return side === 'L' ? output.l6!() : output.r6!();
+};
+
+// 1탑(A조) 시드: InitMarks(8명) 역할×마커로 직접 배정. 조 미정 시점이라 8명 모두 계산(B조 분은 4탑 시드가 덮어씀).
+//   탱힐 쉐어→L위·딜러 쉐어→R위·부채→L아래·산개→R아래.
+const forsaken09Seed1All = (data: Data): { [name: string]: ForsakenPos } => {
+  const seed: { [name: string]: ForsakenPos } = {};
+  for (const [name, role] of Object.entries(data.dmForsakenInitMarks ?? {})) {
+    if (role === 'stack') {
+      const th = data.party.isTank(name) || data.party.isHealer(name);
+      seed[name] = { side: th ? 'L' : 'R', vert: 'U' };
+    } else if (role === 'cone') {
+      seed[name] = { side: 'L', vert: 'D' };
+    } else {
+      seed[name] = { side: 'R', vert: 'D' };
+    }
+  }
+  return seed;
+};
+
+// 현재 탑(패리티 isOdd)에서 내 조 4명의 위치 계산. mode: 'seed4'=B조 첫 탑 시드 / 'trans'=직전 위치로 전이.
+//   반환만; dmForsakenPos commit은 호출측이 결정(머리유도 미리보기는 commit 안 함).
+const forsaken09Compute = (
+  data: Data,
+  mode: 'seed4' | 'trans',
+  isOdd: boolean,
+): { [name: string]: ForsakenPos } => {
+  const marks = forsakenSoakGroupMarks(data);
+  const prev = data.dmForsakenPos ?? {};
+  const next: { [name: string]: ForsakenPos } = { ...prev };
+
+  // 4탑(B조, 짝수) 시드: 힐근=L, 탱원=R; vert=마커(부채 위/12, 산개 아래/6).
+  if (mode === 'seed4') {
+    for (const [name, role] of Object.entries(marks)) {
+      const rank = forsakenRankByName(data, name) ?? 0; // 힐0탱1근2원3 → %2: 힐근=L, 탱원=R
+      next[name] = { side: rank % 2 === 0 ? 'L' : 'R', vert: forsaken09Vert(role, false) };
+    }
+    return next;
+  }
+
+  // 전이 →홀수(3·5·7): 부채=왼7(L아래)·산개=오5(R아래) 고정. 쉐어 2명만 직전 위치로 배정.
+  if (isOdd) {
+    const stacks: string[] = [];
+    for (const [name, role] of Object.entries(marks)) {
+      if (role === 'cone')
+        next[name] = { side: 'L', vert: 'D' };
+      else if (role === 'spread')
+        next[name] = { side: 'R', vert: 'D' };
+      else
+        stacks.push(name);
+    }
+    const s1 = stacks[0];
+    const s2 = stacks[1];
+    const p1 = s1 !== undefined ? prev[s1] : undefined;
+    const p2 = s2 !== undefined ? prev[s2] : undefined;
+    if (s1 !== undefined && s2 !== undefined && p1 !== undefined && p2 !== undefined) {
+      if (p1.side !== p2.side) { // 서로 다른 탑 → 각자 자기 side 쉐어로
+        next[s1] = { side: p1.side, vert: 'U' };
+        next[s2] = { side: p2.side, vert: 'U' };
+      } else { // 같은 탑 → 위쪽이 반대 side로 스왑
+        const upN = p1.vert === 'U' ? s1 : s2;
+        const downN = p1.vert === 'U' ? s2 : s1;
+        next[upN] = { side: forsaken09Opp(p1.side), vert: 'U' };
+        next[downN] = { side: p1.side, vert: 'U' };
+      }
+    } else { // 직전 위치 불명 폴백
+      if (s1 !== undefined)
+        next[s1] = { side: 'L', vert: 'U' };
+      if (s2 !== undefined)
+        next[s2] = { side: 'R', vert: 'U' };
+    }
+    return next;
+  }
+
+  // 전이 →짝수(2·6·8): side별 위(stack)·아래(부/산) 2명의 새 마커로 stay/swap. 같으면 위쪽이 반대 side로.
+  for (const side of ['L', 'R'] as const) {
+    const onSide = Object.keys(marks).filter((n) => prev[n]?.side === side);
+    const upN = onSide.find((n) => prev[n]?.vert === 'U');
+    const downN = onSide.find((n) => prev[n]?.vert === 'D');
+    if (upN === undefined || downN === undefined)
+      continue; // 폴백: 그대로
+    const upRole = marks[upN];
+    const downRole = marks[downN];
+    if (upRole === undefined || downRole === undefined)
+      continue;
+    if (upRole === downRole) { // 같은 마커 → 위쪽 스왑
+      next[upN] = { side: forsaken09Opp(side), vert: forsaken09Vert(upRole, false) };
+      next[downN] = { side: side, vert: forsaken09Vert(downRole, false) };
+    } else { // 다른 마커 → 그 side 유지
+      next[upN] = { side: side, vert: forsaken09Vert(upRole, false) };
+      next[downN] = { side: side, vert: forsaken09Vert(downRole, false) };
+    }
+  }
+  return next;
+};
+
+// 내 위치 표시. withRole=true면 '쉐어: 왼중앙'(+꼬임 접미), false면 위치만(미리보기).
+const forsaken09Show = (
+  data: Data,
+  output: Output,
+  isOdd: boolean,
+  posMap: { [name: string]: ForsakenPos },
+  withRole: boolean,
+): string => {
+  const myMark = (data.dmForsakenCurrent ?? {})[data.me ?? ''];
+  if (myMark === undefined)
+    return withRole ? output.soakOnly!() : output.soak!();
+  if (!isStdComp(data)) // 비표준 구성 → 우선순위/좌우 판정 불가 → 마커종류만
+    return withRole
+      ? output.jingOnly!({ role: forsakenRoleLabel(myMark, output) })
+      : forsakenRoleLabel(myMark, output);
+  const myPos = posMap[data.me ?? ''];
+  if (myPos === undefined)
+    return withRole ? output.soakOnly!() : output.soak!();
+  const clock = forsaken09Clock(myPos.side, myMark, isOdd, output);
+  if (!withRole)
+    return clock;
+  const text = output.posAt!({ role: forsakenRoleLabel(myMark, output), pos: clock });
+  return forsakenTangled(myMark, forsakenSoakGroupMarks(data), data, isOdd)
+    ? output.withTangle!({ text })
+    : text;
+};
+
+// 홀수탑 비처리 유도: 탱커=왼1 쉐어 / 힐러=왼7 부채 / 딜러=오11 쉐어. full=true면 역할 라벨 포함.
+const forsaken09NonSoakOdd = (data: Data, output: Output, full: boolean): string => {
+  if (!isStdComp(data)) // 비표준 구성 → 역할별 자리 불확정 → 일반 안내
+    return output.nonSoakGeneric!();
+  let pos: string;
+  let cone: boolean;
+  if (data.role === 'tank') {
+    pos = output.l4!();
+    cone = false;
+  } else if (data.role === 'healer') {
+    pos = output.l7!();
+    cone = true;
+  } else {
+    pos = output.r10!(); // 비처리 근원딜 전용(소악 쉐어 오11과 분리)
+    cone = false;
+  }
+  if (!full)
+    return pos;
+  return cone ? output.coneBaitAt!({ pos }) : output.shareBaitAt!({ pos });
+};
+
+// 홀수탑(3·5·7) 09STOP 통합. commit=true(홀수탑 안내)면 dmForsakenPos 기록+상세 / false(머리유도)면 위치만.
+const forsaken09NextGuidance = (data: Data, output: Output, commit: boolean): string => {
+  if (forsakenISoakNextOdd(data)) {
+    const map = forsaken09Compute(data, 'trans', true);
+    if (commit)
+      data.dmForsakenPos = map;
+    return forsaken09Show(data, output, true, map, commit);
+  }
+  return forsaken09NonSoakOdd(data, output, commit);
+};
+
 const triggerSet: TriggerSet<Data> = {
   id: 'DancingMadUltimate',
   zoneId: ZoneId.DancingMadUltimate,
+  config: [
+    {
+      id: 'dmForsakenMethod',
+      name: {
+        en: 'P2 Forsaken strategy',
+        ko: 'P2 행방불명 처리법',
+      },
+      comment: {
+        en:
+          'Position strategy for the P2 Forsaken tower phase. A/B group, order, and timing are identical.',
+        ko: '행방불명(탑) 구간 위치 안내 공략. A/B조·순서·타이밍은 두 공략 모두 동일하고 위치만 다릅니다.',
+      },
+      type: 'select',
+      options: {
+        en: {
+          'JamJam': 'jamjam',
+          '09STOP': '09stop',
+        },
+        ko: {
+          '잼잼': 'jamjam',
+          '09STOP': '09stop',
+        },
+      },
+      default: '09stop', // ⚠ 임시(에뮬레이터 09STOP 테스트용). 배포 전 'jamjam'으로 되돌릴 것!
+    },
+  ],
   timelineFile: 'dancing_mad.txt',
   initData: () => ({ phase: 'p1' }),
   triggers: [
@@ -242,8 +749,9 @@ const triggerSet: TriggerSet<Data> = {
       type: 'StartsUsing',
       // BA98=정상(안전=구슬축 수직), BA9B=?(안전=구슬축=텔레그래프). BA9E 제외(BA9B가 텔레그래프 축).
       netRegex: { id: ['BA98', 'BA9B'], source: '케프카' },
-      delaySeconds: 0.5, // 구슬 회전 + 마커 수집
-      durationSeconds: 4.5, // 콜(+0.5) → 널리널리 블리자가 발동까지
+      // 로그 측정: 구슬 위치는 시전 직전(~0.09s 전) 확정·이후 고정, 마커도 선도착 → 큰 대기 불필요.
+      delaySeconds: 0.3, // promise/수집 안전 버퍼만
+      durationSeconds: 4.7, // 콜(+0.3) → 널리널리 블리자가 발동까지(끝 시점 동일 유지)
       suppressSeconds: 5,
       promise: async (data, matches) => {
         if (data.dmSpreadBase === undefined)
@@ -279,8 +787,8 @@ const triggerSet: TriggerSet<Data> = {
       id: 'DancingMad 알쏭달쏭2',
       type: 'StartsUsing',
       netRegex: { id: ['BA98', 'BA9B'], source: '케프카' },
-      delaySeconds: 0.5,
-      durationSeconds: 4.5,
+      delaySeconds: 0.3, // 구슬·마커 선확정 → 버퍼만 (알쏭달쏭1과 동일 근거)
+      durationSeconds: 4.7, // 끝 시점 동일 유지
       suppressSeconds: 5,
       promise: async (data, matches) => {
         // 2번째(블리자가+선더가)만: 산개/쉐어 없고 선더가 있음
@@ -316,8 +824,8 @@ const triggerSet: TriggerSet<Data> = {
       // BA98=진실(바닥 피하고) / BA9B=거짓?(바닥 밟고). 둘 다 쉐어 처리(중력/암석 그룹 공통).
       // 그룹별 이동(중앙/시계방향)은 '중력탄 암석탄 이동' 콜이 별도로 처리.
       netRegex: { id: ['BA98', 'BA9B'], source: '케프카' },
-      delaySeconds: 0.5,
-      durationSeconds: 4.5,
+      delaySeconds: 0.3, // 구슬·마커 선확정 → 버퍼만
+      durationSeconds: 4.7, // 끝 시점 동일 유지
       suppressSeconds: 5,
       alertText: (data, matches, output) => {
         // 산개/쉐어 마커나 선더가가 있으면 다른 조합 → 제외 (단독 블리자가만)
@@ -335,8 +843,8 @@ const triggerSet: TriggerSet<Data> = {
       id: 'DancingMad 산개쉐어',
       type: 'HeadMarker',
       netRegex: { id: ['007F', '0080'] },
-      delaySeconds: 0.6, // 머리고리/블리자가 수집 보장 (블리자가 통합 0.5보다 뒤)
-      durationSeconds: 4, // 콜(+0.6) → 원소 해소(시전 4.7s)
+      delaySeconds: 0.2, // 플래그/마커뿐(promise 없음). dmBlizzardCombo(+0.09s) 본 뒤면 충분 → 0.2
+      durationSeconds: 4.4, // 콜(+0.2) → 원소 해소(끝 시점 동일 유지)
       suppressSeconds: 3,
       alertText: (data, matches, output) => {
         if (data.dmBlizzardCombo)
@@ -434,10 +942,11 @@ const triggerSet: TriggerSet<Data> = {
       id: 'DancingMad 줄줄이 함정 리셋',
       type: 'GainsEffect',
       // 새 부여 시작(첫 1명)에서 본인 포함 플래그 초기화. suppress 4s로 동시 2명째는 통과.
-      // (아래 '내것'보다 배열상 먼저 위치 → 같은 줄에서 false→true 순서 보장.)
+      // ★ run이 아니라 preRun이어야 함: preRun은 동기(줄 처리 즉시)라 같은 줄의 '내것' preRun보다
+      //   배열 순서대로 먼저 실행 → false→true 보장. run은 딜레이 이후라 '내것'(true)을 덮어써 버그.
       netRegex: { effectId: '13D6', capture: false },
+      preRun: (data) => data.dmTrapMine = false,
       suppressSeconds: 4,
-      run: (data) => data.dmTrapMine = false,
     },
     {
       id: 'DancingMad 줄줄이 함정 내것',
@@ -489,8 +998,8 @@ const triggerSet: TriggerSet<Data> = {
       // 2번째 신들의 상 이후 선(002D): 연결 석상이 중앙(x≈102.5)=중력탄 / 오른쪽(x≈126)=암석탄.
       netRegex: { id: '002D', source: '신들의 상' },
       condition: (data, matches) => data.me === matches.target && data.dmStatueCount === 2,
-      delaySeconds: 0.5, // 석상 위치(271 ActorSetPos) 처리 대기
-      durationSeconds: 6.5, // 선(걸림) → 중력탄(BAAC) 해소까지 ≈ 6.5s (이후 '이동' 콜이 인계)
+      delaySeconds: 0.3, // 석상 위치(271)는 선과 동시 확정 → 버퍼만 (측정 기반 0.5→0.3)
+      durationSeconds: 6.7, // 선(걸림) → 중력탄(BAAC) 해소까지(끝 시점 동일 유지)
       suppressSeconds: 3, // 동시 다발 선/중복 방지 (라운드2 선은 ~18s 후라 통과)
       promise: async (data, matches) => {
         data.combatantData = await fetchCombatants(matches.sourceId);
@@ -589,7 +1098,7 @@ const triggerSet: TriggerSet<Data> = {
         },
         unknown: {
           en: 'Dodge half (visual)',
-          ko: '반대편으로 (눈으로)',
+          ko: '반대편으로 (눈으로 볼 것)',
         },
       },
     },
@@ -599,8 +1108,10 @@ const triggerSet: TriggerSet<Data> = {
       type: 'ActorControlExtra',
       // 태만의 신기(BAB4)/아베 마리아(BAB3)는 캐스트 없지만, 발동 ~10초 전 273 019D|40|80 텔레그래프로
       // 미리 판정. 그 액터를 getCombatants로 읽어 BNpcID 구분: 1EBFBE=태만(뒤돌기) / 1EBFBF=아베(신상 보기).
+      //   판정 즉시 시선을 초록색으로 '미리' 안내 → 알쏭달쏭3 종합 안내 등장 직전(~5.7s 후)에 사라짐(duration).
+      //   (시선 외 019D 텔레그래프=성모수마 등은 BNpcID 불일치 → 표시 안 함.)
       // NOTE(에뮬 한계): 이 텔레그래프 액터는 '전투 시작 전' 세팅 단계(엔게이지 ~26s 전)에 생성됨.
-      //   에뮬레이터는 전투(InCombat) 구간만 재생해 Add 시점의 BNpcID를 잃어버림 → 에뮬에선 '시선?' 폴백.
+      //   에뮬레이터는 전투(InCombat) 구간만 재생해 Add 시점의 BNpcID를 잃어버림 → 에뮬에선 표시 안 됨.
       //   실전(live)은 getCombatants가 게임 메모리를 직접 읽어 BNpcID가 있으므로 정상 작동.
       netRegex: {
         id: '4[0-9A-Fa-f]{7}',
@@ -610,8 +1121,19 @@ const triggerSet: TriggerSet<Data> = {
         capture: true,
       },
       condition: (data) => data.dmStatueCount === 3,
+      // 미리 안내(텔레그래프) → 알쏭달쏭3 종합 안내 직전에 소멸. 알쏭달쏭3 delay가 0.2로 더 빨라져(BA94+0.2
+      //   ≈ 텔레그래프+4.9s) 겹치지 않도록 4.5로 축소(선행 트리거 충돌 방지, 변동 여유 포함).
+      durationSeconds: 4.5,
       promise: async (data, matches) => {
         data.combatantData = await fetchCombatants(matches.id);
+      },
+      // 시선 텔레그래프일 때만 초록으로 미리 표시(run보다 먼저 실행되므로 combatantData를 직접 판정).
+      infoText: (data, _matches, output) => {
+        const bnpc = data.combatantData?.[0]?.BNpcID;
+        if (bnpc === 0x1EBFBE)
+          return output.gaze!();
+        if (bnpc === 0x1EBFBF)
+          return output.look!();
       },
       run: (data) => {
         const bnpc = data.combatantData?.[0]?.BNpcID;
@@ -619,6 +1141,10 @@ const triggerSet: TriggerSet<Data> = {
           data.dmGazeType = 'gaze';
         else if (bnpc === 0x1EBFBF)
           data.dmGazeType = 'look';
+      },
+      outputStrings: {
+        gaze: { en: 'Look Away (soon)', ko: '곧 뒤돌기' },
+        look: { en: 'Look at Statue (soon)', ko: '곧 신상 보기' },
       },
     },
     {
@@ -630,8 +1156,8 @@ const triggerSet: TriggerSet<Data> = {
       // dmStatueCount===3 + dmThunderInner로 combo3만 (combo1/2의 BA94 제외).
       netRegex: { id: 'BA94', source: '케프카', capture: false },
       condition: (data) => data.dmStatueCount === 3 && data.dmThunderInner !== undefined,
-      delaySeconds: 1, // 헤드마커 수집 보장
-      durationSeconds: 5, // 콜 → 선더가/태만 발동(~4.7s)
+      delaySeconds: 0.2, // 플래그/마커뿐(promise 없음). 헤드마커 BA94보다 0.09s 먼저 도착(측정) → 0.2
+      durationSeconds: 5.8, // 콜 → 선더가/태만 발동(끝 시점 동일 유지)
       suppressSeconds: 5,
       alertText: (data, _matches, output) => {
         // 선더가: 02A5=거짓(안에서) / 02A6=진실(밖에서)
@@ -663,8 +1189,8 @@ const triggerSet: TriggerSet<Data> = {
       // 선 시점에 석상 위치를 getCombatants로 읽어 판정 (성모 중심거리~75 / 수마~57).
       netRegex: { id: '002D', source: '신들의 상' },
       condition: (data, matches) => data.me === matches.target && (data.dmStatueCount ?? 0) >= 3,
-      delaySeconds: 0.5, // 석상 위치(271 ActorSetPos) 처리 대기
-      durationSeconds: 8, // 선~산개 판정까지
+      delaySeconds: 0.3, // 석상 위치(271)는 선과 동시 확정 → 버퍼만 (측정 기반 0.5→0.3)
+      durationSeconds: 8.2, // 선~산개 판정까지(끝 시점 동일 유지)
       promise: async (data, matches) => {
         data.combatantData = await fetchCombatants(matches.sourceId);
       },
@@ -679,11 +1205,11 @@ const triggerSet: TriggerSet<Data> = {
       outputStrings: {
         outer: {
           en: 'Outer Spread (Confusion)',
-          ko: '바깥쪽 산개',
+          ko: '혼란: 바깥쪽 산개',
         },
         inner: {
           en: 'Inner Spread (Sleep)',
-          ko: '안쪽 산개',
+          ko: '수면: 안쪽 산개',
         },
         unknown: {
           en: 'Spread (check tether)',
@@ -712,8 +1238,8 @@ const triggerSet: TriggerSet<Data> = {
       // 안쪽 4조합은 먼저 만료(짧은 지속)되는 방향에 따라 '~부터' 시작 안내를 덧붙임.
       netRegex: { effectId: ['130C', '130D', '130E', '130F', '13D7', '13D8', '13D9', '13DA'] },
       condition: (data, matches) => data.me === matches.target,
-      delaySeconds: 0.5, // 디버프 2개 수집 대기
-      durationSeconds: 9.5, // 부여 → 2번째(긴 10s 디버프) 설치까지
+      delaySeconds: 0.3, // 디버프 2개는 동시 도착(측정) → 버퍼만 (0.5→0.3)
+      durationSeconds: 9.7, // 부여 → 2번째(긴 10s 디버프) 설치까지(끝 시점 동일 유지)
       suppressSeconds: 5,
       alertText: (data, _matches, output) => {
         const m = data.dmMarch;
@@ -795,38 +1321,279 @@ const triggerSet: TriggerSet<Data> = {
     {
       id: 'DancingMad 행방불명',
       type: 'StartsUsing',
-      // BABC = 전체공격. 직후 8명에게 헤드마커(쉐어/개인/부채꼴) 부여 → 아래 헤드마커 트리거가 처리
+      // BABC = 전체공격 + 행방불명 운동회 시작. 직후 8명에게 위험한 주문 헤드마커(쉐어/부채꼴/산개) 부여.
+      // 탑 세트 카운터(dmForsakenSet) 1로 초기화, 마커 수집 리셋.
       netRegex: { id: 'BABC', source: '케프카', capture: false },
       durationSeconds: 6.7, // 시전 6.7s → 해소
       response: Responses.aoe(),
+      run: (data) => {
+        data.dmForsakenSet = 1;
+        data.dmForsakenMarks = {};
+        data.dmForsakenGroup = 'B'; // 기본 B조; 1탑 처리(set2 마커 수령) 시 A조로 갱신
+        data.dmForsakenInitMarks = {};
+        data.dmForsakenAGroup = [];
+        data.dmForsakenA8Marks = {};
+        data.dmForsakenEndCount = 0;
+        data.dmForsakenCurrent = {};
+        data.dmForsakenPos = {}; // 09STOP 위치 추적 초기화
+      },
     },
     {
-      id: 'DancingMad 위험한 주문 헤드마커',
+      id: 'DancingMad 행방불명 탑 세트 카운터',
+      type: 'Ability',
+      // 빛의 파동(BABE)=탑 처리. 캐스트당 1회 세트++ & 다음 세트 마커 새로 수집(탑 처리자 새 헤드마커).
+      netRegex: { id: 'BABE', source: '케프카', capture: false },
+      suppressSeconds: 3,
+      run: (data) => {
+        if (data.dmForsakenSet !== undefined)
+          data.dmForsakenSet++;
+        data.dmForsakenMarks = {};
+      },
+    },
+    {
+      id: 'DancingMad 행방불명 조 판정',
+      type: 'Ability',
+      // A조 = 1탑 빛의 파동(BABE) 피격자 4명. 2·3탑은 사고 여지가 있어 보지 않고 1탑만 기준(어지간하면 1탑은 안전).
+      //   마커 변경 여부와 무관하게 잡혀 마커 기반 명단보다 견고. 본인이 그 안에 있으면 A조.
+      //   카운터(위 트리거)가 먼저 ++ → 탑1 피격 시점엔 set===2. (탑2=3·탑3=4… 제외.)
+      //   헤드마커 버스트보다 빠른 이 시점에 판정해야 비처리조 안내 레이스 방지.
+      netRegex: { id: 'BABE', source: '케프카' },
+      condition: (data) => data.dmForsakenSet === 2,
+      run: (data, matches) => {
+        const a = (data.dmForsakenAGroup ??= []);
+        if (!a.includes(matches.target))
+          a.push(matches.target);
+        if (matches.target === data.me)
+          data.dmForsakenGroup = 'A';
+      },
+    },
+    {
+      id: 'DancingMad 행방불명 위험한 주문 수집',
       type: 'HeadMarker',
-      // 행방불명 직후 부여. 02CB = 쉐어, 02CD = 부채꼴, 02CC = 개인.
+      // 위험한 주문 마커 수집. set별 추가 저장: set1=초기 전체(B조 4탑용) / set4=A조 8탑 마커(3탑 처리 후).
+      //   (A조 명단은 마커가 아니라 '조 판정'이 빛의 파동 피격으로 모음 — 더 견고.) 탑 처리자만 새 마커를 받음.
       netRegex: { id: ['02CB', '02CC', '02CD'] },
-      condition: Conditions.targetIsYou(),
-      durationSeconds: 11, // 마커 부여 → 타워 해소까지 ~12s (역할 유지)
-      alertText: (_data, matches, output) => {
-        if (matches.id === '02CB')
-          return output.share!();
-        if (matches.id === '02CD')
-          return output.cone!();
-        return output.solo!(); // 02CC
+      run: (data, matches) => {
+        const role = forsakenRole(matches.id);
+        if (role === undefined)
+          return;
+        (data.dmForsakenMarks ??= {})[matches.target] = role;
+        (data.dmForsakenCurrent ??= {})[matches.target] = role; // 현재 마커 갱신(리셋X, 홀수탑 위치용)
+        const set = data.dmForsakenSet ?? 0;
+        if (set === 1)
+          (data.dmForsakenInitMarks ??= {})[matches.target] = role;
+        else if (set === 4)
+          (data.dmForsakenA8Marks ??= {})[matches.target] = role;
+      },
+    },
+    {
+      id: 'DancingMad 행방불명 1탑 위치',
+      type: 'HeadMarker',
+      // 1탑(공략 1238/4567, 세트 쉐산부쉐): 우선순위 미확정(approach b) → (역할군×마커)로 위치 + 같은 조 쉐어 이름.
+      // 시계는 3·5·7탑과 동일: 탱힐 쉐어=왼9시 / 딜러 쉐어=오5시 / 산개=왼3시 / 부채꼴=오7시.
+      // (위치가 역할군×마커로만 정해져 파티 구성과 무관하게 동작. 역할 불명 시에만 징만 표시.)
+      netRegex: { id: ['02CB', '02CC', '02CD'] },
+      condition: (data, matches) => data.me === matches.target && data.dmForsakenSet === 1,
+      delaySeconds: 0.5, // 8개 마커 수집 대기
+      durationSeconds: 9,
+      alertText: (data, matches, output) => {
+        const role = forsakenRole(matches.id);
+        if (role === undefined)
+          return;
+        const roleLabel = forsakenRoleLabel(role, output);
+        // 역할 불명(none 등) → 좌우 판정 불가 → 징만
+        if (data.role !== 'tank' && data.role !== 'healer' && data.role !== 'dps')
+          return output.jingOnly!({ role: roleLabel });
+        const isTh = data.role === 'tank' || data.role === 'healer';
+        if (data.triggerSetConfig.dmForsakenMethod === '09stop') {
+          // 1탑 트리거는 suppress가 없어 A조(첫·둘째 버스트 모두 등장)는 2번 발동됨.
+          //   둘째 버스트=탑1 소악 후 부2산2 재부여(InitMarks 덮어씀) → 시드/표시는 첫 버스트만(가드).
+          if (Object.keys(data.dmForsakenPos ?? {}).length > 0)
+            return; // 이미 시드됨 → 첫 표시(dur 9s) 유지
+          data.dmForsakenPos = forsaken09Seed1All(data); // 1탑 시드(8명, 첫 버스트 기준)
+          if (!isStdComp(data)) // 비표준 구성 → 좌우 판정 불가 → 마커종류만
+            return output.jingOnly!({ role: roleLabel });
+          // 쉐어=탱힐 왼중앙/딜러 오11(위치만) / 부채 왼7·산개 오5(+같은 조 쉐어 대상자)
+          if (role === 'stack')
+            return output.posAt!({
+              role: roleLabel,
+              pos: isTh ? output.lCenter!() : output.r11!(),
+            });
+          const pos09 = role === 'cone' ? output.l7!() : output.r5!();
+          const stackName09 = forsakenStackName(data, isTh) ?? output.unknown!();
+          return output.withStack!({ role: roleLabel, pos: pos09, stack: stackName09 });
+        }
+        // 잼잼: 시계(3·5·7탑과 동일) 쉐어=탱힐 왼9/딜러 오5, 산개=왼3, 부채꼴=오7
+        const pos = role === 'stack'
+          ? (isTh ? output.left9!() : output.right5!())
+          : (role === 'spread' ? output.left3!() : output.right7!());
+        if (role === 'stack')
+          return output.stackPos!({ pos: pos });
+        // 부채꼴/산개 → 위치 + 같은 조 쉐어 대상자 이름
+        const stackName = forsakenStackName(data, isTh) ?? output.unknown!();
+        return output.withStack!({ role: roleLabel, pos: pos, stack: stackName });
       },
       outputStrings: {
-        share: {
-          en: 'Stack',
-          ko: '쉐어',
-        },
-        cone: {
-          en: 'Cone',
-          ko: '부채꼴',
-        },
-        solo: {
-          en: 'Spread',
-          ko: '개인',
-        },
+        ...forsakenOutputsAll,
+        stackPos: { en: 'Stack: ${pos}', ko: '쉐어: ${pos}' },
+      },
+    },
+    {
+      id: 'DancingMad 행방불명 정상 탑 위치',
+      type: 'HeadMarker',
+      // 짝수탑 탑 처리만 직접 안내: A조 2탑(set2), B조 6탑(set6). 4·8탑은 스왑 트리거.
+      //   홀수탑(3·5·7) 탑 처리는 직전 짝수탑의 '분신 머리 유도/소멸발차기'에 통합되어 거기서 안내.
+      // 같은 마커끼리 우선순위(힐0탱1근2원3, 선형 왼탑끝-왼탑아래-우탑아래-우탑끝)로 자리 분할.
+      // 비표준 구성이면 우선순위 판정 불가 → 징만.
+      netRegex: { id: ['02CB', '02CC', '02CD'] },
+      condition: (data, matches) => {
+        if (data.me !== matches.target)
+          return false;
+        const set = data.dmForsakenSet ?? 0;
+        return (data.dmForsakenGroup === 'A' && set === 2) ||
+          (data.dmForsakenGroup === 'B' && set === 6);
+      },
+      delaySeconds: 0.5, // 4개 마커 수집 대기
+      durationSeconds: 9,
+      alertText: (data, matches, output) => {
+        const role = forsakenRole(matches.id);
+        if (role === undefined)
+          return;
+        if (data.triggerSetConfig.dmForsakenMethod === '09stop') {
+          const map = forsaken09Compute(data, 'trans', false); // 직전 홀수 위치 → 짝수 전이
+          data.dmForsakenPos = map;
+          return forsaken09Show(data, output, false, map, true);
+        }
+        if (!isStdComp(data)) // 비표준 구성 → 본인 디버프만
+          return output.jingOnly!({ role: forsakenRoleLabel(role, output) });
+        return forsakenSoakText(role, data.dmForsakenMarks ?? {}, data, output, false);
+      },
+      outputStrings: forsakenOutputsAll,
+    },
+    {
+      id: 'DancingMad 행방불명 스왑 탑 위치',
+      type: 'Ability',
+      // 스왑 탑(짝수, 산산부부): A조 3탑 처리 직후 B조가 4탑(set4) / B조 7탑 처리 직후 A조가 8탑(set8).
+      //   스왑조는 새 헤드마커 없이 기존 마커로 처리 → 빛의 파동(BABE)을 앵커로(HeadMarker 안 옴).
+      //   4탑(B) 마커 = 초기 전체(InitMarks)에서 A조(AGroup) 제외 / 8탑(A) 마커 = 3탑 처리 후 수집(A8Marks).
+      netRegex: { id: 'BABE', source: '케프카', capture: false },
+      condition: (data) =>
+        (data.dmForsakenGroup === 'B' && data.dmForsakenSet === 4) ||
+        (data.dmForsakenGroup === 'A' && data.dmForsakenSet === 8),
+      delaySeconds: 0.5,
+      durationSeconds: 9,
+      suppressSeconds: 5,
+      alertText: (data, _matches, output) => {
+        if (data.triggerSetConfig.dmForsakenMethod === '09stop') {
+          // 4탑=B조 첫 처리(시드) / 8탑=직전 3탑 위치 → 짝수 전이.
+          const map = data.dmForsakenSet === 4
+            ? forsaken09Compute(data, 'seed4', false)
+            : forsaken09Compute(data, 'trans', false);
+          data.dmForsakenPos = map;
+          return forsaken09Show(data, output, false, map, true);
+        }
+        // 잼잼 처리조 4명 마커맵: 4탑=InitMarks−AGroup / 8탑=A8Marks 그대로.
+        let marks: { [name: string]: ForsakenRole };
+        if (data.dmForsakenSet === 4) {
+          const aSet = new Set(data.dmForsakenAGroup ?? []);
+          marks = {};
+          for (const [name, r] of Object.entries(data.dmForsakenInitMarks ?? {})) {
+            if (!aSet.has(name))
+              marks[name] = r;
+          }
+        } else {
+          marks = data.dmForsakenA8Marks ?? {};
+        }
+        const myRole = marks[data.me ?? ''];
+        if (myRole === undefined)
+          return;
+        if (!isStdComp(data)) // 비표준 구성 → 본인 디버프만
+          return output.jingOnly!({ role: forsakenRoleLabel(myRole, output) });
+        return forsakenSoakText(myRole, marks, data, output, false);
+      },
+      outputStrings: forsakenOutputsAll,
+    },
+    {
+      id: 'DancingMad 행방불명 분신 설치 (비처리조)',
+      type: 'Ability',
+      // 짝수탑 비처리조 = 분신 설치. B조=2·8탑(set2/8), A조=4·6탑(set4/6). (홀수탑 디버프 유도는 통합되어 별도 X)
+      // 게이팅을 infoText(지연)에서 — 빛의 파동 첫 줄 시점엔 조 판정이 아직일 수 있어 레이스 방지.
+      netRegex: { id: 'BABE', source: '케프카', capture: false },
+      condition: (data) => (data.dmForsakenSet ?? 0) >= 2,
+      delaySeconds: 0.5,
+      durationSeconds: 9,
+      suppressSeconds: 5,
+      infoText: (data, _matches, output) => {
+        const set = data.dmForsakenSet ?? 0;
+        const g = data.dmForsakenGroup;
+        const placeClone = (g === 'B' && (set === 2 || set === 8)) ||
+          (g === 'A' && (set === 4 || set === 6));
+        if (!placeClone)
+          return;
+        // 09STOP: 탱힐만 분신 설치, 근딜=왼9 부채 유도, 원딜=오3 부채 유도.
+        if (data.triggerSetConfig.dmForsakenMethod === '09stop') {
+          // 비표준 구성 → 근/원 분리 불확정 → 잼잼식 공통 분신 설치로 폴백.
+          if (!isStdComp(data) || data.role === 'tank' || data.role === 'healer')
+            return output.placeClone!();
+          if (Util.isMeleeDpsJob(data.job))
+            return output.coneBaitAt!({ pos: output.l9!() });
+          return output.coneBaitAt!({ pos: output.r3!() });
+        }
+        return output.placeClone!();
+      },
+      outputStrings: forsakenOutputsAll,
+    },
+    {
+      id: 'DancingMad 행방불명 분신 머리 유도',
+      type: 'Ability',
+      // 짝수탑 분신 설치 후 8명 전원 머리 유도(BAD2 미래=보스 너머 / BAD3 과거=탑 사이).
+      //   다음 홀수탑 '위치(시계)'만 '(이후 ~~~)'로 미리 붙여 빠른 이동 유도 → 자세한 마커종류/유도법은
+      //   소멸발차기 타이밍(홀수탑 안내 트리거)에서 표시. 8탑(4번째 종언)은 다음 탑 없음 → 방향만.
+      // delay 1.5: 종언끝 직후(~1.3s) 다음 홀수탑 마커 수집 대기. duration 4.8 → 홀수탑 안내로 인계.
+      netRegex: { id: ['BAD2', 'BAD3'], source: '케프카', capture: true },
+      preRun: (data) => data.dmForsakenEndCount = (data.dmForsakenEndCount ?? 0) + 1,
+      delaySeconds: 1.5,
+      durationSeconds: 4.8,
+      suppressSeconds: 5,
+      infoText: (data, matches, output) => {
+        if ((data.dmForsakenEndCount ?? 0) >= 4) // 8탑: 마지막, 다음 홀수탑 없음 → 방향만
+          return matches.id === 'BAD2' ? output.future!() : output.past!();
+        const dir = matches.id === 'BAD2' ? output.dirFuture!() : output.dirPast!();
+        // 미리보기: 다음 홀수탑 위치만(commit 안 함). 09STOP은 forsaken09NextGuidance(commit=false).
+        const next = data.triggerSetConfig.dmForsakenMethod === '09stop'
+          ? forsaken09NextGuidance(data, output, false)
+          : forsakenNextPos(data, output);
+        return output.baitNext!({ dir: dir, next: next });
+      },
+      outputStrings: {
+        ...forsakenOutputsAll,
+        future: { en: 'Bait behind boss (Future)', ko: '보스 너머로 머리 유도' },
+        past: { en: 'Bait between towers (Past)', ko: '탑 사이에서 머리 유도' },
+        dirFuture: { en: 'Behind boss', ko: '보스 너머로' },
+        dirPast: { en: 'Between towers', ko: '탑 사이로' },
+        baitNext: { en: '${dir} (then ${next})', ko: '${dir} (이후 ${next})' },
+      },
+    },
+    {
+      // 트리거 타이밍은 분신 소멸의 발차기 시전이지만, 내용은 그 경고가 아니라 '다음 홀수탑 처리' 안내.
+      id: 'DancingMad 행방불명 홀수탑 안내',
+      type: 'StartsUsing',
+      // 분신 소멸의 발차기 시전 시작 시점 → 다음 홀수탑 처리 안내(마커종류+위치) 표시(머리유도 통합 흐름).
+      //   미래의 종언=BADC / 과거의 종언=BADD. 8탑(4번째)은 다음 탑 없음 → '이동!'.
+      netRegex: { id: ['BADC', 'BADD'], source: '케프카', capture: false },
+      durationSeconds: 6,
+      suppressSeconds: 5,
+      alertText: (data, _matches, output) => {
+        if ((data.dmForsakenEndCount ?? 0) >= 4)
+          return output.move!();
+        // 09STOP은 forsaken09NextGuidance(commit=true)로 홀수탑 위치 기록+상세 표시.
+        return data.triggerSetConfig.dmForsakenMethod === '09stop'
+          ? forsaken09NextGuidance(data, output, true)
+          : forsakenNextGuidance(data, output);
+      },
+      outputStrings: {
+        ...forsakenOutputsAll,
+        move: { en: 'Move!', ko: '이동!' },
       },
     },
   ],
