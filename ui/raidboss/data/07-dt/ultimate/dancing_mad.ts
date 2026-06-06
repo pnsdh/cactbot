@@ -21,7 +21,11 @@ const phases: { [id: string]: Phase } = {
 };
 
 export interface Data extends RaidbossData {
-  readonly triggerSetConfig: { dmForsakenMethod: ForsakenMethod }; // 행방불명 처리법(잼잼/09STOP)
+  // 행방불명 처리법(잼잼/09STOP) + 09STOP 스왑 주체(윗사람=상대북 / 아랫사람=상대남, 기본 아랫사람)
+  readonly triggerSetConfig: {
+    dmForsakenMethod: ForsakenMethod;
+    dmForsakenSwap: 'upper' | 'lower';
+  };
   phase: Phase | 'unknown';
   combatantData?: PluginCombatantState[];
   dmKnockbackGroup?: boolean;
@@ -456,6 +460,8 @@ const forsaken09Compute = (
   const marks = forsakenSoakGroupMarks(data);
   const prev = data.dmForsakenPos ?? {};
   const next: { [name: string]: ForsakenPos } = { ...prev };
+  // 스왑 옵션: 같은 마커 2명일 때 누가 반대 탑으로. 기본=아랫사람(상대남) / upper=윗사람(상대북).
+  const swapUpper = data.triggerSetConfig.dmForsakenSwap === 'upper';
 
   // 4탑(B조, 짝수) 시드: 힐근=L, 탱원=R; vert=마커(부채 위/12, 산개 아래/6).
   if (mode === 'seed4') {
@@ -485,11 +491,13 @@ const forsaken09Compute = (
       if (p1.side !== p2.side) { // 서로 다른 탑 → 각자 자기 side 쉐어로
         next[s1] = { side: p1.side, vert: 'U' };
         next[s2] = { side: p2.side, vert: 'U' };
-      } else { // 같은 탑 → 위쪽이 반대 side로 스왑
+      } else { // 같은 탑 → 옵션에 따라 위/아래 중 한 명이 반대 side로 스왑
         const upN = p1.vert === 'U' ? s1 : s2;
         const downN = p1.vert === 'U' ? s2 : s1;
-        next[upN] = { side: forsaken09Opp(p1.side), vert: 'U' };
-        next[downN] = { side: p1.side, vert: 'U' };
+        const swapN = swapUpper ? upN : downN;
+        const stayN = swapUpper ? downN : upN;
+        next[swapN] = { side: forsaken09Opp(p1.side), vert: 'U' };
+        next[stayN] = { side: p1.side, vert: 'U' };
       }
     } else { // 직전 위치 불명 폴백
       if (s1 !== undefined)
@@ -511,9 +519,11 @@ const forsaken09Compute = (
     const downRole = marks[downN];
     if (upRole === undefined || downRole === undefined)
       continue;
-    if (upRole === downRole) { // 같은 마커 → 위쪽 스왑
-      next[upN] = { side: forsaken09Opp(side), vert: forsaken09Vert(upRole, false) };
-      next[downN] = { side: side, vert: forsaken09Vert(downRole, false) };
+    if (upRole === downRole) { // 같은 마커 → 옵션에 따라 위/아래 중 한 명이 스왑
+      const swapN = swapUpper ? upN : downN;
+      const stayN = swapUpper ? downN : upN;
+      next[swapN] = { side: forsaken09Opp(side), vert: forsaken09Vert(upRole, false) };
+      next[stayN] = { side: side, vert: forsaken09Vert(upRole, false) };
     } else { // 다른 마커 → 그 side 유지
       next[upN] = { side: side, vert: forsaken09Vert(upRole, false) };
       next[downN] = { side: side, vert: forsaken09Vert(downRole, false) };
@@ -607,7 +617,31 @@ const triggerSet: TriggerSet<Data> = {
           '09STOP': '09stop',
         },
       },
-      default: '09stop', // ⚠ 임시(에뮬레이터 09STOP 테스트용). 배포 전 'jamjam'으로 되돌릴 것!
+      default: '09stop',
+    },
+    {
+      id: 'dmForsakenSwap',
+      name: {
+        en: 'P2 Forsaken swap person (09STOP only)',
+        ko: 'P2 행방불명 스왑 주체 (09STOP 전용)',
+      },
+      comment: {
+        en:
+          'When two same markers land on one tower, who moves to the other tower: Lower = relative-south person (default), Upper = relative-north person.',
+        ko: '09STOP에서 한 탑에 같은 마커 2명이 몰리면 누가 반대 탑으로 넘어가는지. 아랫사람=상대남(기본) / 윗사람=상대북.',
+      },
+      type: 'select',
+      options: {
+        en: {
+          'Lower (rel. south)': 'lower',
+          'Upper (rel. north)': 'upper',
+        },
+        ko: {
+          '아랫사람 (상대남)': 'lower',
+          '윗사람 (상대북)': 'upper',
+        },
+      },
+      default: 'lower',
     },
   ],
   timelineFile: 'dancing_mad.txt',
@@ -1277,9 +1311,9 @@ const triggerSet: TriggerSet<Data> = {
             return output.seIn!({
               from: shortDir === 'right' ? output.fromDown!() : output.fromUp!(),
             });
-          case 'down|left': // 좌하: 좌 먼저→왼쪽부터 / 하 먼저→오른쪽부터
+          case 'down|left': // 좌하(SW): 좌 먼저→오른쪽부터 / 하 먼저→왼쪽부터 (NE 점대칭, 인게임 검증)
             return output.swIn!({
-              from: shortDir === 'left' ? output.fromLeft!() : output.fromRight!(),
+              from: shortDir === 'left' ? output.fromRight!() : output.fromLeft!(),
             });
         }
         return; // 미정의 조합(상+하, 좌+우 등) → 표시 안 함
