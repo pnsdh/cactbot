@@ -198,11 +198,11 @@ const forsakenStackName = (data: Data, isTh: boolean): string | undefined => {
 const forsakenOutputs = {
   ...towerClock,
   stack: { en: 'Stack', ko: '쉐어' },
-  cone: { en: 'Cone', ko: '부채' },
+  cone: { en: 'Cone', ko: '부채꼴' },
   spread: { en: 'Spread', ko: '산개' },
   stackAt: { en: 'Stack: ${pos}', ko: '쉐어: ${pos}' },
-  conePair: { en: 'Cone: ${pos} (pair)', ko: '부채: ${pos}, 부+부' },
-  coneBait: { en: 'Cone: ${pos}', ko: '부채: ${pos}' },
+  conePair: { en: 'Cone: ${pos} (pair)', ko: '부채꼴: ${pos}, 부+부' },
+  coneBait: { en: 'Cone: ${pos}', ko: '부채꼴: ${pos}' },
   spreadAt: { en: 'Spread: ${pos}', ko: '산개: ${pos}' },
   jingOnly: { en: 'Mark: ${role}', ko: '징: ${role}' },
   // 비처리조(짝수 분신 설치 / 홀수 디버프 유도). 홀수 유도는 머리유도·소멸발차기 통합에서도 재사용.
@@ -225,9 +225,10 @@ const towerClock09 = {
   l9: { en: 'Left tower 9:00', ko: '왼쪽 탑 9시' },
   l12: { en: 'Left tower 12:00', ko: '왼쪽 탑 12시' },
   r3: { en: 'Right tower 3:00', ko: '오른쪽 탑 3시' },
+  r4: { en: 'Right tower 4:00', ko: '오른쪽 탑 4시' }, // 홀수탑 산개 처리(오5→오4)
   r5: { en: 'Right tower 5:00', ko: '오른쪽 탑 5시' },
   r6: { en: 'Right tower 6:00', ko: '오른쪽 탑 6시' },
-  r10: { en: 'Right tower 10:00', ko: '오른쪽 탑 10시' }, // 비처리 근원딜 유도 전용(소악 쉐어 r11과 분리)
+  r10: { en: 'Right tower 10:00', ko: '오른쪽 탑 10시' }, // 홀수탑 오른쪽 쉐어 처리 + 비처리 근원딜 유도(같이 쉐어)
   r11: { en: 'Right tower 11:00', ko: '오른쪽 탑 11시' },
   r12: { en: 'Right tower 12:00', ko: '오른쪽 탑 12시' },
 } as const;
@@ -235,20 +236,23 @@ const towerClock09 = {
 const forsaken09Outputs = {
   ...towerClock09,
   stack: { en: 'Stack', ko: '쉐어' },
-  cone: { en: 'Cone', ko: '부채' },
+  cone: { en: 'Cone', ko: '부채꼴' },
   spread: { en: 'Spread', ko: '산개' },
   posAt: { en: '${role}: ${pos}', ko: '${role}: ${pos}' },
   withStack: { en: '${role}: ${pos} (stack: ${stack})', ko: '${role}: ${pos}, 쉐어: ${stack}' },
   jingOnly: { en: 'Mark: ${role}', ko: '징: ${role}' },
   placeClone: { en: 'Go place clone', ko: '분신 설치 위치로' },
-  shareBaitAt: { en: '${pos}, bait stack', ko: '${pos}: 쉐어 유도' },
-  coneBaitAt: { en: '${pos}, bait cone', ko: '${pos}: 부채 유도' },
+  shareBaitAt: { en: '${pos}, bait stack', ko: '${pos}: 쉐어 같이 맞기' },
+  coneBaitAt: { en: '${pos}, bait cone', ko: '${pos}: 부채꼴 유도' },
   soak: { en: 'Tower', ko: '탑' },
   soakOnly: { en: 'Soak tower', ko: '탑 처리' },
   withTangle: { en: '${text} [conflict]', ko: '${text} [디버프 꼬임]' },
   unknown: { en: '?', ko: '?' },
   // 비표준 구성(역할별 자리 불확정) 비처리 폴백.
   nonSoakGeneric: { en: 'Bait by role', ko: '역할대로 유도' },
+  // 8탑 전용: 좌/우 탑이 유저 임의 룰로 정해져(캑봇 모름) side 없이 시만.
+  t12: { en: 'Tower 12:00', ko: '탑에서 12시' },
+  t6: { en: 'Tower 6:00', ko: '탑에서 6시' },
 } as const;
 
 // 잼잼+09STOP 양쪽 출력 통합(메서드 분기 트리거 공용). 겹치는 키는 동일 값.
@@ -416,7 +420,7 @@ const forsaken09Vert = (role: ForsakenRole, isOdd: boolean): 'U' | 'D' => {
   return role === 'cone' ? 'U' : 'D';
 };
 
-// (side, 마커, 패리티) → 시계 라벨. 홀수: 쉐어 L왼중앙/R오11·부채 왼7(고정)·산개 오5(고정) / 짝수: 부채 12·산개 6.
+// (side, 마커, 패리티) → 시계 라벨. 홀수: 쉐어 L왼중앙/R오10·부채 왼7(고정)·산개 오4(고정) / 짝수: 부채 12·산개 6.
 const forsaken09Clock = (
   side: 'L' | 'R',
   role: ForsakenRole,
@@ -425,8 +429,8 @@ const forsaken09Clock = (
 ): string => {
   if (isOdd) {
     if (role === 'stack')
-      return side === 'L' ? output.lCenter!() : output.r11!();
-    return role === 'cone' ? output.l7!() : output.r5!();
+      return side === 'L' ? output.lCenter!() : output.r10!();
+    return role === 'cone' ? output.l7!() : output.r4!();
   }
   if (role === 'cone')
     return side === 'L' ? output.l12!() : output.r12!();
@@ -533,12 +537,14 @@ const forsaken09Compute = (
 };
 
 // 내 위치 표시. withRole=true면 '쉐어: 왼중앙'(+꼬임 접미), false면 위치만(미리보기).
+//   generic=true(8탑): 좌/우 탑 배정이 유저 임의 룰(캑봇 모름) → side 생략, 마커→시(부채꼴 12/산개 6)만.
 const forsaken09Show = (
   data: Data,
   output: Output,
   isOdd: boolean,
   posMap: { [name: string]: ForsakenPos },
   withRole: boolean,
+  generic = false,
 ): string => {
   const myMark = (data.dmForsakenCurrent ?? {})[data.me ?? ''];
   if (myMark === undefined)
@@ -547,10 +553,15 @@ const forsaken09Show = (
     return withRole
       ? output.jingOnly!({ role: forsakenRoleLabel(myMark, output) })
       : forsakenRoleLabel(myMark, output);
-  const myPos = posMap[data.me ?? ''];
-  if (myPos === undefined)
-    return withRole ? output.soakOnly!() : output.soak!();
-  const clock = forsaken09Clock(myPos.side, myMark, isOdd, output);
+  let clock: string;
+  if (generic) { // 8탑: side 모름 → 마커로 시만(짝수 부채꼴=12/산개=6)
+    clock = forsaken09Vert(myMark, isOdd) === 'U' ? output.t12!() : output.t6!();
+  } else {
+    const myPos = posMap[data.me ?? ''];
+    if (myPos === undefined)
+      return withRole ? output.soakOnly!() : output.soak!();
+    clock = forsaken09Clock(myPos.side, myMark, isOdd, output);
+  }
   if (!withRole)
     return clock;
   const text = output.posAt!({ role: forsakenRoleLabel(myMark, output), pos: clock });
@@ -559,7 +570,7 @@ const forsaken09Show = (
     : text;
 };
 
-// 홀수탑 비처리 유도: 탱커=왼1 쉐어 / 힐러=왼7 부채 / 딜러=오11 쉐어. full=true면 역할 라벨 포함.
+// 홀수탑 비처리 유도: 탱커=왼4 쉐어 / 힐러=왼7 부채 / 근원딜=오10 쉐어. full=true면 역할 라벨 포함.
 const forsaken09NonSoakOdd = (data: Data, output: Output, full: boolean): string => {
   if (!isStdComp(data)) // 비표준 구성 → 역할별 자리 불확정 → 일반 안내
     return output.nonSoakGeneric!();
@@ -572,7 +583,7 @@ const forsaken09NonSoakOdd = (data: Data, output: Output, full: boolean): string
     pos = output.l7!();
     cone = true;
   } else {
-    pos = output.r10!(); // 비처리 근원딜 전용(소악 쉐어 오11과 분리)
+    pos = output.r10!(); // 비처리 근원딜: 오른쪽 쉐어 처리자(오10)와 같이 쉐어
     cone = false;
   }
   if (!full)
@@ -1441,35 +1452,35 @@ const triggerSet: TriggerSet<Data> = {
         const isTh = data.role === 'tank' || data.role === 'healer';
         if (data.triggerSetConfig.dmForsakenMethod === '09stop') {
           // 1탑 트리거는 suppress가 없어 A조(첫·둘째 버스트 모두 등장)는 2번 발동됨.
-          //   둘째 버스트=탑1 소악 후 부2산2 재부여(InitMarks 덮어씀) → 시드/표시는 첫 버스트만(가드).
+          //   둘째 버스트=탑1 탑 처리 후 부2산2 재부여(InitMarks 덮어씀) → 시드/표시는 첫 버스트만(가드).
           if (Object.keys(data.dmForsakenPos ?? {}).length > 0)
             return; // 이미 시드됨 → 첫 표시(dur 9s) 유지
           data.dmForsakenPos = forsaken09Seed1All(data); // 1탑 시드(8명, 첫 버스트 기준)
           if (!isStdComp(data)) // 비표준 구성 → 좌우 판정 불가 → 마커종류만
             return output.jingOnly!({ role: roleLabel });
-          // 쉐어=탱힐 왼중앙/딜러 오11(위치만) / 부채 왼7·산개 오5(+같은 조 쉐어 대상자)
+          // 쉐어=탱힐 왼중앙/딜러 오10(위치 안내) / 부채·산개는 위치 생략, 같은 역할군 쉐어 대상자만.
+          //   (오른쪽 쉐어는 3·5·7탑과 동일하게 오10.)
           if (role === 'stack')
             return output.posAt!({
               role: roleLabel,
-              pos: isTh ? output.lCenter!() : output.r11!(),
+              pos: isTh ? output.lCenter!() : output.r10!(),
             });
-          const pos09 = role === 'cone' ? output.l7!() : output.r5!();
           const stackName09 = forsakenStackName(data, isTh) ?? output.unknown!();
-          return output.withStack!({ role: roleLabel, pos: pos09, stack: stackName09 });
+          return output.onlyStack!({ role: roleLabel, stack: stackName09 });
         }
-        // 잼잼: 시계(3·5·7탑과 동일) 쉐어=탱힐 왼9/딜러 오5, 산개=왼3, 부채꼴=오7
-        const pos = role === 'stack'
-          ? (isTh ? output.left9!() : output.right5!())
-          : (role === 'spread' ? output.left3!() : output.right7!());
-        if (role === 'stack')
+        // 잼잼: 쉐어=탱힐 왼9/딜러 오5(위치 안내). 부채꼴/산개는 위치 생략, 같은 역할군 쉐어 대상자만.
+        if (role === 'stack') {
+          const pos = isTh ? output.left9!() : output.right5!();
           return output.stackPos!({ pos: pos });
-        // 부채꼴/산개 → 위치 + 같은 조 쉐어 대상자 이름
+        }
         const stackName = forsakenStackName(data, isTh) ?? output.unknown!();
-        return output.withStack!({ role: roleLabel, pos: pos, stack: stackName });
+        return output.onlyStack!({ role: roleLabel, stack: stackName });
       },
       outputStrings: {
         ...forsakenOutputsAll,
         stackPos: { en: 'Stack: ${pos}', ko: '쉐어: ${pos}' },
+        // 0탑(첫 안내) 부채/산개 전용: 위치 없이 같은 역할군 쉐어 대상자만.
+        onlyStack: { en: '${role} (stack: ${stack})', ko: '${role}, 쉐어: ${stack}' },
       },
     },
     {
@@ -1519,10 +1530,11 @@ const triggerSet: TriggerSet<Data> = {
       suppressSeconds: 5,
       alertText: (data, _matches, output) => {
         if (data.triggerSetConfig.dmForsakenMethod === '09stop') {
-          // 4탑=B조 첫 처리(시드) / 8탑=직전 3탑 위치 → 짝수 전이.
-          const map = data.dmForsakenSet === 4
-            ? forsaken09Compute(data, 'seed4', false)
-            : forsaken09Compute(data, 'trans', false);
+          // 8탑: 좌/우 탑 배정이 유저 임의 룰(캑봇 모름) → side 없이 시만(generic).
+          if (data.dmForsakenSet === 8)
+            return forsaken09Show(data, output, false, {}, true, true);
+          // 4탑=B조 첫 처리(시드).
+          const map = forsaken09Compute(data, 'seed4', false);
           data.dmForsakenPos = map;
           return forsaken09Show(data, output, false, map, true);
         }
