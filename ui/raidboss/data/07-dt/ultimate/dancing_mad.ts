@@ -140,14 +140,14 @@ const forsakenRole = (id: string): ForsakenRole | undefined => {
   return undefined;
 };
 
-// 지원 구성: 탱2·힐2 + ① 근딜2(표준, 캐스터/유격 비율 무관) 또는 ② 근딜1·캐스터2·유격1(캐스터1명이 근딜 대체).
-//   그 외(근딜3·근딜1캐스터1유격2 등)는 미지원 → 폴백(징/마커종류만). 딜러 좌우는 조-국소 2:2 분배로 처리.
+// 지원 구성: 탱2·힐2 + ① 근딜2(표준, 캐스터/유격 비율 무관) 또는 ② 근딜1·캐스터2(서로 다른 직업)·유격1(캐스터1명이 근딜 대체).
+//   그 외(근딜3·근딜1캐스터1유격2·중복 캐스터 등)는 미지원 → 폴백(징/마커종류만). 딜러 좌우는 조-국소 2:2 분배로 처리.
 const isStdComp = (data: Data): boolean => {
   let t = 0;
   let h = 0;
   let m = 0; // 근딜
-  let c = 0; // 캐스터
   let r = 0; // 물리원딜(유격)
+  const casters: Job[] = [];
   for (const p of data.party.details) {
     if (!p.inParty)
       continue;
@@ -159,12 +159,17 @@ const isStdComp = (data: Data): boolean => {
     else if (Util.isMeleeDpsJob(job))
       m++;
     else if (Util.isCasterDpsJob(job))
-      c++;
+      casters.push(job);
     else if (Util.isRangedDpsJob(job))
       r++;
   }
-  // ① 근딜2(원딜 구성 무관) 또는 ② 근딜1+캐스터2(+유격1, 캐스터 대체). 그 외 딜러 구성은 미지원.
-  return t === 2 && h === 2 && m + c + r === 4 && (m === 2 || (m === 1 && c === 2));
+  const c = casters.length;
+  if (t !== 2 || h !== 2 || m + c + r !== 4)
+    return false;
+  if (m === 2) // ① 근딜2(원딜 구성 무관)
+    return true;
+  // ② 근딜1+캐스터2: 두 캐스터가 서로 다른 직업일 때만(프리셋이 직업 기준이라 중복이면 좌우 지정 불가 → 미지원).
+  return m === 1 && c === 2 && casters[0] !== casters[1];
 };
 
 const forsakenJobOf = (data: Data, name: string): Job | undefined => {
@@ -800,6 +805,31 @@ const triggerSet: TriggerSet<Data> = {
       default: 'fwd',
     },
     {
+      id: 'dmBlizzardKnockback',
+      name: {
+        en: 'P1 Blizzard + knockback positioning',
+        ko: 'P1 알쏭달쏭1 (블리자가+넉백) 위치',
+      },
+      comment: {
+        en:
+          'How to split into 4 corners for Blizzard + spread/stack + knockback. KB-group South = knockback group takes south corners, non-KB north, W/E by Blizzard safe diagonal (current). TH-left/DPS-right = tanks+healers go west, DPS east, N/S by Blizzard safe; handle the knockback yourself.',
+        ko:
+          '알쏭달쏭1의 처리 방식 안내. 넉백조 남쪽 = 넉백 걸린 조가 남쪽 고정. 좌우로 위치를 안내함 vs 탱힐 왼쪽/딜러 오른쪽 = 탱힐은 서쪽·딜러는 동쪽 고정, 위아래로 위치를 안내함',
+      },
+      type: 'select',
+      options: {
+        en: {
+          'KB-group South (current)': 'kbSouth',
+          'TH left / DPS right': 'roleSide',
+        },
+        ko: {
+          '넉백조 남쪽 (기존)': 'kbSouth',
+          '탱힐 왼쪽 / 딜러 오른쪽': 'roleSide',
+        },
+      },
+      default: 'kbSouth',
+    },
+    {
       id: 'dmForsakenMethod',
       name: {
         en: 'P2 Forsaken strategy',
@@ -846,31 +876,6 @@ const triggerSet: TriggerSet<Data> = {
         },
       },
       default: 'lower',
-    },
-    {
-      id: 'dmBlizzardKnockback',
-      name: {
-        en: 'P1 Blizzard + knockback positioning',
-        ko: 'P1 알쏭달쏭1 (블리자가+넉백) 위치',
-      },
-      comment: {
-        en:
-          'How to split into 4 corners for Blizzard + spread/stack + knockback. KB-group South = knockback group takes south corners, non-KB north, W/E by Blizzard safe diagonal (current). TH-left/DPS-right = tanks+healers go west, DPS east, N/S by Blizzard safe; handle the knockback yourself.',
-        ko:
-          '알쏭달쏭1의 처리 방식 안내. 넉백조 남쪽 = 넉백 걸린 조가 남쪽 고정. 좌우로 위치를 안내함 vs 탱힐 왼쪽/딜러 오른쪽 = 탱힐은 서쪽·딜러는 동쪽 고정, 위아래로 위치를 안내함',
-      },
-      type: 'select',
-      options: {
-        en: {
-          'KB-group South (current)': 'kbSouth',
-          'TH left / DPS right': 'roleSide',
-        },
-        ko: {
-          '넉백조 남쪽 (기존)': 'kbSouth',
-          '탱힐 왼쪽 / 딜러 오른쪽': 'roleSide',
-        },
-      },
-      default: 'kbSouth',
     },
   ],
   timelineFile: 'dancing_mad.txt',
