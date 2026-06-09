@@ -28,6 +28,7 @@ export interface Data extends RaidbossData {
     dmForsakenMethod: ForsakenMethod;
     dmForsakenSwap: 'upper' | 'lower';
     dmFakeMeleeCaster: 'fwd' | 'rev';
+    dmBlizzardKnockback: 'kbSouth' | 'roleSide';
   };
   phase: Phase | 'unknown';
   combatantData?: PluginCombatantState[];
@@ -846,6 +847,31 @@ const triggerSet: TriggerSet<Data> = {
       },
       default: 'lower',
     },
+    {
+      id: 'dmBlizzardKnockback',
+      name: {
+        en: 'P1 Blizzard + knockback positioning',
+        ko: 'P1 알쏭달쏭1 (블리자가+넉백) 위치',
+      },
+      comment: {
+        en:
+          'How to split into 4 corners for Blizzard + spread/stack + knockback. KB-group South = knockback group takes south corners, non-KB north, W/E by Blizzard safe diagonal (current). TH-left/DPS-right = tanks+healers go west, DPS east, N/S by Blizzard safe; handle the knockback yourself.',
+        ko:
+          '알쏭달쏭1의 처리 방식 안내. 넉백조 남쪽 = 넉백 걸린 조가 남쪽 고정. 좌우로 위치를 안내함 vs 탱힐 왼쪽/딜러 오른쪽 = 탱힐은 서쪽·딜러는 동쪽 고정, 위아래로 위치를 안내함',
+      },
+      type: 'select',
+      options: {
+        en: {
+          'KB-group South (current)': 'kbSouth',
+          'TH left / DPS right': 'roleSide',
+        },
+        ko: {
+          '넉백조 남쪽 (기존)': 'kbSouth',
+          '탱힐 왼쪽 / 딜러 오른쪽': 'roleSide',
+        },
+      },
+      default: 'kbSouth',
+    },
   ],
   timelineFile: 'dancing_mad.txt',
   initData: () => ({ phase: 'p1' }),
@@ -1004,19 +1030,30 @@ const triggerSet: TriggerSet<Data> = {
         const ss = spread ? output.spread!() : output.stack!();
         if (safeNwSe === undefined) // 방향 불명 → ??? 폴백
           return isKb ? output.kbUnknown!({ ss: ss }) : output.noKbUnknown!({ ss: ss });
-        // 왼/오: 넉백=남코너, 비넉백=북코너 / 동코너=오른쪽. isRight = (safeNwSe === isKb)
+        // 새 옵션: 탱힐=서/딜러=동 고정, 블리자가 안전으로 북/남(자기 구역에서 위/아래). 넉백은 스스로 조절.
+        //   북 = (탱힐 == safeNwSe): 탱힐 NW/SE안전→NW(북)·NE/SW안전→SW(남) / 딜러는 반대(SE·NE).
+        if (data.triggerSetConfig.dmBlizzardKnockback === 'roleSide') {
+          const isTh = data.role === 'tank' || data.role === 'healer';
+          const ns = (isTh === safeNwSe) ? output.north!() : output.south!();
+          return isKb ? output.kbRole!({ ns: ns, ss: ss }) : output.noKbRole!({ ns: ns, ss: ss });
+        }
+        // 기존 옵션: 넉백=남코너, 비넉백=북코너 / 동코너=오른쪽. isRight = (safeNwSe === isKb)
         const side = safeNwSe === isKb ? output.right!() : output.left!();
         return isKb ? output.kb!({ side: side, ss: ss }) : output.noKb!({ side: side, ss: ss });
       },
       outputStrings: {
         kb: { en: '${side} + Knockback + ${ss}', ko: '${side}에서 넉백 + ${ss}' },
         noKb: { en: '${side} + ${ss}', ko: '${side} + ${ss}' },
+        kbRole: { en: 'Knockback + ${ns} + ${ss}', ko: '넉백 이후 ${ns}쪽에서 ${ss}' },
+        noKbRole: { en: '${ns} + ${ss}', ko: '${ns}쪽에서 ${ss}' },
         kbUnknown: { en: 'Knockback + ${ss} / Blizzard: ???', ko: '넉백 + ${ss} / 블리자가: ???' },
         noKbUnknown: { en: '${ss} / Blizzard: ???', ko: '${ss} / 블리자가: ???' },
         spread: { en: 'Spread', ko: '산개' },
         stack: { en: 'Stack', ko: '쉐어' },
         right: { en: 'Right', ko: '오른쪽' },
         left: { en: 'Left', ko: '왼쪽' },
+        north: { en: 'North', ko: '위' },
+        south: { en: 'South', ko: '아래' },
       },
     },
     // 출력: 2번째 알쏭달쏭 (블리자가 방향 + 선더가 안/밖) — 산개/쉐어 마커가 없을 때만
