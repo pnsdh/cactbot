@@ -42,6 +42,8 @@ export interface Data extends RaidbossData {
   dmStatueCount?: number; // 신들의 상(BCF2) 소환 횟수 (1=넉백 / 2=중력 / 3↑=성모수마)
   dmGravityGroup?: 'gravity' | 'rock'; // 본인 그룹: 중력탄(중앙) / 암석탄(오른쪽)
   dmGazeType?: 'gaze' | 'look'; // combo3 시선: gaze=태만(뒤돌기) / look=아베(신상 보기)
+  // 신들의 상 텔레그래프 엔티티 actor ID(첫 019D에서 산술 유도). purple=중력파 yellow=박살 eye=태만 fakeEye=아베.
+  dmTeleIds?: { purple: string[]; yellow: string[]; eye: string[]; fakeEye: string[] };
   dmMarch?: { id: string; dur: number }[]; // 성큼성큼 강제이동 본인 2개 (effectId + 만료초)
   dmTrapMine?: boolean; // 줄줄이 함정(13D6) 이번 부여에 본인 포함 (일반 타이머 중복 억제용)
   dmForsakenSet?: number; // 행방불명 탑 세트 번호 1~8 (행방불명=1, 빛의 파동마다 ++)
@@ -71,11 +73,14 @@ export interface Data extends RaidbossData {
 //
 // [위치 판정용 로그 신호]  (즉발기는 캐스트가 없어 좌표/텔레그래프로 판정)
 //   271 ActorSetPos                    선·텔레그래프 시점의 석상/장판 좌표(PosX/PosY/Heading).
-//   273 ActorControlExtra 019D|40|80   즉발기 '발동 N초 전 장판 텔레그래프' 신호. 액터 id로 위치 조회.
-//   fetchCombatants(헬퍼) → getCombatants  위 좌표/BNpcID를 게임 메모리에서 직접 읽음.
-//     ⚠ 에뮬레이터는 전투(InCombat) 구간만 재생 → 전투 시작 전 생성된 액터의 BNpcID는 못 읽음(폴백 발생).
+//   273 ActorControlExtra 019D|40|80   즉발기 '발동 N초 전 장판 텔레그래프' 신호. 액터 id가 기믹을 식별.
+//   fetchCombatants(헬퍼) → getCombatants  좌표/BNpcID를 게임 메모리에서 직접 읽음(트라인·블리자가 등 위치용).
+//     ⚠ 에뮬레이터는 전투(InCombat) 구간만 재생 → 전투 시작 전 생성된 액터의 BNpcID는 못 읽음.
+//   ↳ 중력파/박살·태만/아베는 BNpcID 대신 **텔레그래프 actor ID 산술**로 식별('신들의 상 텔레그래프 ID 수집').
+//     첫 019D(=blue 최고 ID)에서 유도 → getCombatants 불필요 + 에뮬에서도 동작(공식 PR #1069 방식).
 //
 // [BNpcID]  1EBFBC=중력파 1EBFBD=박살 · 1EBFBE=태만 1EBFBF=아베 · 1EBFB4=중앙장판(블리자가 등, 오발동 제외)
+//   (※ 위 4종은 이제 actor ID 산술로 식별 — BNpcID는 매핑 참고용)
 //
 // [헤드마커]  007F=산개 0080=쉐어 · 02A1=머리?(산개쉐어 반전) 02A2=없음 ·
 //             02A5=선더가?(안) 02A6=선더가 진실(밖) · 02CB=쉐어 02CC=개인 02CD=부채꼴(P2)
@@ -1335,13 +1340,12 @@ const triggerSet: TriggerSet<Data> = {
       },
     },
     {
-      id: 'DancingMad 중력파 박살 방향',
+      id: 'DancingMad 신들의 상 텔레그래프 ID 수집',
       type: 'ActorControlExtra',
-      // 중력파(BAB1, 왼쪽 절반)/박살(BAB2, 오른쪽 절반)은 즉발이라 캐스트가 없지만,
-      // 발동 5.1초 전 장판 텔레그래프 액터가 273 ActorControlExtra 019D|40|80 신호를 냄.
-      // 그 액터 위치로 어느 절반이 위험한지 판정: PosX<100=중력파(왼쪽 위험) / >100=박살(오른쪽 위험).
-      // 019D는 신들의 상 장판 범용 신호라 dmStatueCount===2(중력 페이즈)로 게이팅
-      // (중력탄/암석탄엔 019D 텔레그래프 없음 — 확인됨).
+      // 신들의 상 텔레그래프 엔티티(파동포/중력파/박살/태만/아베)는 전투 시작 시 연속된 actor ID로 동시 스폰.
+      //   첫 019D|40|80(=파동포 blue, 최고 ID) 하나로 나머지를 산술 유도 → getCombatants 없이 기믹 판별.
+      //   (BNpcID 의존 제거 → 에뮬레이터에서도 동작.) KR 로그 검증: id,id-1=blue / id-2,id-4=중력파 /
+      //   id-3,id-5=박살 / id-7,id-9=태만 / id-6,id-8=아베. (공식 PR #1069 방식 채택.)
       netRegex: {
         id: '4[0-9A-Fa-f]{7}',
         category: '019D',
@@ -1349,23 +1353,40 @@ const triggerSet: TriggerSet<Data> = {
         param2: '80',
         capture: true,
       },
-      condition: (data) => data.dmStatueCount === 2,
+      suppressSeconds: 99999, // 첫(=blue 최고 ID) 1회만 — 나머지는 산술로 유도
+      run: (data, matches) => {
+        const id = parseInt(matches.id, 16);
+        const hex = (n: number): string => n.toString(16).toUpperCase();
+        data.dmTeleIds = {
+          purple: [id - 2, id - 4].map(hex), // 중력파
+          yellow: [id - 3, id - 5].map(hex), // 박살
+          eye: [id - 7, id - 9].map(hex), // 태만
+          fakeEye: [id - 6, id - 8].map(hex), // 아베
+        };
+      },
+    },
+    {
+      id: 'DancingMad 중력파 박살 방향',
+      type: 'ActorControlExtra',
+      // 중력파(왼쪽 절반 위험)→오른쪽 / 박살(오른쪽 절반 위험)→왼쪽. 발동 ~5.1초 전 019D|40|80 텔레그래프 신호.
+      //   기믹 구분은 텔레그래프 엔티티 actor ID로('신들의 상 텔레그래프 ID 수집'이 산술 유도). getCombatants 불필요.
+      netRegex: {
+        id: '4[0-9A-Fa-f]{7}',
+        category: '019D',
+        param1: '40',
+        param2: '80',
+        capture: true,
+      },
+      condition: (data, matches) =>
+        data.dmStatueCount === 2 &&
+        ((data.dmTeleIds?.purple.includes(matches.id) ?? false) ||
+          (data.dmTeleIds?.yellow.includes(matches.id) ?? false)),
       durationSeconds: 5, // 텔레그래프(발동 5.1초 전) → 발동
       suppressSeconds: 2,
-      promise: async (data, matches) => {
-        data.combatantData = await fetchCombatants(matches.id);
-      },
-      alertText: (data, _matches, output) => {
-        const tele = data.combatantData?.[0];
-        if (tele === undefined)
-          return output.unknown!();
-        // 중력파/박살 텔레그래프는 BNpcID 1EBFBC(중력파)/1EBFBD(박살)뿐. 같은 페이즈의
-        // 다른 중앙 019D 장판(예: 1EBFB4 @ 100,100 = 블리자가 등)은 오발동이므로 제외.
-        if (tele.BNpcID !== 0x1EBFBC && tele.BNpcID !== 0x1EBFBD)
-          return;
-        // 위치 고정: 중력파(92,27) / 박살(116,43). 위험 절반의 반대로 대피.
-        return tele.PosX < 100 ? output.goRight!() : output.goLeft!();
-      },
+      alertText: (data, matches, output) =>
+        (data.dmTeleIds?.purple.includes(matches.id) ?? false)
+          ? output.goRight!()
+          : output.goLeft!(),
       outputStrings: {
         goRight: {
           en: 'Right (Gravity left)',
@@ -1375,23 +1396,16 @@ const triggerSet: TriggerSet<Data> = {
           en: 'Left (Comet right)',
           ko: '왼쪽으로',
         },
-        unknown: {
-          en: 'Dodge half (visual)',
-          ko: '반대편으로 (눈으로 볼 것)',
-        },
       },
     },
     // ───────── 신들의 상 3상: 태만·아베(시선) / 알쏭달쏭3 / 성모수마 ─────────
     {
       id: 'DancingMad 태만 아베 수집',
       type: 'ActorControlExtra',
-      // 태만의 신기(BAB4)/아베 마리아(BAB3)는 캐스트 없지만, 발동 ~10초 전 273 019D|40|80 텔레그래프로
-      // 미리 판정. 그 액터를 getCombatants로 읽어 BNpcID 구분: 1EBFBE=태만(뒤돌기) / 1EBFBF=아베(신상 보기).
+      // 태만의 신기(BAB4)/아베 마리아(BAB3)는 캐스트 없지만, 발동 ~10초 전 273 019D|40|80 텔레그래프로 미리 판정.
+      //   시선 구분은 텔레그래프 엔티티 actor ID로('신들의 상 텔레그래프 ID 수집' 산술 유도): eye=태만(뒤돌기) /
+      //   fakeEye=아베(신상 보기). getCombatants/BNpcID 제거 → 전투 전 스폰 BNpcID 손실 문제 없이 에뮬에서도 동작.
       //   판정 즉시 시선을 초록색으로 '미리' 안내 → 알쏭달쏭3 종합 안내 등장 직전(~5.7s 후)에 사라짐(duration).
-      //   (시선 외 019D 텔레그래프=성모수마 등은 BNpcID 불일치 → 표시 안 함.)
-      // NOTE(에뮬 한계): 이 텔레그래프 액터는 '전투 시작 전' 세팅 단계(엔게이지 ~26s 전)에 생성됨.
-      //   에뮬레이터는 전투(InCombat) 구간만 재생해 Add 시점의 BNpcID를 잃어버림 → 에뮬에선 표시 안 됨.
-      //   실전(live)은 getCombatants가 게임 메모리를 직접 읽어 BNpcID가 있으므로 정상 작동.
       netRegex: {
         id: '4[0-9A-Fa-f]{7}',
         category: '019D',
@@ -1399,27 +1413,18 @@ const triggerSet: TriggerSet<Data> = {
         param2: '80',
         capture: true,
       },
-      condition: (data) => data.dmStatueCount === 3,
+      condition: (data, matches) =>
+        data.dmStatueCount === 3 &&
+        ((data.dmTeleIds?.eye.includes(matches.id) ?? false) ||
+          (data.dmTeleIds?.fakeEye.includes(matches.id) ?? false)),
       // 미리 안내(텔레그래프) → 알쏭달쏭3 종합 안내 직전에 소멸. 알쏭달쏭3 delay가 0.2로 더 빨라져(BA94+0.2
       //   ≈ 텔레그래프+4.9s) 겹치지 않도록 4.5로 축소(선행 트리거 충돌 방지, 변동 여유 포함).
       durationSeconds: 4.5,
-      promise: async (data, matches) => {
-        data.combatantData = await fetchCombatants(matches.id);
-      },
-      // 시선 텔레그래프일 때만 초록으로 미리 표시(run보다 먼저 실행되므로 combatantData를 직접 판정).
-      infoText: (data, _matches, output) => {
-        const bnpc = data.combatantData?.[0]?.BNpcID;
-        if (bnpc === 0x1EBFBE)
-          return output.gaze!();
-        if (bnpc === 0x1EBFBF)
-          return output.look!();
-      },
-      run: (data) => {
-        const bnpc = data.combatantData?.[0]?.BNpcID;
-        if (bnpc === 0x1EBFBE)
-          data.dmGazeType = 'gaze';
-        else if (bnpc === 0x1EBFBF)
-          data.dmGazeType = 'look';
+      suppressSeconds: 5, // 활성 시선 엔티티 2개(id-7·id-9 등) 중복 발동 방지
+      infoText: (data, matches, output) =>
+        (data.dmTeleIds?.eye.includes(matches.id) ?? false) ? output.gaze!() : output.look!(),
+      run: (data, matches) => {
+        data.dmGazeType = (data.dmTeleIds?.eye.includes(matches.id) ?? false) ? 'gaze' : 'look';
       },
       outputStrings: {
         gaze: { en: 'Look Away (soon)', ko: '곧 뒤돌기' },
