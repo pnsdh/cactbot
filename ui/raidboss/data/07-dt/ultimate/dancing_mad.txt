@@ -141,77 +141,404 @@ hideall "--sync--"
 500.0 "갈기갈기 에어로가" Ability { id: "C3F7", source: "케프카" } window 500,20
 
 # =================================== P3: 카오스 · 엑스데스 ===================================
-# 업스트림 기반(미세 보정 필요). rsv 현지화명 사용(재구성/결전/자아도취 등).
-537.6 "재구성" Ability { id: "BAE2", source: "케프카" }
-543.7 "결전" Ability { id: "C2E3", source: "엑스데스" }
-543.7 "결전" #Ability { id: "C2E2", source: "카오스" }
-547.8 "--sync--" Ability { id: "C554", source: "케프카" }
-562.9 "고통의 심핵" Ability { id: "BAF2", source: "카오스" }
-581.9 "선더가" #Ability { id: "BB12", source: "엑스데스" }
-581.9 "혼돈의 불" #Ability { id: "BAF3", source: "케프카" }
-582.9 "화염" Ability { id: "BAF4", source: "카오스" }
-584.6 "회오리" Ability { id: "BAF8", source: "카오스" }
-590.9 "선더가" #Ability { id: "BB09", source: "엑스데스" }
-590.9 "선더가" #Ability { id: "BB0C", source: "엑스데스" }
-592.1 "회오리" Ability { id: "BAF8", source: "카오스" }
-593.9 "선더가" Ability { id: "BB0C", source: "엑스데스" }
-595.1 "회오리" #Ability { id: "BAF8", source: "카오스" }
-596.5 "--sync--" Ability { id: "C555", source: "케프카" }
-596.7 "회오리" #Ability { id: "BAF8", source: "카오스" }
-599.6 "혼돈의 물" Ability { id: "BAF6", source: "카오스" }
-600.6 "회오리" #Ability { id: "BAF8", source: "카오스" }
-600.6 "해일" Ability { id: "BAF5", source: "카오스" }
-602.3 "회오리" #Ability { id: "BAF8", source: "카오스" }
-602.3 "자아도취" Ability { id: "C2D6", source: "케프카" }
-603.5 "세로 내파" Ability { id: "BAFD", source: "카오스" }
-604.3 "충격파" #Ability { id: "BAFF", source: "카오스" }
-606.3 "충격파" #Ability { id: "BAFF", source: "카오스" }
+# ⚠ 업스트림(영문 커뮤니티 타임라인) 기반 — 유저 로그 미보정(공대가 P2에서 전멸해 P3 도달 로그 없음).
+#   id/타이밍은 업스트림 신뢰값. source명(네오 엑스데스·블랙홀)·표시명은 best-effort(미검증).
+537.7 "재구성" Ability { id: "BAE2", source: "케프카" }
+543.8 "결전" Ability { id: ["C2E3", "C2E2"], source: ["엑스데스", "카오스"] }
+548.0 "--sync--" Ability { id: "C554", source: "케프카" }
 
-# P2 전멸 시퀀스
+# 불·물·바람 원소
+563.1 "고통의 심핵" Ability { id: "BAF2", source: "카오스" }
+582.1 "혼돈의 물" Ability { id: "BAF6", source: "케프카" }
+582.1 "선더가" #Ability { id: "BB12", source: "엑스데스" }
+583.1 "해일" Ability { id: "BAF5", source: ["카오스", "케프카"] }
+584.9 "회오리" Ability { id: "BAF8", source: "카오스" }
+591.3 "선더가" Ability { id: "BB09", source: "엑스데스" }
+594.3 "선더가" #Ability { id: "BB0C", source: "엑스데스" }
+597.0 "--sync--" Ability { id: "C555", source: "케프카" }
+603.0 "자아도취" Ability { id: "C2D6", source: "케프카" }
+604.2 "세로 내파/가로 내파" Ability { id: ["BAFD", "BAFE"], source: "카오스" }
+605.0 "충격파" #Ability { id: "BAFF", source: "카오스" }
+609.0 "혼돈의 불" Ability { id: "BAF3", source: "카오스" }
+610.0 "화염" Ability { id: "BAF4", source: "카오스" }
+611.7 "회오리" Ability { id: "BAF8", source: "카오스" }
+
+# 한계돌파(예고 → 본번)
+620.3 "알테마 블래스터" #Ability { id: "BAE3", source: "케프카" }
+624.4 "그림자 타격" Ability { id: "BB00", source: "카오스" }
+627.3 "진공파" Ability { id: "BB13", source: "엑스데스" }
+631.3 "회오리" Ability { id: "BAF8", source: "카오스" }
+632.7 "에테르 연결" #Ability { id: ["C2E5", "C2E4"], source: ["엑스데스", "카오스"] }
+634.4 "알테마 블래스터" #Ability { id: "BAE3", source: "케프카" }
+642.4 "알테마 블래스터 (한계돌파)" #Ability { id: "BAE4", source: "케프카" }
+649.7 "선더가" Ability { id: "BB09", source: "엑스데스" }
+657.7 "결전" Ability { id: ["C2E3", "C2E2"], source: ["엑스데스", "카오스"] }
+666.8 "선더가" Ability { id: "BB09", source: "엑스데스" }
+
+# 거대 케프카 + 대지 원소 + 블랙홀
+668.6 "맥시멈" Ability { id: "BAE5", source: "케프카" }
+671.8 "지진" Ability { id: ["C571", "C572"], source: "카오스" }
+680.5 "지진" Ability { id: "BAFA", source: "카오스" }
+684.1 "지진" Ability { id: "BAFA", source: "카오스" }
+687.4 "철썩철썩 따귀" Ability { id: "BAE7", source: "케프카" }
+690.9 "철썩철썩 따귀" Ability { id: "BAE9", source: "케프카" }
+691.2 "블랙홀" Ability { id: "BAFB", source: "엑스데스" }
+698.3 "무의 파동" Ability { id: "BAFC", source: "블랙홀" }
+705.3 "무의 파동" Ability { id: "BAFC", source: "블랙홀" }
+708.4 "선더가" Ability { id: "BB09", source: "엑스데스" }
+712.7 "지진" Ability { id: "BAFA", source: "카오스" }
+716.5 "파멸 포고" Ability { id: "BB01", source: "카오스" }
+717.7 "철썩철썩 따귀" Ability { id: "BAE7", source: "케프카" }
+721.2 "철썩철썩 따귀" Ability { id: "BAE9", source: "케프카" }
+724.6 "검은 불꽃" Ability { id: "BCCD", source: "블랙홀" }
+728.6 "무의 파동" Ability { id: "BAFC", source: "블랙홀" }
+730.2 "지진" Ability { id: "BAFA", source: "카오스" }
+739.0 "무의 파동" Ability { id: "BAFC", source: "블랙홀" }
+744.0 "파멸 포고" Ability { id: "BB01", source: "카오스" }
+744.4 "있는 그대로의 나" Ability { id: "BAEC", source: "케프카" }
+745.4 "있는 그대로의 나" Ability { id: "BAEE", source: "케프카" }
+747.5 "검은 피" Ability { id: "C4BA", source: "케프카" }
+749.7 "선더가" Ability { id: "BB09", source: "엑스데스" }
+764.4 "지진" Ability { id: "BAFA", source: "카오스" }
+765.0 "에테르 연결" Ability { id: ["C2E5", "C2E4"], source: ["엑스데스", "카오스"] }
+769.6 "지진" Ability { id: "BAFA", source: "카오스" }
+784.2 "화이트홀" Ability { id: "BD66", source: "엑스데스" }
+784.2 "세로 내파/가로 내파" Ability { id: ["BAFD", "BAFE"], source: "카오스" }
+785.9 "철썩철썩 따귀" Ability { id: "BAE6", source: "케프카" }
+789.3 "겹충격" Ability { id: "BAEA", source: "케프카" }
+792.5 "검은 불꽃" Ability { id: "BCCD", source: ["블랙홀", "케프카"] }
+802.2 "있는 그대로의 나" Ability { id: "BAED", source: "케프카" }
+803.2 "있는 그대로의 나" Ability { id: "BAEE", source: "케프카" }
+
+# 블리자드 + 타워
+805.3 "--sync--" Ability { id: "C533", source: "케프카" }
+812.4 "블리자가" Ability { id: "BB0F", source: "엑스데스" }
+815.4 "블리자가" Ability { id: "BB0D", source: "엑스데스" }
+816.3 "쿵쿵 발 구르기 (시전)" Ability { id: "BAEF", source: "케프카" }
+817.9 "착탄하라" Ability { id: "BB02", source: "카오스" }
+818.0 "쿵쿵 발 구르기" Ability { id: "BAF0", source: "케프카" }
+823.3 "착탄" Ability { id: "BB03", source: "카오스" }
+826.4 "블리자가" Ability { id: "BB11", source: "엑스데스" }
+827.4 "돌출" Ability { id: ["BB05", "BB06"], source: "카오스" }
+
+# P3 종료 분기: 엑스데스 전멸 / 카오스·엑스데스 전멸 / P4 진입
+839.0 "--sync--" StartsUsing { id: "C61E", source: "엑스데스" } window 839,3 jump "p3-exdeath-enrage"
+840.8 "--sync--" StartsUsing { id: "C258", source: "엑스데스" } jump "p3-enrage"
+840.8 "--sync--" StartsUsing { id: "C259", source: "카오스" } jump "p3-enrage"
+845.8 "메테오 (P3 전멸기)" #Ability { id: "C258", source: "엑스데스" }
+845.8 "고통의 심핵 (P3 전멸기)" #Ability { id: "C259", source: "카오스" }
+
+
+# =================================== P4: 케프카 · 카오스 · 네오 엑스데스 ===================================
+995.0 "--sync--" StartsUsing { id: "C2DC", source: "케프카" } window 995,12000
+1000.0 "꼭두각시 영혼" Ability { id: "C2DC", source: "케프카" }
+1003.1 "--sync--" Ability { id: "C3FD", source: "케프카" }
+1009.4 "알쏭달쏭 마법 1" Ability { id: "BA94", source: "케프카" }
+1013.7 "그랜드크로스" Ability { id: "BB14", source: "네오 엑스데스" }
+1018.7 "화염/해일" Ability { id: ["BB20", "BB21"], source: "카오스" }
+1024.1 "알쏭달쏭 마법 2" Ability { id: "BA94", source: "케프카" }
+1028.4 "그랜드크로스" Ability { id: "BB14", source: "네오 엑스데스" }
+1033.5 "해일/화염" Ability { id: ["BB21", "BB20"], source: "카오스" }
+1039.2 "알쏭달쏭 마법 3" Ability { id: "BA94", source: "케프카" }
+1043.3 "그랜드크로스" Ability { id: "BB14", source: "네오 엑스데스" }
+1045.3 "--sync--" Ability { id: "C554", source: "케프카" }
+1055.4 "무의 범람" Ability { id: "C393", source: "네오 엑스데스" }
+1055.8 "생사의 갈림길" Ability { id: "C396", source: "네오 엑스데스" }
+1059.0 "--sync--" Ability { id: "C555", source: "케프카" }
+1059.7 "죽음의 격동" Ability { id: "BB1D", source: "네오 엑스데스" }
+1064.1 "마력 충전" Ability { id: "BAA4", source: "케프카" }
+1072.4 "찌릿찌릿 선더가" Ability { id: "C5DE", source: "케프카" }
+1073.4 "죽음의 비명" Ability { id: "BB16", source: "네오 엑스데스" }
+1082.5 "두근두근 알테마" Ability { id: "C24A", source: "케프카" }
+1085.3 "혼돈의 불" Ability { id: "BB23", source: "카오스" }
+1089.4 "죽음의 파도" Ability { id: "BB1B", source: "네오 엑스데스" }
+1090.4 "널리널리 블리자가" Ability { id: "BA9B", source: "케프카" }
+1097.2 "죽음의 비명" Ability { id: "BB17", source: "네오 엑스데스" }
+1103.5 "마력 방출" Ability { id: "BAA5", source: "케프카" }
+1107.6 "혼돈의 물" Ability { id: "BB25", source: "카오스" }
+1112.8 "--sync--" StartsUsing { id: "BABB", source: "케프카" } jump "p1-and-p4-enrage"
+1114.8 "--sync--" Ability { id: "C3FD", source: "케프카" } window 90,5 jump "p4-success"
+1117.8 "심판의 빛 (P4 전멸기)" #Ability { id: "BABB", source: "케프카" }
+
+
+# =================================== P5: 케프카 ===================================
+1255.6 label "p4-success"
+1255.6 "--sync--" Ability { id: "C3FD", source: "케프카" }
+1261.9 "두근두근 알테마" Ability { id: "C24A", source: "케프카" }
+1300.0 "연속 알테마" Ability { id: "BB40", source: "케프카" }
+1305.4 "--sync--" Ability { id: "C652", source: "케프카" }
+1306.3 "마격" Ability { id: ["C653", "C654", "C655"], source: "케프카" }
+1308.6 "--sync--" Ability { id: "C652", source: "케프카" }
+1309.5 "마격" Ability { id: ["C653", "C654", "C655"], source: "케프카" }
+1311.7 "--sync--" Ability { id: "C652", source: "케프카" }
+1312.6 "마격" Ability { id: ["C653", "C654", "C655"], source: "케프카" }
+1317.9 "플러드" Ability { id: "C13F", source: "케프카" }
+1330.9 "광기의 오케스트라" Ability { id: "BB50", source: "케프카" }
+1331.8 "홀리" Ability { id: "BB54", source: "케프카" }
+1334.0 "광기의 오케스트라" Ability { id: "BB51", source: "케프카" }
+1334.9 "홀리" Ability { id: "BB54", source: "케프카" }
+1338.3 "혼돈의 홀리" Ability { id: "BB56", source: "케프카" }
+1342.2 "--sync--" Ability { id: "C652", source: "케프카" }
+1343.1 "마격" Ability { id: ["C653", "C654", "C655"], source: "케프카" }
+1345.4 "--sync--" Ability { id: "C652", source: "케프카" }
+1346.3 "마격" Ability { id: ["C653", "C654", "C655"], source: "케프카" }
+1352.9 "세 개의 별" Ability { id: "BB42", source: "케프카" }
+1361.3 "두 가지 선택의 참사" Ability { id: "C24F", source: "케프카" }
+1362.0 "파이가/블리자가/선더가" Ability { id: ["BB43", "BB44", "BB45"], source: "케프카" }
+1362.1 "토네이도" Ability { id: "BB4B", source: "케프카" }
+1368.0 "파이가/블리자가/선더가" Ability { id: ["BB43", "BB44", "BB45"], source: "케프카" }
+1373.4 "두 가지 선택의 참사" Ability { id: "C24E", source: "케프카" }
+1374.0 "파이가/블리자가/선더가" Ability { id: ["BB43", "BB44", "BB45"], source: "케프카" }
+1374.2 "퀘이크" Ability { id: "BB4A", source: "케프카" }
+1382.2 "연속 알테마" Ability { id: "BB40", source: "케프카" }
+1387.6 "--sync--" Ability { id: "C652", source: "케프카" }
+1388.5 "마격" Ability { id: ["C653", "C654", "C655"], source: "케프카" }
+1390.8 "--sync--" Ability { id: "C652", source: "케프카" }
+1391.7 "마격" Ability { id: ["C653", "C654", "C655"], source: "케프카" }
+1397.1 "혼돈의 종말" Ability { id: "BB3B", source: "케프카" }
+1412.0 "혼돈의 와류" Ability { id: "BB3E", source: "케프카" }
+1412.9 "혼돈의 와류" Ability { id: "BB3F", source: "케프카" }
+1421.1 "광기의 오케스트라" Ability { id: "BB50", source: "케프카" }
+1422.0 "홀리" Ability { id: "BB54", source: "케프카" }
+1424.2 "광기의 오케스트라" Ability { id: "BB51", source: "케프카" }
+1425.1 "홀리" Ability { id: "BB54", source: "케프카" }
+1428.7 "확산 플레어" Ability { id: "BB55", source: "케프카" }
+1432.5 "--sync--" Ability { id: "C652", source: "케프카" }
+1433.4 "마격" Ability { id: ["C653", "C654", "C655"], source: "케프카" }
+1435.7 "--sync--" Ability { id: "C652", source: "케프카" }
+1436.6 "마격" Ability { id: ["C653", "C654", "C655"], source: "케프카" }
+1438.9 "--sync--" Ability { id: "C652", source: "케프카" }
+1439.8 "마격" Ability { id: ["C653", "C654", "C655"], source: "케프카" }
+
+# P5 전멸 시퀀스
+1451.1 "행방불명 1" Ability { id: "BB35", source: "케프카" }
+1459.1 "행방불명 2" Ability { id: "BB36", source: "케프카" }
+1467.1 "행방불명 3" Ability { id: "BB36", source: "케프카" }
+1475.1 "행방불명 4" Ability { id: "BB36", source: "케프카" }
+1485.1 "--sync--" StartsUsing { id: "BB3A", source: "케프카" }
+1511.1 "행방불명: 소실 (P5 전멸기)" Ability { id: "BB3A", source: "케프카" }
+
+
+# === 전멸 시퀀스 라벨 ===
+# P1·P4 전멸
+10000.0 label "p1-and-p4-enrage"
+10005.0 "심판의 빛 (전멸기)" Ability { id: "BABB", source: "케프카" }
+
+# P2 전멸
 10376.2 label "p2-enrage"
 10381.2 "심판의 빛 (P2 전멸기)" #Ability { id: "BAE1", source: "케프카" }
+
+# P3 전멸 (카오스·엑스데스)
+10840.8 label "p3-enrage"
+10845.8 "고통의 심핵 (P3 전멸기)" Ability { id: "C259", source: "카오스" }
+10845.8 "메테오 (P3 전멸기)" Ability { id: "C258", source: "엑스데스" }
+
+# P3 엑스데스 전멸
+11839.0 label "p3-exdeath-enrage"
+11849.0 "메테오 (엑스데스 전멸기)" StartsUsing { id: "C61E", source: "엑스데스" }
+
+# P4 전멸
+12000.0 label "p4-enrage"
+12005.0 "심판의 빛 (P4 전멸기)" Ability { id: "BABB", source: "케프카" }
 
 
 # ============================================================
 # 스킬 사전 (전 인카운터 ID — 업스트림 ALL ENCOUNTER ABILITIES 번역 + KR명)
 # VFX=시각효과 / 피해=실제 데미지. -ii(무시) 대상은 [무시] 표기.
 # ============================================================
+# P3~P5(BAE2~)는 ref/exd RSV 테이블(ko/global_751_kr.txt)·Action.csv로 KR명 확정. C4BA·C652는 테이블에 없어 best-effort.
+#
 # --- P1: 케프카 / 신들의 상 ---
-# C403 파삭파삭 루인가(1타) / C4E1 파삭파삭 루인가(2타)
-# C622 심판의 빛(P1 광역) / BABB 심판의 빛(P1 전멸기)
-# C24B 하이퍼드라이브 / BCF2 신들의 상(소환) / C3FD --sync-- 보스 중앙 점프
+# C403 파삭파삭 루인가(1타)
+# C4E1 파삭파삭 루인가(2타)
+# C622 심판의 빛(P1 광역)
+# BABB 심판의 빛(P1 전멸기)
+# C24B 하이퍼드라이브
+# BCF2 신들의 상(소환)
+# C3FD --sync-- 보스 중앙 점프
 # BA94 알쏭달쏭 마법
-# BA95 널리널리 블리자가: VFX(BA98 짝) [무시] / BA98 〃 피해(가짜?)
-# BA9B 널리널리 블리자가: VFX(BA9E 짝)      / BA9E 〃 피해 [무시]
-# BA9F 찌릿찌릿 선더가: 피해(가짜?, VFX 없음) / BAA0 〃 VFX(BAA1 짝) [무시] / BAA1 〃 피해
-# BAA2 이글이글 파이가: 산개 피해 / BAA3 이글이글 파이가: 쉐어 피해 (※ 풀마다 id 갈림)
-# BAA9 파동탄 / BAA8 파동포 / BAAA 폭발(타워 미처리 시) / BAAB 대폭발(타워 미흡수=전멸급) [무시]
-# BAA6 줄줄이 함정: VFX / BAA7 줄줄이 함정
-# BAAC 중력탄 / BAB0 암석탄
-# BAAF 그라비가(중력탄 장판 적기 흡수) [무시] / BAAD 중력 폭발(암석탄·중력탄 장판 겹침) [무시]
-# BAB1 중력파 / BAB2 박살의 신기
-# BAB3 아베 마리아 / BAB4 태만의 신기 / BAB5 성모의 신기 / BAB6 수마의 신기
-# BAB9 성큼성큼 텔레포: VFX / BABA 성큼성큼 텔레포
+# BA95 널리널리 블리자가: VFX(BA98 짝) [무시]
+# BA98 널리널리 블리자가: 피해(가짜?)
+# BA9B 널리널리 블리자가: VFX(BA9E 짝)
+# BA9E 널리널리 블리자가: 피해 [무시]
+# BA9F 찌릿찌릿 선더가: 피해(가짜?, VFX 없음)
+# BAA0 찌릿찌릿 선더가: VFX(BAA1 짝) [무시]
+# BAA1 찌릿찌릿 선더가: 피해
+# BAA2 이글이글 파이가: 산개 피해
+# BAA3 이글이글 파이가: 쉐어 피해 (※ 풀마다 id 갈림)
+# BAA9 파동탄
+# BAA8 파동포
+# BAAA 폭발(타워 미처리 시)
+# BAAB 대폭발(타워 미흡수=전멸급) [무시]
+# BAA6 줄줄이 함정: VFX
+# BAA7 줄줄이 함정
+# BAAC 중력탄
+# BAB0 암석탄
+# BAAF 그라비가(중력탄 장판 적기 흡수) [무시]
+# BAAD 중력 폭발(암석탄·중력탄 장판 겹침) [무시]
+# BAB1 중력파
+# BAB2 박살의 신기
+# BAB3 아베 마리아
+# BAB4 태만의 신기
+# BAB5 성모의 신기
+# BAB6 수마의 신기
+# BAB9 성큼성큼 텔레포: VFX
+# BABA 성큼성큼 텔레포
 # --- P2: God 케프카 ---
-# C24C 종말의 포옹 / BABC 행방불명
-# BABD 심판의 빛(P2) / BAE1 심판의 빛(P2 전멸기)
-# BABE 빛의 파동 / BABF 빛의 대파동
-# BAC0 위험한 주문: 집중(쉐어) / BAC1 위험한 주문: 분산(개인) / BAC2 위험한 주문: 파동(부채꼴)
-# BAD2 미래의 종언: VFX / BAD3 과거의 종언: VFX
-# BAD6 미래의 종언: 피해(1인) [무시] / BAD7 과거의 종언: 피해(1인) [무시]
-# BAD8 미래의 종언: 피해(3인) [무시] / BAD9 과거의 종언: 피해(3인) [무시]
-# BADC / BADD 소멸의 발차기
-# BADF / BAE0 트라인 / BACD · BACE · BACF · C487 파괴의 날개
+# C24C 종말의 포옹
+# BABC 행방불명
+# BABD 심판의 빛(P2)
+# BAE1 심판의 빛(P2 전멸기)
+# BABE 빛의 파동
+# BABF 빛의 대파동
+# BAC0 위험한 주문: 집중(쉐어)
+# BAC1 위험한 주문: 분산(개인)
+# BAC2 위험한 주문: 파동(부채꼴)
+# BAD2 미래의 종언: VFX
+# BAD3 과거의 종언: VFX
+# BAD6 미래의 종언: 피해(1인) [무시]
+# BAD7 과거의 종언: 피해(1인) [무시]
+# BAD8 미래의 종언: 피해(3인) [무시]
+# BAD9 과거의 종언: 피해(3인) [무시]
+# BADC 소멸의 발차기(미래)
+# BADD 소멸의 발차기(과거)
+# BADF 트라인(시전)
+# BAE0 트라인(폭발)
+# BACD 파괴의 날개(왼쪽)
+# BACE 파괴의 날개(오른쪽)
+# C487 파괴의 날개(양쪽 시전)
+# BACF 파괴의 날개(양쪽 피해)
 # C3F7 갈기갈기 에어로가 (→ P3 진입)
 # --- P3: 카오스 · 엑스데스 ---
-# BAE2 재구성 / C2E2 · C2E3 결전 / C2D6 자아도취
-# BAF2 고통의 심핵 / BAF3 혼돈의 불 / BAF4 화염 / BAF5 해일 / BAF6 혼돈의 물
-# BAF8 회오리 / BAFD 세로 내파 / BAFF 충격파 / BB09 · BB0C · BB12 선더가
+# BAE2 재구성
+# C2E2 결전 (카오스)
+# C2E3 결전 (엑스데스)
+# C2D6 자아도취
+# C2E4 에테르 연결 (카오스)
+# C2E5 에테르 연결 (엑스데스)
+# BAF2 고통의 심핵
+# BAF3 혼돈의 불
+# BAF4 화염
+# BAF5 해일
+# BAF6 혼돈의 물
+# BAF8 회오리
+# BAFD 세로 내파
+# BAFE 가로 내파
+# BAFF 충격파
+# BB09 선더가
+# BB0C 선더가
+# BB12 선더가
+# BAE3 알테마 블래스터
+# BAE4 알테마 블래스터(한계돌파)
+# BB00 그림자 타격
+# BB13 진공파
+# BAE5 맥시멈(거대화)
+# C571 지진
+# C572 지진
+# BAFA 지진
+# BB01 파멸 포고
+# BAE6 철썩철썩 따귀
+# BAE7 철썩철썩 따귀
+# BAE9 철썩철썩 따귀
+# BAEA 겹충격
+# BAEB 충격파
+# BAEC 있는 그대로의 나
+# BAED 있는 그대로의 나
+# BAEE 있는 그대로의 나
+# C4BA 검은 피 (※ 테이블 없음, best-effort)
+# BAFB 블랙홀
+# BAFC 무의 파동
+# BCCD 검은 불꽃
+# BD66 화이트홀
+# BAEF 쿵쿵 발 구르기(시전)
+# BAF0 쿵쿵 발 구르기
+# BB02 착탄하라
+# BB03 착탄
+# BB0D 블리자가
+# BB0F 블리자가
+# BB11 블리자가
+# BB05 돌출하라
+# BB06 돌출
+# C61E 메테오(엑스데스 전멸기)
+# C258 메테오(P3 전멸)
+# C259 고통의 심핵(P3 전멸)
+# --- P4: 케프카 · 카오스 · 네오 엑스데스 ---
+# C2DC 꼭두각시 영혼
+# BB14 그랜드크로스
+# BB20 화염
+# BB21 해일
+# C392 무의 범람
+# C393 무의 범람
+# C3A2 무의 범람
+# C396 생사의 갈림길
+# C394 산 자의 암흑광
+# C395 죽은 자의 암흑광
+# BB1C 죽음의 격동
+# BB1D 죽음의 격동
+# BB15 죽음의 폭탄
+# BB16 죽음의 비명
+# BB17 죽음의 비명
+# BB18 죽음의 번개
+# BB19 죽음의 번개
+# BB1A 죽음의 파도
+# BB1B 죽음의 파도
+# BAA4 마력 충전
+# BAA5 마력 방출
+# C24A 두근두근 알테마
+# C5DE 찌릿찌릿 선더가
+# BB23 혼돈의 불
+# BB25 혼돈의 물
+# BABB 심판의 빛(P4 전멸기)
+# --- P5: 케프카 ---
+# BB40 연속 알테마
+# BB41 연속 알테마
+# C652 --sync-- (마격 시전)
+# C653 마격 (탱커)
+# C654 마격 (힐러)
+# C655 마격 (딜러)
+# C13F 플러드
+# C269 플러드
+# BB4F 혼돈의 홍수
+# BB50 광기의 오케스트라
+# BB51 광기의 오케스트라
+# BB52 플레어
+# BB53 혼돈의 플레어
+# BB54 홀리
+# BB55 확산 플레어
+# BB56 혼돈의 홀리
+# BB42 세 개의 별
+# C24E 두 가지 선택의 참사
+# C24F 두 가지 선택의 참사
+# BB43 파이가
+# BB44 블리자가
+# BB45 선더가
+# BB4A 퀘이크
+# BB4B 토네이도
+# BB3B 혼돈의 종말
+# BB3E 혼돈의 와류
+# BB3F 혼돈의 와류
+# BB35 행방불명
+# BB36 행방불명
+# BB37 행방불명: 지면
+# BB39 행방불명: 유대
+# BB3A 행방불명: 소실(P5 전멸기)
 # --- sync/평타 전용(내부) ---
-# C252 케프카 평타(P1)·카오스 평타(P3) [무시] / C250 엑스데스 평타(P3) [무시]
-# C554 · C555 --sync-- / (C3FD는 P1 항목 참조)
+# C252 케프카 평타(P1)·카오스 평타(P3) [무시]
+# C250 엑스데스 평타(P3) [무시]
+# C554 --sync--
+# C555 --sync--
+# C533 --sync--
 # --- 아군 펫 (타임라인 -ic 제외 대상) ---
-# 322 빛의 치유 / 323 빛의 속삭임 / 325 요정의 광휘 (카벙클)
-# 40A3 위안 / 40A4 세라핌의 보호 / 40A7 세라핌의 광휘 (세라핌)
+# 322 빛의 치유 (카벙클)
+# 323 빛의 속삭임 (카벙클)
+# 325 요정의 광휘 (카벙클)
+# 40A3 위안 (세라핌)
+# 40A4 세라핌의 보호 (세라핌)
+# 40A7 세라핌의 광휘 (세라핌)
 # 1D11 지상의 큰별 폭발 (지상의 별)
-# 45F0 심연의 갈증 / 45F4 칠흑검 / 45F5 피보라 / 6519 칠흑 도래 / 9045 경멸 / 9670 그림자 걸음 (영웅의 환영)
+# 45F0 심연의 갈증 (영웅의 환영)
+# 45F4 칠흑검 (영웅의 환영)
+# 45F5 피보라 (영웅의 환영)
+# 6519 칠흑 도래 (영웅의 환영)
+# 9045 경멸 (영웅의 환영)
+# 9670 그림자 걸음 (영웅의 환영)
