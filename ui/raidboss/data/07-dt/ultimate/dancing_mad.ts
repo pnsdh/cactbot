@@ -27,7 +27,7 @@ export interface Data extends RaidbossData {
   readonly triggerSetConfig: {
     dmForsakenMethod: ForsakenMethod;
     dmForsakenSwap: 'upper' | 'lower';
-    dmForsakenSubCaster: 'auto' | 'blm' | 'smn' | 'rdm' | 'pct';
+    dmFakeMeleeCaster: 'fwd' | 'rev';
   };
   phase: Phase | 'unknown';
   combatantData?: PluginCombatantState[];
@@ -171,25 +171,21 @@ const forsakenJobOf = (data: Data, name: string): Job | undefined => {
   return p === undefined ? undefined : Util.jobEnumToJob(p.job);
 };
 
-// 근딜1·원딜3 등 비표준 딜러 구성 대응: 한 캐스터가 '근딜 자리(왼쪽 탑)'를 대체.
-//   설정 dmForsakenSubCaster로 대체 캐스터 지정. '자동'이면 적마>소환>흑마>픽토 순으로 1명 자동 선정.
-const forsakenSubCasterJob: { [k: string]: Job } = {
-  rdm: 'RDM',
-  smn: 'SMN',
-  blm: 'BLM',
-  pct: 'PCT',
-};
-const forsakenCasterAutoOrder: { [job: string]: number } = { RDM: 0, SMN: 1, BLM: 2, PCT: 3 };
+// 근딜1·캐스터2 구성 대응: 한 캐스터가 '근딜 자리(왼쪽 탑)'를 대체. 우선순위 높은 캐스터가 근딜측.
+//   프리셋 2개(정방향 적>소>흑>픽 / 역방향 픽>흑>소>적)는 서로 완전 역순 → 2캐스터의 모든 쌍에서
+//   원하는 쪽을 근딜측으로 지정 가능(설정 dmFakeMeleeCaster).
+const forsakenCasterFwd: { [job: string]: number } = { RDM: 0, SMN: 1, BLM: 2, PCT: 3 };
+const forsakenCasterRev: { [job: string]: number } = { PCT: 0, BLM: 1, SMN: 2, RDM: 3 };
 
-// 딜러 L(근딜측) 우선순위. 작을수록 왼쪽 탑. 근딜0 < 지정 대체캐스터1 < 캐스터(적·소·흑·픽) < 물리원딜.
+// 딜러 L(근딜측) 우선순위. 작을수록 왼쪽 탑. 근딜0 < 캐스터(프리셋 순) < 물리원딜.
 const forsakenDpsLPriority = (data: Data, job: Job): number => {
   if (Util.isMeleeDpsJob(job))
     return 0;
   if (Util.isCasterDpsJob(job)) {
-    const sub = forsakenSubCasterJob[data.triggerSetConfig.dmForsakenSubCaster];
-    if (sub !== undefined && job === sub)
-      return 1;
-    return 2 + (forsakenCasterAutoOrder[job] ?? 9);
+    const map = data.triggerSetConfig.dmFakeMeleeCaster === 'rev'
+      ? forsakenCasterRev
+      : forsakenCasterFwd;
+    return 2 + (map[job] ?? 9);
   }
   return 20; // 물리원딜(유격) 등 → 오른쪽 탑(원딜측) 고정
 };
@@ -777,6 +773,32 @@ const triggerSet: TriggerSet<Data> = {
   zoneId: ZoneId.DancingMadUltimate,
   config: [
     {
+      id: 'dmFakeMeleeCaster',
+      name: {
+        en: 'Fake-melee caster priority',
+        ko: '근딜 자리 캐스터 우선순위',
+      },
+      comment: {
+        en:
+          'When the party runs 2 casters, which one plays the melee (fake-melee) spot in mechanics that split DPS into melee/ranged sides. The higher-priority caster is the fake melee. The two presets are exact reverses, so any caster pair can pick either side. ' +
+          '(Currently used by P2 Forsaken; kept fight-wide for future use.)',
+        ko:
+          '캐스터 2명 구성에서, 딜러를 근딜/원딜로 가르는 기믹에서 어느 캐스터가 근딜 자리(fake-melee)를 맡을지. 우선순위 높은(왼쪽) 캐스터가 근딜 자리.',
+      },
+      type: 'select',
+      options: {
+        en: {
+          'RDM > SMN > BLM > PCT': 'fwd',
+          'PCT > BLM > SMN > RDM': 'rev',
+        },
+        ko: {
+          '적마>소환>흑마>픽토': 'fwd',
+          '픽토>흑마>소환>적마': 'rev',
+        },
+      },
+      default: 'fwd',
+    },
+    {
       id: 'dmForsakenMethod',
       name: {
         en: 'P2 Forsaken strategy',
@@ -785,7 +807,7 @@ const triggerSet: TriggerSet<Data> = {
       comment: {
         en:
           'Position strategy for the P2 Forsaken tower phase. A/B group, order, and timing are identical.',
-        ko: '행방불명(탑) 구간 위치 안내 공략. A/B조·순서·타이밍은 두 공략 모두 동일하고 위치만 다릅니다.',
+        ko: '행방불명 공략별 위치 안내 방식 설정',
       },
       type: 'select',
       options: {
@@ -804,12 +826,12 @@ const triggerSet: TriggerSet<Data> = {
       id: 'dmForsakenSwap',
       name: {
         en: 'P2 Forsaken swap person (09STOP only)',
-        ko: 'P2 행방불명 스왑 주체 (09STOP 전용)',
+        ko: 'P2 행방불명 스왑 주체 (09STOP)',
       },
       comment: {
         en:
           'When two same markers land on one tower, who moves to the other tower: Lower = relative-south person (default), Upper = relative-north person.',
-        ko: '09STOP에서 한 탑에 같은 마커 2명이 몰리면 누가 반대 탑으로 넘어가는지. 아랫사람=상대남(기본) / 윗사람=상대북.',
+        ko: '09STOP에서 한 탑에 같은 마커 2명이 겹치면 누가 반대 탑으로 넘어가는지 설정. 아랫사람=상대남(기본) / 윗사람=상대북.',
       },
       type: 'select',
       options: {
@@ -823,37 +845,6 @@ const triggerSet: TriggerSet<Data> = {
         },
       },
       default: 'lower',
-    },
-    {
-      id: 'dmForsakenSubCaster',
-      name: {
-        en: 'P2 Forsaken melee-substitute caster',
-        ko: 'P2 행방불명 근딜 대체 캐스터',
-      },
-      comment: {
-        en:
-          'For non-standard DPS comps (e.g. 1 melee + 3 ranged), which caster takes the melee (left tower) spot. Auto = pick by RDM > SMN > BLM > PCT among present casters. Ignored for standard 2-melee comps.',
-        ko:
-          '근딜1·원딜3 같은 비표준 딜러 구성에서 어느 캐스터가 근딜(왼쪽 탑) 자리를 대체할지. 자동 = 파티에 있는 캐스터 중 적마>소환>흑마>픽토 순. 표준(근딜2) 구성에선 무시됩니다.',
-      },
-      type: 'select',
-      options: {
-        en: {
-          'Auto (RDM > SMN > BLM > PCT)': 'auto',
-          'Black Mage': 'blm',
-          'Summoner': 'smn',
-          'Red Mage': 'rdm',
-          'Pictomancer': 'pct',
-        },
-        ko: {
-          '자동 (적마>소환>흑마>픽토)': 'auto',
-          '흑마법사': 'blm',
-          '소환사': 'smn',
-          '적마도사': 'rdm',
-          '픽토맨서': 'pct',
-        },
-      },
-      default: 'auto',
     },
   ],
   timelineFile: 'dancing_mad.txt',
