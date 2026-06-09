@@ -32,6 +32,7 @@ export interface Data extends RaidbossData {
   };
   phase: Phase | 'unknown';
   combatantData?: PluginCombatantState[];
+  dmSigns?: { [name: string]: string }; // 현재 머리 사인 {플레이어 이름 → 영문 id(attack1·bind1·ignore1·square 등)}
   dmKnockbackGroup?: boolean;
   dmHeadInvert?: boolean;
   dmSpreadBase?: boolean; // 007F=true(산개) / 0080=false(쉐어) / undefined=이번 조합엔 없음
@@ -57,6 +58,29 @@ export interface Data extends RaidbossData {
   dmForsakenCurrent?: { [name: string]: ForsakenRole }; // 8명 현재 마커(매 부여 덮어씀, 리셋X). 홀수탑 위치용
   dmForsakenPos?: { [name: string]: ForsakenPos }; // 09STOP 전용: 처리자별 직전 탑 위치(스왑 판정용)
 }
+
+// 머리 사인(표식) waymark 번호 → 영문 사인 id(cactbot 관례). 인게임 전체 캡처로 검증(2026-06-10).
+//   attack1~5=0~4 / attack6~8=14~16(클래식 enum 뒤에 추가) / bind1~3=5~7 / ignore1~2=8~9(금지) /
+//   square10(네모) circle11(동그라미) cross12(십자) triangle13(세모).
+const dmSignNames: { [waymark: string]: string } = {
+  '0': 'attack1',
+  '1': 'attack2',
+  '2': 'attack3',
+  '3': 'attack4',
+  '4': 'attack5',
+  '14': 'attack6',
+  '15': 'attack7',
+  '16': 'attack8',
+  '5': 'bind1',
+  '6': 'bind2',
+  '7': 'bind3',
+  '8': 'ignore1',
+  '9': 'ignore2',
+  '10': 'square',
+  '11': 'circle',
+  '12': 'cross',
+  '13': 'triangle',
+};
 
 // =============================================================================
 // Dancing Mad (Ultimate) / 절 요성난무 — 개인용(한글), P1 중심
@@ -893,6 +917,25 @@ const triggerSet: TriggerSet<Data> = {
       // 종말의 포옹(C24C)=P2 / 갈기갈기 에어로가(C3F7)=P3 진입 시점에 data.phase 갱신.
       netRegex: { id: Object.keys(phases) },
       run: (data, matches) => data.phase = phases[matches.id] ?? 'unknown',
+    },
+    {
+      id: 'DancingMad 사인 수집',
+      type: 'NetworkTargetMarker',
+      // 머리 표식(공격/속박/금지/도형) = type 29 SignMarker. 부여/해제 추적 → data.dmSigns[이름]=영문 id.
+      //   consumer는 기믹별로 추가: 예) data.dmSigns?.[data.me] === 'attack1' / ?.startsWith('attack').
+      //   waymark 번호표 = dmSignNames. 출력 시 KR명은 consumer outputStrings에서(attack1→공격1 등).
+      //   ⚠ 전투 시작 전(카운트다운)에 찍은 사인은 라이브선 보이나 에뮬레이터(InCombat 재생)에선 누락될 수 있음.
+      netRegex: {},
+      run: (data, matches) => {
+        data.dmSigns ??= {};
+        if (matches.operation === 'Delete') {
+          delete data.dmSigns[matches.targetName];
+          return;
+        }
+        const name = dmSignNames[matches.waymark];
+        if (name !== undefined)
+          data.dmSigns[matches.targetName] = name;
+      },
     },
     // ───────── 전체공격 ─────────
     {
