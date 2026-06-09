@@ -27,6 +27,7 @@ export interface Data extends RaidbossData {
   readonly triggerSetConfig: {
     dmForsakenMethod: ForsakenMethod;
     dmForsakenSwap: 'upper' | 'lower';
+    dmForsakenSubCaster: 'auto' | 'blm' | 'smn' | 'rdm' | 'pct';
   };
   phase: Phase | 'unknown';
   combatantData?: PluginCombatantState[];
@@ -49,6 +50,7 @@ export interface Data extends RaidbossData {
   dmForsakenAGroup?: string[]; // A조 이름들(1·2·3탑 빛의 파동 피격자 = '조 판정'이 수집)
   dmForsakenA8Marks?: { [name: string]: ForsakenRole }; // A조 8탑 마커(set4 버스트 = 3탑 처리 후)
   dmForsakenEndCount?: number; // 종언(분신 설치) 횟수 1~4. 4=8탑(마지막, 다음 홀수탑 없음)
+  dmForsakenLastEnd?: 'future' | 'past'; // 직전 종언 방향(BAD2미래/BAD3과거). 8탑 후 이동!/대기! 판정용
   dmForsakenCurrent?: { [name: string]: ForsakenRole }; // 8명 현재 마커(매 부여 덮어씀, 리셋X). 홀수탑 위치용
   dmForsakenPos?: { [name: string]: ForsakenPos }; // 09STOP 전용: 처리자별 직전 탑 위치(스왑 판정용)
 }
@@ -137,12 +139,14 @@ const forsakenRole = (id: string): ForsakenRole | undefined => {
   return undefined;
 };
 
-// 표준 구성(탱2·힐2·근딜2·원딜2[원딜=물리원딜+캐스터]) 여부. 비표준이면 우선순위 판정 불가 → 상세 생략.
+// 지원 구성: 탱2·힐2 + ① 근딜2(표준, 캐스터/유격 비율 무관) 또는 ② 근딜1·캐스터2·유격1(캐스터1명이 근딜 대체).
+//   그 외(근딜3·근딜1캐스터1유격2 등)는 미지원 → 폴백(징/마커종류만). 딜러 좌우는 조-국소 2:2 분배로 처리.
 const isStdComp = (data: Data): boolean => {
   let t = 0;
   let h = 0;
-  let m = 0;
-  let r = 0;
+  let m = 0; // 근딜
+  let c = 0; // 캐스터
+  let r = 0; // 물리원딜(유격)
   for (const p of data.party.details) {
     if (!p.inParty)
       continue;
@@ -153,25 +157,87 @@ const isStdComp = (data: Data): boolean => {
       h++;
     else if (Util.isMeleeDpsJob(job))
       m++;
-    else if (Util.isRangedDpsJob(job) || Util.isCasterDpsJob(job))
+    else if (Util.isCasterDpsJob(job))
+      c++;
+    else if (Util.isRangedDpsJob(job))
       r++;
   }
-  return t === 2 && h === 2 && m === 2 && r === 2;
+  // ① 근딜2(원딜 구성 무관) 또는 ② 근딜1+캐스터2(+유격1, 캐스터 대체). 그 외 딜러 구성은 미지원.
+  return t === 2 && h === 2 && m + c + r === 4 && (m === 2 || (m === 1 && c === 2));
 };
 
-// 행방불명 우선순위 랭크: 힐0 < 탱1 < 근딜2 < 원딜3 (작을수록 우선순위 높음 = 라인 왼쪽).
-const forsakenRank = (job: Job): number => {
+const forsakenJobOf = (data: Data, name: string): Job | undefined => {
+  const p = data.party.details.find((x) => x.name === name);
+  return p === undefined ? undefined : Util.jobEnumToJob(p.job);
+};
+
+// 근딜1·원딜3 등 비표준 딜러 구성 대응: 한 캐스터가 '근딜 자리(왼쪽 탑)'를 대체.
+//   설정 dmForsakenSubCaster로 대체 캐스터 지정. '자동'이면 적마>소환>흑마>픽토 순으로 1명 자동 선정.
+const forsakenSubCasterJob: { [k: string]: Job } = {
+  rdm: 'RDM',
+  smn: 'SMN',
+  blm: 'BLM',
+  pct: 'PCT',
+};
+const forsakenCasterAutoOrder: { [job: string]: number } = { RDM: 0, SMN: 1, BLM: 2, PCT: 3 };
+
+// 딜러 L(근딜측) 우선순위. 작을수록 왼쪽 탑. 근딜0 < 지정 대체캐스터1 < 캐스터(적·소·흑·픽) < 물리원딜.
+const forsakenDpsLPriority = (data: Data, job: Job): number => {
+  if (Util.isMeleeDpsJob(job))
+    return 0;
+  if (Util.isCasterDpsJob(job)) {
+    const sub = forsakenSubCasterJob[data.triggerSetConfig.dmForsakenSubCaster];
+    if (sub !== undefined && job === sub)
+      return 1;
+    return 2 + (forsakenCasterAutoOrder[job] ?? 9);
+  }
+  return 20; // 물리원딜(유격) 등 → 오른쪽 탑(원딜측) 고정
+};
+
+// 내 행방불명 조(A/B) 4명 이름. A=AGroup(1탑 피격자) / B=그 외 inParty(=dmForsakenGroup 미설정자).
+const forsakenMyGroupNames = (data: Data): string[] => {
+  const a = data.dmForsakenAGroup ?? [];
+  if (data.dmForsakenGroup === 'A')
+    return [...a];
+  return data.party.details.filter((p) => p.inParty && !a.includes(p.name)).map((p) => p.name);
+};
+
+// 조 4명 중 '근딜측(L)'에 설 딜러 이름 집합. 근딜측 인원 = 2 - 조내 힐러수 (힐=L·탱=R 고정).
+//   딜러를 L우선순위로 정렬해 상위 N명을 근딜측으로. → 어떤 조든 L 2명·R 2명 균형 유지.
+const forsakenGroupMeleeSide = (data: Data, group: string[]): Set<string> => {
+  let healers = 0;
+  const dps: { name: string; pri: number }[] = [];
+  for (const name of group) {
+    const job = forsakenJobOf(data, name);
+    if (job === undefined)
+      continue;
+    if (Util.isHealerJob(job))
+      healers++;
+    else if (!Util.isTankJob(job))
+      dps.push({ name: name, pri: forsakenDpsLPriority(data, job) });
+  }
+  dps.sort((x, y) => x.pri - y.pri || x.name.localeCompare(y.name));
+  return new Set(dps.slice(0, Math.max(0, 2 - healers)).map((d) => d.name));
+};
+
+// 본인이 내 조의 근딜측(L)인가 (딜러 한정; 탱힐은 호출 전에 분기).
+const forsakenIsMeleeSide = (data: Data): boolean =>
+  forsakenGroupMeleeSide(data, forsakenMyGroupNames(data)).has(data.me ?? '');
+
+// 행방불명 우선순위 랭크: 힐0 < 탱1 < 근딜측딜2 < 원딜측딜3 (작을수록 라인 왼쪽). 딜러 좌우는 조-국소 결정.
+const forsakenRank = (data: Data, name: string): number => {
+  const job = forsakenJobOf(data, name);
+  if (job === undefined)
+    return 3;
   if (Util.isHealerJob(job))
     return 0;
   if (Util.isTankJob(job))
     return 1;
-  if (Util.isMeleeDpsJob(job))
-    return 2;
-  return 3; // 원딜(물리원딜/캐스터)
+  return forsakenGroupMeleeSide(data, forsakenMyGroupNames(data)).has(name) ? 2 : 3;
 };
 const forsakenRankByName = (data: Data, name: string): number | undefined => {
   const p = data.party.details.find((x) => x.name === name);
-  return p === undefined ? undefined : forsakenRank(Util.jobEnumToJob(p.job));
+  return p === undefined ? undefined : forsakenRank(data, name);
 };
 
 // 같은 조(탱힐 또는 딜러)의 쉐어 대상자 이름. isTh=본인이 탱힐인지.
@@ -278,7 +344,7 @@ const forsakenSlotRank = (
   marks: { [name: string]: ForsakenRole },
   data: Data,
 ): { count: number; higher: number } => {
-  const myRank = forsakenRank(data.job);
+  const myRank = forsakenRank(data, data.me ?? '');
   let count = 0;
   let higher = 0; // 같은 마커 중 나보다 우선순위 높은(rank 작은) 수
   for (const [name, r] of Object.entries(marks)) {
@@ -379,7 +445,7 @@ const forsakenSoakGroupMarks = (data: Data): { [name: string]: ForsakenRole } =>
 const forsakenNonSoakSpot = (data: Data, output: Output): { spot: ForsakenSpot; role: string } => {
   if (data.role === 'tank' || data.role === 'healer')
     return { spot: { side: 'L', clock: output.c9!() }, role: output.nonSoakStack!() };
-  if (Util.isMeleeDpsJob(data.job))
+  if (forsakenIsMeleeSide(data)) // 근딜측(근딜 또는 근딜 대체 캐스터)
     return { spot: { side: 'R', clock: output.c5!() }, role: output.nonSoakStack!() };
   return { spot: { side: 'R', clock: output.c7!() }, role: output.nonSoakCone!() };
 };
@@ -614,6 +680,98 @@ const forsaken09NextGuidance = (data: Data, output: Output, commit: boolean): st
   return forsaken09NonSoakOdd(data, output, commit, tower);
 };
 
+// ───── P2 트라인(Trine) ─────
+// 육각 6칸 고정 좌표(중앙 100,100 제외). idx 시계방향: 0북 1북동 2남동 3남 4남서 5북서.
+const dmTrineSpots = [
+  { x: 102.9, y: 85 }, // 0 북
+  { x: 114.4, y: 95 }, // 1 북동
+  { x: 111.5, y: 110 }, // 2 남동
+  { x: 97.1, y: 115 }, // 3 남
+  { x: 85.6, y: 105 }, // 4 남서
+  { x: 88.5, y: 90 }, // 5 북서
+] as const;
+// 1:1:1 담당 영역: idx별 0=T1 / 1=T2 / 2=본진. (T1 북서·남서 / T2 북·남 / 본진 북동·남동)
+const dmTrineZone = [1, 2, 2, 1, 0, 0] as const;
+
+// (x,y) → 가장 가까운 육각 칸 idx(0~5).
+const dmTrineNearest = (x: number, y: number): number => {
+  let best = 0;
+  let bestD = Infinity;
+  for (let i = 0; i < 6; i++) {
+    const dx = x - dmTrineSpots[i]!.x;
+    const dy = y - dmTrineSpots[i]!.y;
+    const d = dx * dx + dy * dy;
+    if (d < bestD) {
+      bestD = d;
+      best = i;
+    }
+  }
+  return best;
+};
+
+type DmTrineAssign = {
+  type: 'consecutive' | 'twoOne' | 'oneEach';
+  t1: number;
+  relT1: 'left' | '';
+  t2: number;
+  relT2: 'mid' | 'right' | '';
+  body: number;
+  relBody: 'right' | 'one' | '';
+};
+
+// 첫 3개 칸 idx → T1/T2/본진 배정 + 상대(왼/중/오/1칸) 라벨. 중앙은 항상 3차라 첫 3개엔 미포함.
+//   중앙에서 바깥(중간/페어) 바라볼 때 반시계=왼쪽, 시계=오른쪽 (idx 시계 증가).
+const dmTrineAssign = (idxs: number[]): DmTrineAssign | undefined => {
+  if (idxs.length !== 3)
+    return undefined;
+  const s = new Set(idxs);
+  const pairs: number[] = []; // 인접쌍의 반시계(작은쪽) idx
+  for (let i = 0; i < 6; i++) {
+    if (s.has(i) && s.has((i + 1) % 6))
+      pairs.push(i);
+  }
+  if (pairs.length === 2) { // 3연속: 양옆이 모두 set = 중간. 왼=mid-1, 오(본진)=mid+1.
+    const mid = idxs.find((i) => s.has((i + 1) % 6) && s.has((i + 5) % 6));
+    if (mid === undefined)
+      return undefined;
+    return {
+      type: 'consecutive',
+      t1: (mid + 5) % 6,
+      relT1: 'left',
+      t2: mid,
+      relT2: 'mid',
+      body: (mid + 1) % 6,
+      relBody: 'right',
+    };
+  }
+  if (pairs.length === 1) { // 2:1: 페어 반시계=왼=T1, 시계=오=T2, 외딴=본진.
+    const a = pairs[0]!;
+    const b = (a + 1) % 6;
+    const sep = idxs.find((i) => i !== a && i !== b);
+    if (sep === undefined)
+      return undefined;
+    return {
+      type: 'twoOne',
+      t1: a,
+      relT1: 'left',
+      t2: b,
+      relT2: 'right',
+      body: sep,
+      relBody: 'one',
+    };
+  }
+  // 1:1:1: 담당 영역제. 각 칸의 영역(T1/T2/본진)으로 배정.
+  const byZone: (number | undefined)[] = [undefined, undefined, undefined];
+  for (const i of idxs)
+    byZone[dmTrineZone[i]!] = i;
+  const t1 = byZone[0];
+  const t2 = byZone[1];
+  const body = byZone[2];
+  if (t1 === undefined || t2 === undefined || body === undefined)
+    return undefined;
+  return { type: 'oneEach', t1: t1, relT1: '', t2: t2, relT2: '', body: body, relBody: '' };
+};
+
 const triggerSet: TriggerSet<Data> = {
   id: 'DancingMadUltimate',
   zoneId: ZoneId.DancingMadUltimate,
@@ -665,6 +823,37 @@ const triggerSet: TriggerSet<Data> = {
         },
       },
       default: 'lower',
+    },
+    {
+      id: 'dmForsakenSubCaster',
+      name: {
+        en: 'P2 Forsaken melee-substitute caster',
+        ko: 'P2 행방불명 근딜 대체 캐스터',
+      },
+      comment: {
+        en:
+          'For non-standard DPS comps (e.g. 1 melee + 3 ranged), which caster takes the melee (left tower) spot. Auto = pick by RDM > SMN > BLM > PCT among present casters. Ignored for standard 2-melee comps.',
+        ko:
+          '근딜1·원딜3 같은 비표준 딜러 구성에서 어느 캐스터가 근딜(왼쪽 탑) 자리를 대체할지. 자동 = 파티에 있는 캐스터 중 적마>소환>흑마>픽토 순. 표준(근딜2) 구성에선 무시됩니다.',
+      },
+      type: 'select',
+      options: {
+        en: {
+          'Auto (RDM > SMN > BLM > PCT)': 'auto',
+          'Black Mage': 'blm',
+          'Summoner': 'smn',
+          'Red Mage': 'rdm',
+          'Pictomancer': 'pct',
+        },
+        ko: {
+          '자동 (적마>소환>흑마>픽토)': 'auto',
+          '흑마법사': 'blm',
+          '소환사': 'smn',
+          '적마도사': 'rdm',
+          '픽토맨서': 'pct',
+        },
+      },
+      default: 'auto',
     },
   ],
   timelineFile: 'dancing_mad.txt',
@@ -1603,7 +1792,7 @@ const triggerSet: TriggerSet<Data> = {
           // 비표준 구성 → 근/원 분리 불확정 → 잼잼식 공통 분신 설치로 폴백.
           if (!isStdComp(data) || data.role === 'tank' || data.role === 'healer')
             return output.placeClone!({ tower: set });
-          const spot: ForsakenSpot = Util.isMeleeDpsJob(data.job)
+          const spot: ForsakenSpot = forsakenIsMeleeSide(data) // 근딜측(근딜 또는 근딜 대체 캐스터)
             ? { side: 'L', clock: output.c9!() }
             : { side: 'R', clock: output.c3!() };
           return forsakenSoakLine(output, set, output.nonSoakCone!(), spot, false, false);
@@ -1613,6 +1802,29 @@ const triggerSet: TriggerSet<Data> = {
       outputStrings: forsakenOutputsAll,
     },
     {
+      // '분신 머리 유도'(BAD2/BAD3 Ability)의 선행 안내: 종언 캐스팅 시작(StartsUsing) 시점에
+      //   미래(BAD2)=보스 너머 / 과거(BAD3)=탑 사이를 미리 예고해 빠른 위치 선점 유도.
+      //   본 안내(분신 머리 유도: 캐스트~6.4s + delay 1.5 ≈ 7.9s 후)가 뜨기 전에 사라지도록 delay 2.5 + dur 5
+      //   → 캐스트 시작 2.5s 후 떠서 5s 표시(=7.5s에 사라짐).
+      //   8탑(4번째 종언, 캐스트 시점엔 endCount 아직 3)은 미래/과거 무관 '터진 8탑 사이로'.
+      id: 'DancingMad 행방불명 분신 머리 유도 선행',
+      type: 'StartsUsing',
+      netRegex: { id: ['BAD2', 'BAD3'], source: '케프카', capture: true },
+      delaySeconds: 2.5,
+      durationSeconds: 5,
+      suppressSeconds: 5,
+      infoText: (data, matches, output) => {
+        if ((data.dmForsakenEndCount ?? 0) >= 3) // 4번째 종언(8탑): 캐스트 시점은 증가 전이라 3
+          return output.bait8!();
+        return matches.id === 'BAD2' ? output.future!() : output.past!();
+      },
+      outputStrings: {
+        bait8: { en: 'Then bait between burst towers', ko: '이후 터진 8탑 사이에서 머리 유도' },
+        future: { en: 'Then bait behind boss', ko: '이후 보스 너머에서 머리 유도' },
+        past: { en: 'Then bait between towers', ko: '이후 탑 사이에서 머리 유도' },
+      },
+    },
+    {
       id: 'DancingMad 행방불명 분신 머리 유도',
       type: 'Ability',
       // 짝수탑 분신 설치 후 8명 전원 머리 유도(BAD2 미래=보스 너머 / BAD3 과거=탑 사이).
@@ -1620,13 +1832,16 @@ const triggerSet: TriggerSet<Data> = {
       //   소멸발차기 타이밍(홀수탑 안내 트리거)에서 표시. 8탑(4번째 종언)은 다음 탑 없음 → 방향만.
       // delay 1.5: 종언끝 직후(~1.3s) 다음 홀수탑 마커 수집 대기. duration 4.8 → 홀수탑 안내로 인계.
       netRegex: { id: ['BAD2', 'BAD3'], source: '케프카', capture: true },
-      preRun: (data) => data.dmForsakenEndCount = (data.dmForsakenEndCount ?? 0) + 1,
+      preRun: (data, matches) => {
+        data.dmForsakenEndCount = (data.dmForsakenEndCount ?? 0) + 1;
+        data.dmForsakenLastEnd = matches.id === 'BAD2' ? 'future' : 'past'; // 8탑 후 이동!/대기! 판정용
+      },
       delaySeconds: 1.5,
       durationSeconds: 4.8,
       suppressSeconds: 5,
       infoText: (data, matches, output) => {
-        if ((data.dmForsakenEndCount ?? 0) >= 4) // 8탑: 마지막, 다음 홀수탑 없음 → 방향만
-          return matches.id === 'BAD2' ? output.future!() : output.past!();
+        if ((data.dmForsakenEndCount ?? 0) >= 4) // 8탑: 마지막, 미래/과거 무관 터진 8탑 사이로
+          return output.bait8!();
         const dir = matches.id === 'BAD2' ? output.dirFuture!() : output.dirPast!();
         // 미리보기: 다음 홀수탑 위치만(commit 안 함). 09STOP은 forsaken09NextGuidance(commit=false).
         const next = data.triggerSetConfig.dmForsakenMethod === '09stop'
@@ -1636,8 +1851,7 @@ const triggerSet: TriggerSet<Data> = {
       },
       outputStrings: {
         ...forsakenOutputsAll,
-        future: { en: 'Bait behind boss (Future)', ko: '보스 너머로 머리 유도' },
-        past: { en: 'Bait between towers (Past)', ko: '탑 사이에서 머리 유도' },
+        bait8: { en: 'Bait between burst towers', ko: '터진 8탑 사이에서 머리 유도' },
         dirFuture: { en: 'Behind boss', ko: '보스 너머로' },
         dirPast: { en: 'Between towers', ko: '탑 사이로' },
         baitNext: { en: '${dir} (then ${next})', ko: '${dir} (이후 ${next})' },
@@ -1648,15 +1862,16 @@ const triggerSet: TriggerSet<Data> = {
       id: 'DancingMad 행방불명 홀수탑 안내',
       type: 'StartsUsing',
       // 분신 소멸의 발차기 시전 시작 시점 → 다음 홀수탑 처리 안내(마커종류+위치) 표시(머리유도 통합 흐름).
-      //   미래의 종언=BADC / 과거의 종언=BADD. 8탑(4번째)은 다음 탑 없음 → '이동!'.
+      //   미래의 종언=BADC / 과거의 종언=BADD. 8탑(4번째)은 다음 탑 없음 → 직전 종언 방향따라 이동!/대기!.
       netRegex: { id: ['BADC', 'BADD'], source: '케프카', capture: false },
-      durationSeconds: 6,
+      durationSeconds: 5.5,
       suppressSeconds: 5,
-      // 본 액션이라 처리/비처리 모두 alertText(노랑). 예고(머리유도)만 초록. 8탑(다음 탑 없음)=이동!.
+      // 본 액션이라 처리/비처리 모두 alertText(노랑). 예고(머리유도)만 초록.
+      //   8탑(다음 탑 없음): 직전 분신 종언이 미래면 '이동!', 과거면 '대기!'.
       //   09STOP은 forsaken09NextGuidance(commit=true)로 홀수탑 위치 기록+상세 표시.
       alertText: (data, _matches, output) => {
         if ((data.dmForsakenEndCount ?? 0) >= 4)
-          return output.move!();
+          return data.dmForsakenLastEnd === 'past' ? output.wait!() : output.move!();
         return data.triggerSetConfig.dmForsakenMethod === '09stop'
           ? forsaken09NextGuidance(data, output, true)
           : forsakenNextGuidance(data, output, 2 * (data.dmForsakenEndCount ?? 0) + 1);
@@ -1664,6 +1879,114 @@ const triggerSet: TriggerSet<Data> = {
       outputStrings: {
         ...forsakenOutputsAll,
         move: { en: 'Move!', ko: '이동!' },
+        wait: { en: 'Wait!', ko: '대기!' },
+      },
+    },
+    {
+      // 첫 번째 파괴의 날개(한쪽 날개): BACD=왼쪽 날개 빛→오른쪽 회피 / BACE=오른쪽 날개 빛→왼쪽 회피.
+      //   (두 번째 파괴의 날개 C487/BACF는 양 날개라 회피 방향 없음 → 트리거 X.)
+      id: 'DancingMad 파괴의 날개 회피',
+      type: 'StartsUsing',
+      netRegex: { id: ['BACD', 'BACE'], source: '케프카' },
+      durationSeconds: 4, // 시전(~4s) 동안 유지
+      alertText: (_data, matches, output) =>
+        matches.id === 'BACD' ? output.right!() : output.left!(),
+      outputStrings: {
+        right: { en: 'Right', ko: '오른쪽으로' },
+        left: { en: 'Left', ko: '왼쪽으로' },
+      },
+    },
+    {
+      id: 'DancingMad 트라인 배치',
+      type: 'Ability',
+      // 트라인(BADF) + delay → getCombatants로 첫 3개 삼각형 위치 읽어 배정. '이후 ~' 초록 안내.
+      //   탱커=T1+T2 두 자리(순서구분X), 그 외(딜힐)=본진 1자리. 1번째 날개 회피와 동시(날개=노랑/배치=초록).
+      netRegex: { id: 'BADF', source: '케프카', capture: false },
+      delaySeconds: 1.5,
+      durationSeconds: 11, // 1트라인 폭발(이동 안내)까지 유지
+      promise: async (data) => {
+        data.combatantData = (await callOverlayHandler({ call: 'getCombatants' })).combatants;
+      },
+      infoText: (data, _matches, output) => {
+        const all = data.combatantData ?? [];
+        // 삼각형 = 주인 없는 NPC(BNpcID 있음·OwnerID 없음) & 육각 6칸 정확 좌표 위(반경<1.5).
+        //   플레이어(BNpcID 없음)·펫/분신(OwnerID 있음, 영웅의 환영 등)은 칸 위에 서 있어도 제외.
+        //   중앙·칸 밖 마커는 반경으로 제외. 조회 시점(BADF+1.5s)엔 1차 3개만 칸 위(2·3차 미스폰).
+        //   BNpcNameID는 에뮬서 깨져 미사용. BNpcID/OwnerID는 정상.
+        const tris = all.filter((c) => {
+          if (c.BNpcID === undefined || c.OwnerID !== undefined)
+            return false;
+          const i = dmTrineNearest(c.PosX, c.PosY);
+          const dx = c.PosX - dmTrineSpots[i]!.x;
+          const dy = c.PosY - dmTrineSpots[i]!.y;
+          return (dx * dx + dy * dy) < 2.25;
+        });
+        if (tris.length !== 3) // 칸 위 3개 미수집(타이밍/불완전 풀) → 생략
+          return;
+        const idxs = tris.map((c) => dmTrineNearest(c.PosX, c.PosY)).sort((x, y) => x - y);
+        const assign = dmTrineAssign(idxs);
+        if (assign === undefined)
+          return;
+        const dirs = [
+          output.dirN!(),
+          output.dirNE!(),
+          output.dirSE!(),
+          output.dirS!(),
+          output.dirSW!(),
+          output.dirNW!(),
+        ];
+        const rels: { [k: string]: string } = {
+          'left': output.relLeft!(),
+          'mid': output.relMid!(),
+          'right': output.relRight!(),
+          'one': output.relOne!(),
+          '': '',
+        };
+        const fmt = (idx: number, rel: string) =>
+          rel === '' ? dirs[idx]! : `${dirs[idx]!}(${rels[rel]!})`;
+        const type = assign.type === 'consecutive'
+          ? output.consecutive!()
+          : (assign.type === 'twoOne' ? output.twoOne!() : output.oneEach!());
+        if (data.role === 'tank') {
+          return output.tank!({
+            type: type,
+            left: fmt(assign.t1, assign.relT1),
+            right: fmt(assign.t2, assign.relT2),
+          });
+        }
+        return output.body!({ type: type, spot: fmt(assign.body, assign.relBody) });
+      },
+      outputStrings: {
+        consecutive: { en: '3-in-row', ko: '3연속' },
+        twoOne: { en: '2:1', ko: '2:1' },
+        oneEach: { en: '1:1:1', ko: '1:1:1' },
+        dirN: { en: 'N', ko: '북쪽' },
+        dirNE: { en: 'NE', ko: '북동쪽' },
+        dirSE: { en: 'SE', ko: '남동쪽' },
+        dirS: { en: 'S', ko: '남쪽' },
+        dirSW: { en: 'SW', ko: '남서쪽' },
+        dirNW: { en: 'NW', ko: '북서쪽' },
+        relLeft: { en: 'left', ko: '왼쪽' },
+        relMid: { en: 'mid', ko: '중간' },
+        relRight: { en: 'right', ko: '오른쪽' },
+        relOne: { en: '1 away', ko: '1칸' },
+        tank: { en: 'Then ${type} - ${left} + ${right}', ko: '이후 ${type} - ${left} + ${right}' },
+        body: { en: 'Then ${type} - ${spot}', ko: '이후 ${type} - ${spot}' },
+      },
+    },
+    {
+      id: 'DancingMad 트라인 이동',
+      type: 'Ability',
+      // 1트라인(첫 3개) 폭발 = 첫 BAE0 → 이동 시작(2번째 파괴의 날개 양쪽 대응). suppress로 첫 폭발만.
+      netRegex: { id: 'BAE0', source: '케프카', capture: false },
+      // 첫 BAE0(365.6)~파괴의 날개 양쪽 피격(BACF 370.0)≈4.4s → 피격 직전까지 유지.
+      durationSeconds: 4.3,
+      suppressSeconds: 20,
+      alertText: (data, _matches, output) =>
+        data.role === 'tank' ? output.tankMove!() : output.bodyMove!(),
+      outputStrings: {
+        tankMove: { en: 'Move! Farthest / Closest!', ko: '이동! 가장 멀리 / 가까이!' },
+        bodyMove: { en: 'Move to party spot!', ko: '이동! 본대 위치로!' },
       },
     },
   ],

@@ -81,57 +81,61 @@ hideall "--sync--"
 186.3 "태만의 신기/아베 마리아" #Ability { id: ["BAB4", "BAB3"], source: "신들의 상" }
 186.9 "이글이글 파이가" Ability { id: "BAA3", source: "케프카" }
 
-# === P1 엔레이지 (DPS 부족 시 전멸) ===
-# 푸시 성공 시 BABB 미발동 → 아래 P2로 자연 진행(연속 타이밍). 막히면 전멸기.
-# 케프카 타겟 불가(NameToggle 00)는 전멸기 발동 ~5.1초 전(=시전 시작 직전). 못 때림 = 전멸 확정.
-197.3 "--untargetable--"
+# === P1 종료 → 전멸(BABB) vs P2 진입(성공) 분기 ===
+# 케프카 타겟 불가(NameToggle 00)=P1 종료 공통(~197.4, 전멸기 시전 직전). 이후 분기:
+#   전멸: 심판의 빛(BABB). / 성공: 보스 변신 후 재타겟(NameToggle 01, ~207.7) → 종말의 포옹(C24C).
+197.4 "--untargetable--"
 202.4 "심판의 빛 (P1 전멸기)" Ability { id: "BABB", source: "케프카" }
+207.7 "--targetable--"
 
 
 # =================================== P2: God 케프카 ===================================
-# 업스트림 타임라인(FFLOGS 기반) 번역본. P2 진입은 종말의 포옹(C24C) 넓은 window(220,5)로 동기화.
-# ⚠ P2/P3 타이밍은 FFLOGS 기반이라 미세 오차 가능 → 네트워크 로그로 보정 권장.
-219.5 "종말의 포옹" Ability { id: "C24C", source: "케프카" } window 220,5
-231.7 "행방불명" Ability { id: "BABC", source: "케프카" }
-244.9 "빛의 파동 1" Ability { id: "BABE", source: "케프카" }
-245.6 "위험한 주문" #Ability { id: ["BAC0", "BAC1", "BAC2"], source: "케프카" }
-254.3 "미래/과거의 종언" Ability { id: ["BAD2", "BAD3"], source: "케프카" }
-255.0 "빛의 파동 2" Ability { id: "BABE", source: "케프카" }
-255.7 "위험한 주문" #Ability { id: ["BAC0", "BAC1", "BAC2"], source: "케프카" }
-265.7 "소멸의 발차기" #Ability { id: ["BACD", "BADD"], source: "케프카" }
-265.9 "빛의 파동 3" Ability { id: "BABE", source: "케프카" }
-266.4 "위험한 주문" #Ability { id: ["BAC0", "BAC1", "BAC2"], source: "케프카" }
-275.4 "미래/과거의 종언" Ability { id: ["BAD2", "BAD3"], source: "케프카" }
-275.8 "빛의 파동 4" Ability { id: "BABE", source: "케프카" }
-276.5 "위험한 주문" #Ability { id: ["BAC0", "BAC1", "BAC2"], source: "케프카" }
-286.7 "소멸의 발차기" #Ability { id: ["BACD", "BADD"], source: "케프카" }
-286.7 "빛의 파동 5" Ability { id: "BABE", source: "케프카" }
-287.1 "위험한 주문" #Ability { id: ["BAC0", "BAC1", "BAC2"], source: "케프카" }
-296.1 "미래/과거의 종언" Ability { id: ["BAD2", "BAD3"], source: "케프카" }
-296.4 "빛의 파동 6" Ability { id: "BABE", source: "케프카" }
-297.1 "위험한 주문" #Ability { id: ["BAC0", "BAC1", "BAC2"], source: "케프카" }
-307.5 "빛의 파동 7" Ability { id: "BABE", source: "케프카" }
-307.5 "소멸의 발차기" #Ability { id: ["BACD", "BADD"], source: "케프카" }
-308.0 "위험한 주문" #Ability { id: ["BAC0", "BAC1", "BAC2"], source: "케프카" }
-317.0 "미래/과거의 종언" Ability { id: ["BAD2", "BAD3"], source: "케프카" }
-317.4 "빛의 파동 8" Ability { id: "BABE", source: "케프카" }
-318.1 "위험한 주문" #Ability { id: ["BAC0", "BAC1", "BAC2"], source: "케프카" }
-328.3 "소멸의 발차기" #Ability { id: ["BACD", "BADD"], source: "케프카" }
-337.4 "심판의 빛" Ability { id: "BABD", source: "케프카" }
-348.6 "트라인" Ability { id: "BADF", source: "케프카" }
-355.7 "파괴의 날개" Ability { id: "BACD", source: "케프카" }
-361.5 "트라인 1" #Ability { id: "BAE0", source: "케프카" }
-363.5 "트라인 2" #Ability { id: "BAE0", source: "케프카" }
-365.5 "트라인 3" #Ability { id: "BAE0", source: "케프카" }
-365.9 "파괴의 날개" Ability { id: "C487", source: "케프카" }
-365.9 "파괴의 날개" #Ability { id: "BACF", source: "케프카" }
-372.9 "종말의 포옹" Ability { id: "C24C", source: "케프카" }
+# P2 진입 = 종말의 포옹(C24C=49740) 해소(판정) 시점에 넓은 window 동기화. 타임라인은 판정(resolve) 기준 표시.
+# 타이밍은 네트워크 로그(2026-06-07)로 보정·검증(C24C 판정=220.0 기준, 전 구간 오차 <0.1s).
+# ⚠ P3는 아직 FFLOGS 기반(미보정). (종말의 포옹은 49740=C24C / 10512 두 id 존재, P2는 49740.)
+220.0 "종말의 포옹" Ability { id: "C24C", source: "케프카" } window 220,5
+235.3 "행방불명" Ability { id: "BABC", source: "케프카" }
+248.5 "빛의 파동 1" Ability { id: "BABE", source: "케프카" }
+249.2 "위험한 주문" #Ability { id: ["BAC0", "BAC1", "BAC2"], source: "케프카" }
+257.8 "미래/과거의 종언" Ability { id: ["BAD2", "BAD3"], source: "케프카" }
+258.5 "빛의 파동 2" Ability { id: "BABE", source: "케프카" }
+259.2 "위험한 주문" #Ability { id: ["BAC0", "BAC1", "BAC2"], source: "케프카" }
+264.3 "소멸의 발차기" #Ability { id: ["BADC", "BADD"], source: "케프카" }
+269.5 "빛의 파동 3" Ability { id: "BABE", source: "케프카" }
+270.2 "위험한 주문" #Ability { id: ["BAC0", "BAC1", "BAC2"], source: "케프카" }
+278.9 "미래/과거의 종언" Ability { id: ["BAD2", "BAD3"], source: "케프카" }
+279.5 "빛의 파동 4" Ability { id: "BABE", source: "케프카" }
+280.2 "위험한 주문" #Ability { id: ["BAC0", "BAC1", "BAC2"], source: "케프카" }
+285.3 "소멸의 발차기" #Ability { id: ["BADC", "BADD"], source: "케프카" }
+290.6 "빛의 파동 5" Ability { id: "BABE", source: "케프카" }
+291.3 "위험한 주문" #Ability { id: ["BAC0", "BAC1", "BAC2"], source: "케프카" }
+300.0 "미래/과거의 종언" Ability { id: ["BAD2", "BAD3"], source: "케프카" }
+300.6 "빛의 파동 6" Ability { id: "BABE", source: "케프카" }
+301.3 "위험한 주문" #Ability { id: ["BAC0", "BAC1", "BAC2"], source: "케프카" }
+306.4 "소멸의 발차기" #Ability { id: ["BADC", "BADD"], source: "케프카" }
+311.6 "빛의 파동 7" Ability { id: "BABE", source: "케프카" }
+312.3 "위험한 주문" #Ability { id: ["BAC0", "BAC1", "BAC2"], source: "케프카" }
+321.0 "미래/과거의 종언" Ability { id: ["BAD2", "BAD3"], source: "케프카" }
+321.6 "빛의 파동 8" Ability { id: "BABE", source: "케프카" }
+322.3 "위험한 주문" #Ability { id: ["BAC0", "BAC1", "BAC2"], source: "케프카" }
+327.4 "소멸의 발차기" #Ability { id: ["BADC", "BADD"], source: "케프카" }
+341.5 "심판의 빛" Ability { id: "BABD", source: "케프카" }
+352.7 "트라인" Ability { id: "BADF", source: "케프카" }
+# 파괴의 날개 3종: 첫번째=한쪽 날개(BACD 왼쪽빛→오른쪽 회피 / BACE 오른쪽빛→왼쪽 회피).
+#   두번째=양 날개(C487 자기대상 시전 → BACF가 케프카 최원거리·최근접 각 1명에게 범위, 같은 id 2회).
+359.8 "파괴의 날개 (한쪽)" Ability { id: ["BACD", "BACE"], source: "케프카" }
+365.6 "트라인 1" #Ability { id: "BAE0", source: "케프카" }
+367.6 "트라인 2" #Ability { id: "BAE0", source: "케프카" }
+369.6 "트라인 3" #Ability { id: "BAE0", source: "케프카" }
+369.9 "파괴의 날개 (양쪽)" Ability { id: "C487", source: "케프카" }
+370.0 "파괴의 날개 (양쪽)" #Ability { id: "BACF", source: "케프카" }
+377.1 "종말의 포옹" Ability { id: "C24C", source: "케프카" }
 
 # P2 분기: 전멸기(BAE1) vs 성공(C3F7 갈기갈기 에어로가 → P3)
-376.2 "--sync--" StartsUsing { id: "BAE1", source: "케프카" } jump "p2-enrage"
-379.3 "--sync--" StartsUsing { id: "C3F7", source: "케프카" } jump "p2-success"
-381.2 "심판의 빛 (P2 전멸기)" #Ability { id: "BAE1", source: "케프카" }
-382.3 "갈기갈기 에어로가" Ability { id: "C3F7", source: "케프카" } forcejump "p2-success"
+380.5 "--sync--" StartsUsing { id: "BAE1", source: "케프카" } jump "p2-enrage"
+383.5 "--sync--" StartsUsing { id: "C3F7", source: "케프카" } jump "p2-success"
+385.4 "심판의 빛 (P2 전멸기)" #Ability { id: "BAE1", source: "케프카" }
+386.5 "갈기갈기 에어로가" Ability { id: "C3F7", source: "케프카" } forcejump "p2-success"
 
 497.0 label "p2-success"
 500.0 "갈기갈기 에어로가" Ability { id: "C3F7", source: "케프카" } window 500,20
