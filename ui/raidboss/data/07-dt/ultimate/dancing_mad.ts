@@ -14,8 +14,6 @@ type ForsakenPos = { side: 'L' | 'R'; vert: 'U' | 'D' };
 type ForsakenMethod = 'jamjam' | '09stop'; // 행방불명 처리법 옵션
 // 안내 위치 = 탑(side) + 시(clock). side 'N'=8탑(좌우 미정). 처리=안/비처리=밖은 렌더 시 결정.
 type ForsakenSpot = { side: 'L' | 'R' | 'N'; clock: string };
-// P3 크리스탈 코너 방위(맵 중심 100,100 기준 사분면).
-type DmCorner = 'NE' | 'NW' | 'SE' | 'SW';
 
 // 페이즈 구분(업스트림 방식 채택): 보스 단계. dmStatueCount(P1 세부 단계)와는 별개·보완 관계.
 type Phase = 'p1' | 'p2' | 'p3';
@@ -59,7 +57,6 @@ export interface Data extends RaidbossData {
   dmForsakenLastEnd?: 'future' | 'past'; // 직전 종언 방향(BAD2미래/BAD3과거). 8탑 후 이동!/대기! 판정용
   dmForsakenCurrent?: { [name: string]: ForsakenRole }; // 8명 현재 마커(매 부여 덮어씀, 리셋X). 홀수탑 위치용
   dmForsakenPos?: { [name: string]: ForsakenPos }; // 09STOP 전용: 처리자별 직전 탑 위치(스왑 판정용)
-  dmCrystalWind?: DmCorner; // P3 크리스탈 바람 코너(조기 getCombatants 성공 시 저장 → 혼돈의물 폴백 억제)
 }
 
 // 머리 사인(표식) waymark 번호 → 영문 사인 id(cactbot 관례). 인게임 전체 캡처로 검증(2026-06-10).
@@ -843,19 +840,6 @@ const dmTrineAssign = (idxs: number[]): DmTrineAssign | undefined => {
 };
 
 // ───── P3 불·물·바람 크리스탈 ─────
-// 크리스탈 좌표 → 코너(중심100 사분면, +y=남/-y=북, +x=동/-x=서).
-const dmCrystalCorner = (x: number, y: number): DmCorner =>
-  y >= 100 ? (x >= 100 ? 'SE' : 'SW') : (x >= 100 ? 'NE' : 'NW');
-const dmCrystalOpp: Record<DmCorner, DmCorner> = { NE: 'SW', SW: 'NE', NW: 'SE', SE: 'NW' };
-// 점유 코너 집합에서 '대각 짝이 비어있는' 코너 = 바람(물·불은 중심대칭이라 항상 짝 점유). 3코너 모일 때만 유효.
-const dmLoneCorner = (corners: Set<DmCorner>): DmCorner | undefined => {
-  for (const c of corners) {
-    if (!corners.has(dmCrystalOpp[c]))
-      return c;
-  }
-  return undefined;
-};
-
 // '원딜 2명'(물) 이름 집합. 본대(바람)=탱·힐·근딜(근딜 자리 캐스터=fake-melee 포함).
 //   딜러 4명을 L우선순위(근딜0 < 캐스터(프리셋) < 유격20)로 정렬 → 우선순위 큰 2명(원딜측)이 물.
 //   forsakenDpsLPriority 재사용 → dmFakeMeleeCaster 설정이 캐스터 근딜/원딜 배정에 그대로 반영.
@@ -2142,58 +2126,23 @@ const triggerSet: TriggerSet<Data> = {
     },
     // ───── P3 불·물·바람 크리스탈 ─────
     {
-      // 고통의 심핵 시전 직후(+0.3s) '단 한 번' 안내, 여기서 끝(이후 크리스탈 출력 없음).
-      //   getCombatants(메모리) 단발 → 코너영역 크리스탈 3개 잡히면 본대=바람 코너(대각 짝 빈 코너) 방위까지.
-      //   못 잡으면(에뮬=로그 재구성 / 라이브서 아직 메모리에 없으면) 방위 없이 직업군별 '바람/물 크리스탈로'만.
-      //   ※ 원딜 물 방위는 위치만으론 불·물(중심대칭) 못 가려 항상 방위 없음. ※ 단발이라 에뮬 안전.
+      // 고통의 심핵 시전 직후 직업군별 안내(여기서 끝, 이후 출력 없음). 방향은 인게임에서 크리스탈 색으로 직접.
+      //   (로그·메모리론 라운드 전 코너 조기 확정 불가가 확인돼 방위 안내는 제거 — 2026-06-11.)
+      //   본대(탱·힐·근딜+fake-melee)=바람 / 원딜2=물. 비표준 구성은 양쪽 다 전원에게(자기 분류).
       id: 'DancingMad 크리스탈 안내',
       type: 'StartsUsing',
       netRegex: { id: 'BAF2', source: '카오스', capture: false },
       delaySeconds: 0.3, // 고통의 심핵 시전 직후 여유
       durationSeconds: 8,
-      promise: async (data) => {
-        const all = (await callOverlayHandler({ call: 'getCombatants' })).combatants ?? [];
-        const seen = new Set<DmCorner>();
-        for (const c of all) {
-          const id = c.ID ?? 0;
-          if (id < 0x40000000 || id >= 0x50000000 || (c.OwnerID ?? 0) !== 0)
-            continue; // NPC/오브젝트만(펫·분신 제외)
-          const dist = Math.sqrt((c.PosX - 100) ** 2 + (c.PosY - 100) ** 2);
-          if (dist >= 8 && dist <= 22) // 코너 영역
-            seen.add(dmCrystalCorner(c.PosX, c.PosY));
-        }
-        if (seen.size >= 3) // 3코너 → 바람=대각 짝 빈 코너 (4코너=가짜→미설정)
-          data.dmCrystalWind = dmLoneCorner(seen);
-      },
       infoText: (data, _matches, output) => {
-        const dir = (c: DmCorner): string => {
-          switch (c) {
-            case 'NE':
-              return output.NE!();
-            case 'NW':
-              return output.NW!();
-            case 'SE':
-              return output.SE!();
-            case 'SW':
-              return output.SW!();
-          }
-        };
-        const w = data.dmCrystalWind;
-        const windStr = w === undefined ? output.windPlain!() : output.wind!({ dir: dir(w) });
-        const waterStr = output.waterPlain!(); // 물 방위는 산출 불가 → 항상 텍스트만
-        if (!isStdComp(data)) // 비표준 → 양쪽 다(자기 분류)
-          return output.both!({ wind: windStr, water: waterStr });
-        return dmCrystalRangedNames(data).has(data.me ?? '') ? waterStr : windStr;
+        if (!isStdComp(data))
+          return output.both!();
+        return dmCrystalRangedNames(data).has(data.me ?? '') ? output.water!() : output.wind!();
       },
       outputStrings: {
-        wind: { en: '${dir} (wind crystal)', ko: '${dir} (바람 크리스탈)' },
-        windPlain: { en: 'Wind crystal', ko: '바람 크리스탈로' },
-        waterPlain: { en: 'Water crystal', ko: '물 크리스탈로' },
-        both: { en: '${wind} / ${water}', ko: '본대 ${wind} / 원딜 ${water}' },
-        NE: { en: 'NE', ko: '북동' },
-        NW: { en: 'NW', ko: '북서' },
-        SE: { en: 'SE', ko: '남동' },
-        SW: { en: 'SW', ko: '남서' },
+        wind: { en: 'Wind crystal', ko: '바람 크리스탈로' },
+        water: { en: 'Water crystal', ko: '물 크리스탈로' },
+        both: { en: 'Wind (party) / Water (ranged)', ko: '본대 바람 / 원딜 물 크리스탈로' },
       },
     },
   ],
