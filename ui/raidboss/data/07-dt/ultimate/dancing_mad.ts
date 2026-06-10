@@ -640,8 +640,44 @@ const forsaken09Compute = (
   return next;
 };
 
+// 8탑(09STOP) 좌/우 탑 = 머리 사인으로 결정(유저 룰). 3탑 처리 후 순서대로 찍음: 부채꼴→bind(속박)·산개→ignore(금지).
+//   ★홀짝 기준: 홀수(1·3)=왼쪽 탑 / 짝수(2)=오른쪽 탑. (속박3=오기지만 단독/2공존이면 홀수라 왼쪽.)
+//   내 사인 우선. 단 같은 홀짝 충돌(속박1·속박3 둘 다 왼)이면 큰 번호(오기 3)가 오른쪽으로 양보 → 1=왼/3=오.
+//   내 사인 없으면 짝 사인의 보수(짝=홀수면 나=오/짝=짝수면 나=왼) → 판정 불가면 undefined(폴백 N). bind만 3까지.
+const forsaken8SignSide = (data: Data, myMark: ForsakenRole): 'L' | 'R' | undefined => {
+  const prefix = myMark === 'cone' ? 'bind' : (myMark === 'spread' ? 'ignore' : undefined);
+  if (prefix === undefined)
+    return undefined; // 8탑은 부2산2(쉐어 없음) — 방어
+  const me = data.me ?? '';
+  const group = new Set(forsakenMyGroupNames(data));
+  const sideOf = (n: number): 'L' | 'R' => (n % 2 === 1 ? 'L' : 'R'); // 홀수=왼 / 짝수=오
+  let mine: number | undefined;
+  const others: number[] = [];
+  for (const [name, s] of Object.entries(data.dmSigns ?? {})) {
+    if (!s.startsWith(prefix) || (name !== me && !group.has(name)))
+      continue;
+    const n = parseInt(s.slice(prefix.length), 10);
+    if (Number.isNaN(n))
+      continue;
+    if (name === me)
+      mine = n;
+    else
+      others.push(n);
+  }
+  if (mine !== undefined) {
+    const mySide = sideOf(mine);
+    const conflict = others.filter((n) => sideOf(n) === mySide); // 같은 홀짝 짝(충돌, 예 속박1·3)
+    if (conflict.length > 0) // 충돌: 큰 번호(오기 속박3)가 반대편 양보 → 1=왼/3=오
+      return mine > Math.min(...conflict) ? (mySide === 'L' ? 'R' : 'L') : mySide;
+    return mySide;
+  }
+  if (others.length === 1) // 내 사인 없음 → 짝 1명의 보수
+    return sideOf(others[0]!) === 'L' ? 'R' : 'L';
+  return undefined; // 폴백(머리징쪽 N)
+};
+
 // 처리자 본인 안내. withRole=true면 통합 본안내(N탑 ...+꼬임), false면 미리보기(side+시 안).
-//   generic=true(8탑): 좌/우 탑 배정이 유저 임의 룰(캑봇 모름) → side 생략(N), 마커→시(부채꼴 12/산개 6)만.
+//   generic=true(8탑): 좌/우는 머리 사인(forsaken8SignSide)으로 결정, 없으면 머리징쪽(N). 마커→시(부채꼴 12/산개 6).
 const forsaken09Show = (
   data: Data,
   output: Output,
@@ -659,9 +695,9 @@ const forsaken09Show = (
       ? output.jingOnly!({ tower: tower, role: forsakenRoleLabel(myMark, output) })
       : forsakenRoleLabel(myMark, output);
   let spot: ForsakenSpot;
-  if (generic) { // 8탑: side 모름(N) → 마커로 시만(짝수 부채꼴=12/산개=6)
+  if (generic) { // 8탑: 좌/우는 머리 사인으로(없으면 머리징쪽 N). 시계=부채꼴 12/산개 6.
     spot = {
-      side: 'N',
+      side: forsaken8SignSide(data, myMark) ?? 'N',
       clock: forsaken09Vert(myMark, isOdd) === 'U' ? output.c12!() : output.c6!(),
     };
   } else {
