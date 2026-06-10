@@ -144,25 +144,29 @@ hideall "--sync--"
 # ✅ 실로그 검증(2026-06-11): 외부 P5-도달 로그로 test_timeline 대조 →
 #   P3·P4·P5(~세개의별 1352s) 핵심 스킬 전부 ±0.3초 일치(반복 장판 지진/회오리/다단히트만 펄별 편차라 미세조정 안 함).
 #   source명(네오 엑스데스·블랙홀)·표시명도 매칭 확인됨. ※ P5 후반(파국의 선택 1361s+)·전멸기는 도달 로그 없어 추정 유지.
+# ↳ 보정(2026-06-11): 크리스탈 물/불 라운드 순서가 풀마다 랜덤이라 고정 id를 결합 id로 교체.
+#   회오리 584.9·611.7은 타 공략용이라 주석화(우리 공략은 631.3 1회만).
+# ↳ 선더가 탱버는 모두 2연타(BB09+BB0C 2회, 2타=+3.0s) → '선더가 1타'(BB09 싱크) + '선더가 2타'(#BB0C 표시전용)로 분리.
+#   (582 BB12는 단일 레이드와이드라 분리 안 함.)
 537.7 "재구성" Ability { id: "BAE2", source: "케프카" }
 543.8 "결전" Ability { id: ["C2E3", "C2E2"], source: ["엑스데스", "카오스"] }
 548.0 "--sync--" Ability { id: "C554", source: "케프카" }
 
-# 불·물·바람 원소
+# 불·물·바람 원소 (물/불 라운드 순서는 풀마다 랜덤 → 결합 id. 회오리 584.9·611.7은 타 공략용이라 주석화, 우리 공략은 631.3 1회)
 563.1 "고통의 심핵" Ability { id: "BAF2", source: "카오스" }
-582.1 "혼돈의 물" Ability { id: "BAF6", source: "케프카" }
+582.1 "혼돈의 물/불" Ability { id: ["BAF3", "BAF6"], source: "카오스" }
 582.1 "선더가" #Ability { id: "BB12", source: "엑스데스" }
-583.1 "해일" Ability { id: "BAF5", source: ["카오스", "케프카"] }
-584.9 "회오리" Ability { id: "BAF8", source: "카오스" }
-591.3 "선더가" Ability { id: "BB09", source: "엑스데스" }
-594.3 "선더가" #Ability { id: "BB0C", source: "엑스데스" }
+583.1 "해일/화염" Ability { id: ["BAF4", "BAF5"], source: ["카오스", "케프카"] }
+# 584.9 "회오리" Ability { id: "BAF8", source: "카오스" }
+591.3 "선더가 1타" Ability { id: "BB09", source: "엑스데스" }
+594.3 "선더가 2타" #Ability { id: "BB0C", source: "엑스데스" }
 597.0 "--sync--" Ability { id: "C555", source: "케프카" }
 603.0 "자아도취" Ability { id: "C2D6", source: "케프카" }
 604.2 "세로 내파/가로 내파" Ability { id: ["BAFD", "BAFE"], source: "카오스" }
 605.0 "충격파" #Ability { id: "BAFF", source: "카오스" }
-609.0 "혼돈의 불" Ability { id: "BAF3", source: "카오스" }
-610.0 "화염" Ability { id: "BAF4", source: "카오스" }
-611.7 "회오리" Ability { id: "BAF8", source: "카오스" }
+609.0 "혼돈의 물/불" Ability { id: ["BAF3", "BAF6"], source: "카오스" }
+610.0 "해일/화염" Ability { id: ["BAF4", "BAF5"], source: ["카오스", "케프카"] }
+# 611.7 "회오리" Ability { id: "BAF8", source: "카오스" }
 
 # 한계돌파(예고 → 본번)
 620.3 "알테마 블래스터" #Ability { id: "BAE3", source: "케프카" }
@@ -172,12 +176,14 @@ hideall "--sync--"
 632.7 "에테르 연결" #Ability { id: ["C2E5", "C2E4"], source: ["엑스데스", "카오스"] }
 634.4 "알테마 블래스터" #Ability { id: "BAE3", source: "케프카" }
 642.4 "알테마 블래스터 (한계돌파)" #Ability { id: "BAE4", source: "케프카" }
-649.7 "선더가" Ability { id: "BB09", source: "엑스데스" }
+649.7 "선더가 1타" Ability { id: "BB09", source: "엑스데스" }
+652.7 "선더가 2타" #Ability { id: "BB0C", source: "엑스데스" }
 657.7 "결전" Ability { id: ["C2E3", "C2E2"], source: ["엑스데스", "카오스"] }
-666.8 "선더가" Ability { id: "BB09", source: "엑스데스" }
+666.8 "선더가 1타" Ability { id: "BB09", source: "엑스데스" }
 
 # 거대 케프카 + 대지 원소 + 블랙홀
 668.6 "맥시멈" Ability { id: "BAE5", source: "케프카" }
+669.8 "선더가 2타" #Ability { id: "BB0C", source: "엑스데스" }
 671.8 "지진" Ability { id: ["C571", "C572"], source: "카오스" }
 680.5 "지진" Ability { id: "BAFA", source: "카오스" }
 684.1 "지진" Ability { id: "BAFA", source: "카오스" }
@@ -186,7 +192,8 @@ hideall "--sync--"
 691.2 "블랙홀" Ability { id: "BAFB", source: "엑스데스" }
 698.3 "무의 파동" Ability { id: "BAFC", source: "블랙홀" }
 705.3 "무의 파동" Ability { id: "BAFC", source: "블랙홀" }
-708.4 "선더가" Ability { id: "BB09", source: "엑스데스" }
+708.4 "선더가 1타" Ability { id: "BB09", source: "엑스데스" }
+711.4 "선더가 2타" #Ability { id: "BB0C", source: "엑스데스" }
 712.7 "지진" Ability { id: "BAFA", source: "카오스" }
 716.5 "파멸 포고" Ability { id: "BB01", source: "카오스" }
 717.7 "철썩철썩 따귀" Ability { id: "BAE7", source: "케프카" }
@@ -199,7 +206,8 @@ hideall "--sync--"
 744.4 "있는 그대로의 나" Ability { id: "BAEC", source: "케프카" }
 745.4 "있는 그대로의 나" Ability { id: "BAEE", source: "케프카" }
 747.5 "검은 피" Ability { id: "C4BA", source: "케프카" }
-749.7 "선더가" Ability { id: "BB09", source: "엑스데스" }
+749.7 "선더가 1타" Ability { id: "BB09", source: "엑스데스" }
+752.7 "선더가 2타" #Ability { id: "BB0C", source: "엑스데스" }
 764.4 "지진" Ability { id: "BAFA", source: "카오스" }
 765.0 "에테르 연결" Ability { id: ["C2E5", "C2E4"], source: ["엑스데스", "카오스"] }
 769.6 "지진" Ability { id: "BAFA", source: "카오스" }

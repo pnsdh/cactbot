@@ -57,6 +57,14 @@ export interface Data extends RaidbossData {
   dmForsakenLastEnd?: 'future' | 'past'; // 직전 종언 방향(BAD2미래/BAD3과거). 8탑 후 이동!/대기! 판정용
   dmForsakenCurrent?: { [name: string]: ForsakenRole }; // 8명 현재 마커(매 부여 덮어씀, 리셋X). 홀수탑 위치용
   dmForsakenPos?: { [name: string]: ForsakenPos }; // 09STOP 전용: 처리자별 직전 탑 위치(스왑 판정용)
+  dmImplosionStrike?: number; // P3 내파 충격파(BAFF) 타격 카운트(2번째=디버프 자리). 내파 시전에 리셋
+  dmAfterImplosion?: boolean; // P3 내파 후=true. 2번째 디버프(혼돈물/불) 만료 판정용(만료 시 그림자 유도)
+  dmKnockbackFace?: 'look' | 'away'; // P3 진공파 넉백: 혼돈의 바람(642)=바라보기 / 역풍(643)=보지않기 / 없음
+  dmUltimaDirs?: number[]; // P3 알테마 블래스터(BAE3) 시전별 방위(0=북~7=북서/-1=좌표깨짐). 연속쌍으로 회전·시작 산출
+  dmUltimaStart?: number; // 알테마 시작 방위(0~7) 확정값. 리미트컷 자리 계산용
+  dmUltimaCw?: boolean; // 알테마 회전 시계=true. 리미트컷 자리 계산용
+  dmLimitCut?: number; // P3 리미트컷 본인 주사위 번호(1~8)
+  dmWhirlwindDone?: boolean; // P3 회오리(BAF8=리미트컷 자리) 발동됨 → 이후 알테마 회전 안내 생략(겹침 방지)
 }
 
 // 머리 사인(표식) waymark 번호 → 영문 사인 id(cactbot 관례). 인게임 전체 캡처로 검증(2026-06-10).
@@ -85,7 +93,7 @@ const dmSignNames: { [waymark: string]: string } = {
 // =============================================================================
 // Dancing Mad (Ultimate) / 절 요성난무 — 개인용(한글), P1 중심
 // =============================================================================
-// 진행도: P1(케프카) 완성 / P2 행방불명 운동회 구현(인게임 검증 중) / P3 미착수.
+// 진행도: P1(케프카) 완성 / P2 행방불명 운동회 구현(인게임 검증 중) / P3 1운동회(크리스탈~회오리) 구현(미검증).
 //
 // [페이즈 구조]  신들의 상(BCF2) 소환 횟수 = dmStatueCount 로 구분:
 //   1상 = 넉백선 + 파동포 / 2상 = 중력탄·암석탄 + 중력파·박살 / 3상↑ = 성모수마 + 태만·아베
@@ -857,6 +865,78 @@ const dmCrystalRangedNames = (data: Data): Set<string> => {
   return new Set(dps.slice(-2).map((d) => d.name));
 };
 
+// P3 알테마 블래스터: 시전자(케프카 분신) 좌표 → 8방위 인덱스(0=북·1=북동·…·7=북서, 시계방향).
+//   +x=동 / +y=남이므로 북=atan2(dx, -dy)=0. 중앙(반경<5)은 -1(깨진 좌표 가드).
+const dmUltimaDir = (x: number, y: number): number => {
+  if ((x - 100) ** 2 + (y - 100) ** 2 < 25)
+    return -1;
+  return (Math.round(Math.atan2(x - 100, 100 - y) / (Math.PI / 4)) + 8) % 8;
+};
+
+// 알테마 방위 배열(0~7, -1=글리치)에서 가장 이른 결정가능 쌍(i<j, 둘 다 클린, 간격 g≠4)으로
+//   시작방위·회전 산출. 방위차 +g=시계 / −g=반시계. 결정 불가면 undefined. (떨어진 클린쌍으로도 복구.)
+const dmUltimaDetermine = (dirs: number[]): { start: number; cw: boolean } | undefined => {
+  for (let j = 1; j < dirs.length; j++) {
+    const dj = dirs[j]!;
+    if (dj < 0)
+      continue; // 뒤쪽 글리치
+    for (let i = 0; i < j; i++) {
+      const di = dirs[i]!;
+      if (di < 0)
+        continue; // 앞쪽 글리치
+      const g = j - i; // 1~7
+      if (g === 4)
+        continue; // 정반대 → 회전 모호
+      const raw = (dj - di + 8) % 8;
+      let step: number;
+      if (raw === g)
+        step = 1; // +g → 시계
+      else if (raw === (8 - g) % 8)
+        step = -1; // −g → 반시계
+      else
+        continue; // 불일치 → 다른 쌍
+      const start = (((di - i * step) % 8) + 8) % 8; // 1번째 시전 방위 역산
+      return { start: start, cw: step === 1 };
+    }
+  }
+  return undefined;
+};
+
+// P3 리미트컷 주사위 1~8 헤드마커(Lockon 시트, sph_lockon2_num0X). 0150~0153=1~4 / 01B5~01B8=5~8.
+const dmLimitCutMap: { [id: string]: number } = {
+  '0150': 1,
+  '0151': 2,
+  '0152': 3,
+  '0153': 4,
+  '01B5': 5,
+  '01B6': 6,
+  '01B7': 7,
+  '01B8': 8,
+};
+
+// 리미트컷 자리(시계) 출력: 본인 번호 + 알테마 '반대편+반대방향' → 'N번, M시로'. 알테마 미집계면 'N번' 폴백.
+//   r=반대편 기준(시작+4). 케프카 시계→번호 반시계(r−num) / 반시계→번호 시계(r+num−1). 칸=정각 빼고 1·2·4·5·7·8·10·11시.
+//   즉시/지연 두 트리거가 공유(outputStrings에 text·fallback 필요).
+const dmLimitCutText = (data: Data, output: Output): string | undefined => {
+  const num = data.dmLimitCut;
+  if (num === undefined)
+    return; // 마커 못 받음
+  const start = data.dmUltimaStart;
+  const cw = data.dmUltimaCw;
+  if (start === undefined || cw === undefined)
+    return output.fallback!({ num: num }); // 알테마 끝까지 미집계 → 번호만
+  const r = (start + 4) % 8; // 반대편 기준 방위(0~7)
+  const idx = cw ? (((r - num) % 8) + 8) % 8 : (r + num - 1) % 8; // 칸 인덱스
+  const hours = [1, 2, 4, 5, 7, 8, 10, 11]; // 칸=징 사이 시계 위치
+  return output.text!({ num: num, clock: hours[idx]! });
+};
+
+// 리미트컷 자리 출력 문자열(즉시/지연 두 트리거 공유). dmLimitCutText가 text·fallback 키 사용.
+const dmLimitCutOutputs = {
+  text: { en: '#${num}: ${clock} o\'clock', ko: '${num}번, ${clock}시로' },
+  fallback: { en: '#${num} (check Ultima dir)', ko: '${num}번 (알테마 직접 확인)' },
+} as const;
+
 const triggerSet: TriggerSet<Data> = {
   id: 'DancingMadUltimate',
   zoneId: ZoneId.DancingMadUltimate,
@@ -971,6 +1051,22 @@ const triggerSet: TriggerSet<Data> = {
       // 종말의 포옹(C24C)=P2 / 갈기갈기 에어로가(C3F7)=P3 진입 시점에 data.phase 갱신.
       netRegex: { id: Object.keys(phases) },
       run: (data, matches) => data.phase = phases[matches.id] ?? 'unknown',
+    },
+    {
+      // P3(카오스·엑스데스) 진입(C3F7) 시 1운동회(크리스탈~리미트컷) 상태를 1회 초기화.
+      //   1운동회는 P3당 1회뿐 → 크리스탈(BAF2)마다 하던 사이클 리셋을 페이즈 진입 시점으로 이동.
+      id: 'DancingMad P3 진입 초기화',
+      type: 'StartsUsing',
+      netRegex: { id: 'C3F7', source: '케프카', capture: false },
+      run: (data) => {
+        data.dmAfterImplosion = false; // 내파 플래그
+        data.dmKnockbackFace = undefined; // 넉백 시선 디버프
+        data.dmUltimaDirs = []; // 알테마 회전 방위 수집
+        data.dmUltimaStart = undefined; // 알테마 시작/회전 확정값
+        data.dmUltimaCw = undefined;
+        data.dmLimitCut = undefined; // 리미트컷 번호
+        data.dmWhirlwindDone = false; // 회오리 발동 플래그
+      },
     },
     {
       id: 'DancingMad 사인 수집',
@@ -2126,14 +2222,16 @@ const triggerSet: TriggerSet<Data> = {
     },
     // ───── P3 불·물·바람 크리스탈 ─────
     {
-      // 고통의 심핵 시전 직후 직업군별 안내(여기서 끝, 이후 출력 없음). 방향은 인게임에서 크리스탈 색으로 직접.
+      // 고통의 심핵 시전 완료 직후 직업군별 안내(여기서 끝, 이후 출력 없음). 방향은 인게임에서 크리스탈 색으로 직접.
       //   (로그·메모리론 라운드 전 코너 조기 확정 불가가 확인돼 방위 안내는 제거 — 2026-06-11.)
       //   본대(탱·힐·근딜+fake-melee)=바람 / 원딜2=물. 비표준 구성은 양쪽 다 전원에게(자기 분류).
       id: 'DancingMad 크리스탈 안내',
-      type: 'StartsUsing',
+      // Ability(=시전 완료, 캐스트끝+~0.3s)에 발동 — 크리스탈은 완료 시 등장. StartsUsing+delaySeconds(캐스트 하드코딩) 불필요.
+      //   상태 리셋은 'P3 진입 초기화'(C3F7)로 이동 → 여기선 preRun 없음.
+      type: 'Ability',
       netRegex: { id: 'BAF2', source: '카오스', capture: false },
-      delaySeconds: 0.3, // 고통의 심핵 시전 직후 여유
-      durationSeconds: 8,
+      durationSeconds: 5,
+      suppressSeconds: 5, // BAF2 Ability는 8인 동시 피격 → 1회로 합침(preRun도 1회)
       infoText: (data, _matches, output) => {
         if (!isStdComp(data))
           return output.both!();
@@ -2144,6 +2242,249 @@ const triggerSet: TriggerSet<Data> = {
         water: { en: 'Water crystal', ko: '물 크리스탈로' },
         both: { en: 'Wind (party) / Water (ranged)', ko: '본대 바람 / 원딜 물 크리스탈로' },
       },
+    },
+    // ───── P3 범위 선더가 → 선더가 탱버 → 내파 → 디버프 자리 ─────
+    {
+      // 범위 선더가(BB12): 엑스데스 주변 광역. 시전(캐스트 6.7s) 동안 '떨어지기' 표시 → 종료 시 사라짐.
+      id: 'DancingMad 범위 선더가',
+      type: 'StartsUsing',
+      netRegex: { id: 'BB12', source: '엑스데스', capture: false },
+      durationSeconds: 6.7, // 시전 6.7s 동안만 표시(종료 시 소멸)
+      infoText: (_data, _matches, output) => output.text!(),
+      outputStrings: {
+        text: {
+          en: 'Proximity Thundaga: away from Exdeath',
+          ko: '범위 선더가: 엑스데스에서 떨어지기',
+        },
+      },
+    },
+    {
+      // 선더가 탱버 2연타(BB0C 즉시 ×2): 엑스데스에게서 가장 가까운 1명 대상(어글자 아님).
+      //   → 탱커가 엑스데스에 붙어 받고, 나머지는 엑스데스·탱커에서 멀어진다. 역할별 안내.
+      id: 'DancingMad 선더가 탱버',
+      type: 'StartsUsing',
+      netRegex: { id: 'BB09', source: '엑스데스', capture: false },
+      durationSeconds: 8.2, // BB09 시전 시작~BB0C 2타(=+8.11s) 종료까지 유지
+      suppressSeconds: 5,
+      infoText: (data, _matches, output) =>
+        data.role === 'tank' ? output.tank!() : output.nonTank!(),
+      outputStrings: {
+        tank: { en: 'Thundaga x2: close to Exdeath', ko: '선더가 2연타: 엑스데스와 가까이' },
+        nonTank: {
+          en: 'Thundaga x2: away from Exdeath/tank',
+          ko: '선더가 2연타: 엑스데스, 탱커와 멀어지기',
+        },
+      },
+    },
+    {
+      // 세로 내파(BAFD)=세로 먼저 공격 → 좌우로 / 가로 내파(BAFE)=가로 먼저 → 앞뒤로. 시전(4.7s) 동안 표시.
+      //   preRun: 충격파 카운터 리셋(아래 '디버프 자리'가 2번째 충격파에 발동하도록).
+      id: 'DancingMad 내파 방향',
+      type: 'StartsUsing',
+      netRegex: { id: ['BAFD', 'BAFE'], source: '카오스' },
+      preRun: (data) => {
+        data.dmImplosionStrike = 0;
+        data.dmAfterImplosion = true; // 이후 디버프 만료 = 2번째 디버프
+      },
+      durationSeconds: 4.7, // 시전 끝나면 '이동!'으로 교체(겹침 방지)
+      alertText: (_data, matches, output) =>
+        matches.id === 'BAFD' ? output.leftRight!() : output.frontBack!(),
+      outputStrings: {
+        leftRight: { en: 'Left/Right', ko: '카오스 좌우로' },
+        frontBack: { en: 'Front/Back', ko: '카오스 앞뒤로' },
+      },
+    },
+    {
+      // 내파 시전 종료(피격) 직후 → 이동!(2번째 공격 회피).
+      id: 'DancingMad 내파 이동',
+      type: 'Ability',
+      netRegex: { id: ['BAFD', 'BAFE'], source: '카오스', capture: false },
+      durationSeconds: 2, // 2번째 충격파('디버프 자리') 뜰 때까지(겹침 방지)
+      suppressSeconds: 5,
+      infoText: (_data, _matches, output) => output.move!(),
+      outputStrings: {
+        move: { en: 'Move!', ko: '이동!' },
+      },
+    },
+    {
+      // 내파 2번째 충격파(BAFF) 기점 → 두번째 디버프(혼돈의 물/불 남은쪽) 자리로.
+      //   충격파=한 타당 크리스탈 2개(동시) → suppress로 합치고, 카운터로 2번째 타격에만 발동.
+      //   2번째 충격파→2라운드 디버프(640/641) 만료까지 2.1초(양 풀 일치) → 디버프 소실 시점에 종료.
+      id: 'DancingMad 내파 후 디버프 자리',
+      type: 'Ability',
+      netRegex: { id: 'BAFF', capture: false },
+      preRun: (data) => {
+        data.dmImplosionStrike = (data.dmImplosionStrike ?? 0) + 1;
+      },
+      durationSeconds: 2.1,
+      suppressSeconds: 1, // 동시 2크리스탈 합치기(타격 간 ~2s는 분리)
+      infoText: (data, _matches, output) => {
+        if (data.dmImplosionStrike === 2) // 2번째 충격파에만
+          return output.text!();
+      },
+      outputStrings: {
+        text: { en: 'Move to debuff spot', ko: '디버프 자리로 이동' },
+      },
+    },
+    {
+      // 2번째 디버프(혼돈의 물/불 중 긴쪽) 만료 직후 → 유격대에 그림자 타격(BB00) 유도. 유격 없으면 전원.
+      //   '내파 후(dmAfterImplosion)' 만료만 = 2번째 디버프(1번째는 내파 전 만료라 제외). BB00 시전까지 유지.
+      id: 'DancingMad 그림자 타격 유도',
+      type: 'LosesEffect',
+      netRegex: { effectId: ['640', '641'], capture: false }, // 640=혼돈의 불 / 641=혼돈의 물
+      condition: (data) => data.dmAfterImplosion === true,
+      // 2번째 디버프 만료(loss)~그림자 타격 BB00 '시전 시작'=10.4초(실측 18.887→29.284). 시전 완료 아님.
+      durationSeconds: 10.4,
+      suppressSeconds: 30,
+      infoText: (data, _matches, output) => {
+        // 유격대(물리 원딜)가 있으면 유격만, 없으면 전원 유도.
+        const hasRanged = data.party.details.some((p) =>
+          p.inParty && Util.isRangedDpsJob(Util.jobEnumToJob(p.job))
+        );
+        if (hasRanged && !Util.isRangedDpsJob(data.job))
+          return;
+        return output.text!();
+      },
+      run: (data) => {
+        data.dmAfterImplosion = false; // 1회만(다음 사이클 내파에서 다시 true)
+      },
+      outputStrings: {
+        text: { en: 'Bait Shadow Strike', ko: '그림자 타격 유도' },
+      },
+    },
+    {
+      // 진공파 넉백 시선 디버프 수집: 혼돈의 바람(642)=엑스데스 바라보기 / 역풍(643)=보지 않기.
+      id: 'DancingMad 넉백 시선 수집',
+      type: 'GainsEffect',
+      netRegex: { effectId: ['642', '643'] },
+      condition: Conditions.targetIsYou(),
+      run: (data, matches) => {
+        data.dmKnockbackFace = matches.effectId === '642' ? 'look' : 'away';
+      },
+    },
+    {
+      // 디버프 해제(공략상 지워지면) → 시선 안내 없음(없는 사람).
+      id: 'DancingMad 넉백 시선 해제',
+      type: 'LosesEffect',
+      netRegex: { effectId: ['642', '643'] },
+      condition: Conditions.targetIsYou(),
+      run: (data) => {
+        data.dmKnockbackFace = undefined;
+      },
+    },
+    {
+      // 진공파(BB13 엑스데스, 그림자 타격과 동시) 넉백. 시전 시작~완료(7.7s) 동안 시선 안내.
+      //   혼돈의 바람=엑스데스 바라보기 / 역풍=보지 않기 / 둘 다 없으면 넉백만.
+      id: 'DancingMad 진공파 넉백',
+      type: 'StartsUsing',
+      netRegex: { id: 'BB13', source: '엑스데스', capture: false },
+      durationSeconds: 7.7, // 시전 시작~완료(넉백 발동)까지
+      alertText: (data, _matches, output) => {
+        if (data.dmKnockbackFace === 'look')
+          return output.look!();
+        if (data.dmKnockbackFace === 'away')
+          return output.away!();
+        return output.plain!();
+      },
+      outputStrings: {
+        look: { en: 'Knockback: Look at Exdeath', ko: '넉백: 엑스데스 바라보기' },
+        away: { en: 'Knockback: Look away from Exdeath', ko: '넉백: 엑스데스 보지 않기' },
+        plain: { en: 'Knockback', ko: '넉백' },
+      },
+    },
+    {
+      // 알테마 블래스터(BAE3, 케프카 분신): 중앙 관통 라인이 45°씩 회전하며 총 8회. 시전자 좌표를 방위로
+      //   수집 → dmUltimaDetermine으로 회전·시작방위 산출(가장 이른 결정가능 시점에 1회 안내).
+      //   분신 좌표 ~29%가 (100,100)으로 stale 글리치(=-1)라 떨어진 깨끗쌍으로도 복구.
+      //   BAE3는 한 시전당 8명 피격(같은 시각·시전자) → suppress로 시전당 1회 처리(시전 간 ~2s).
+      id: 'DancingMad 알테마 블래스터 회전',
+      type: 'Ability',
+      netRegex: { id: 'BAE3', source: '케프카' },
+      preRun: (data, matches) => {
+        (data.dmUltimaDirs ??= []).push(
+          dmUltimaDir(parseFloat(matches.x), parseFloat(matches.y)),
+        );
+      },
+      durationSeconds: 5,
+      suppressSeconds: 1.5, // 한 시전(8타겟) 합치기, 시전 간 ~2s는 분리
+      infoText: (data, _matches, output) => {
+        if (data.dmUltimaStart !== undefined)
+          return; // 이미 확정 → 재안내 안 함(1회만)
+        const r = dmUltimaDetermine(data.dmUltimaDirs ?? []);
+        if (r === undefined)
+          return; // 아직 결정 불가(글리치 등)
+        data.dmUltimaStart = r.start; // 회오리 후 늦은 확정도 저장 → 지연 자리 트리거가 사용
+        data.dmUltimaCw = r.cw;
+        // 회오리(리미트컷 자리)가 이미 발동했으면 늦은 회전 안내는 생략(자리 안내는 리미트컷 자리 트리거가 담당).
+        if (data.dmWhirlwindDone)
+          return;
+        const names = [
+          output.n!(),
+          output.ne!(),
+          output.e!(),
+          output.se!(),
+          output.s!(),
+          output.sw!(),
+          output.w!(),
+          output.nw!(),
+        ];
+        return output.text!({ dir: names[r.start]!, rot: r.cw ? output.cw!() : output.ccw!() });
+      },
+      outputStrings: {
+        text: { en: 'Start ${dir} / ${rot}', ko: '${dir}에서 시작 / ${rot} 회전' },
+        cw: { en: 'CW', ko: '시계' },
+        ccw: { en: 'CCW', ko: '반시계' },
+        n: { en: 'N', ko: '북' },
+        ne: { en: 'NE', ko: '북동' },
+        e: { en: 'E', ko: '동' },
+        se: { en: 'SE', ko: '남동' },
+        s: { en: 'S', ko: '남' },
+        sw: { en: 'SW', ko: '남서' },
+        w: { en: 'W', ko: '서' },
+        nw: { en: 'NW', ko: '북서' },
+      },
+    },
+    {
+      // 리미트컷 주사위 1~8(알테마 5~6회차 즈음): 헤드마커 Lockon ID로 본인 번호 수집 → data.dmLimitCut.
+      //   0150~0153=1~4(_s8p) / 01B5~01B8=5~8(_s8t)(Lockon.csv sph_lockon2_num0X). 표시는 회오리 자리 안내에서.
+      id: 'DancingMad 리미트컷 번호 수집',
+      type: 'HeadMarker',
+      netRegex: { id: ['0150', '0151', '0152', '0153', '01B5', '01B6', '01B7', '01B8'] },
+      condition: Conditions.targetIsYou(),
+      run: (data, matches) => {
+        data.dmLimitCut = dmLimitCutMap[matches.id];
+      },
+    },
+    {
+      // 리미트컷 자리(즉시): 회오리(BAF8, 진공파 뒤 피격) 시점에 알테마가 이미 확정 → 바로 'N번, M시로'.
+      //   규칙: 알테마 시작/회전의 '반대편 + 반대방향'(dmLimitCutText 참고).
+      id: 'DancingMad 리미트컷 자리',
+      type: 'Ability',
+      netRegex: { id: 'BAF8', capture: false },
+      condition: (data) => data.dmUltimaStart !== undefined,
+      preRun: (data) => {
+        data.dmWhirlwindDone = true; // 이후 알테마 회전 안내 생략(겹침 방지)
+      },
+      durationSeconds: 9,
+      suppressSeconds: 30,
+      alertText: (data, _matches, output) => dmLimitCutText(data, output),
+      outputStrings: dmLimitCutOutputs,
+    },
+    {
+      // 리미트컷 자리(지연): 회오리 시점에 알테마 미확정(글리치) → 남은 알테마(632.5·634.5=회오리+3.0s)까지
+      //   본 뒤(+3.5s) 출력. 그래도 미확정이면 'N번' 폴백. → 폴백을 섣불리 내지 않고 완전 판단 후 자리 안내.
+      id: 'DancingMad 리미트컷 자리 (지연)',
+      type: 'Ability',
+      netRegex: { id: 'BAF8', capture: false },
+      condition: (data) => data.dmUltimaStart === undefined,
+      preRun: (data) => {
+        data.dmWhirlwindDone = true; // 회전 안내 생략(판정은 계속 저장됨)
+      },
+      delaySeconds: 3.5, // 마지막 알테마(회오리+3.0s) 처리 후 재평가
+      durationSeconds: 9,
+      suppressSeconds: 30,
+      alertText: (data, _matches, output) => dmLimitCutText(data, output),
+      outputStrings: dmLimitCutOutputs,
     },
   ],
 };
