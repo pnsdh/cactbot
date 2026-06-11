@@ -58,6 +58,7 @@ export interface Data extends RaidbossData {
   dmForsakenCurrent?: { [name: string]: ForsakenRole }; // 8명 현재 마커(매 부여 덮어씀, 리셋X). 홀수탑 위치용
   dmForsakenPos?: { [name: string]: ForsakenPos }; // 09STOP 전용: 처리자별 직전 탑 위치(스왑 판정용)
   dmImplosionStrike?: number; // P3 내파 충격파(BAFF) 타격 카운트(2번째=디버프 자리). 내파 시전에 리셋
+  dmImplosionCount?: number; // P3 내파 시퀀스 횟수. 디버프 자리는 1번째 내파에만 발동
   dmAfterImplosion?: boolean; // P3 내파 후=true. 2번째 디버프(혼돈물/불) 만료 판정용(만료 시 그림자 유도)
   dmKnockbackFace?: 'look' | 'away'; // P3 진공파 넉백: 혼돈의 바람(642)=바라보기 / 역풍(643)=보지않기 / 없음
   dmUltimaDirs?: number[]; // P3 알테마 블래스터(BAE3) 시전별 방위(0=북~7=북서/-1=좌표깨짐). 연속쌍으로 회전·시작 산출
@@ -66,6 +67,11 @@ export interface Data extends RaidbossData {
   dmLimitCut?: number; // P3 리미트컷 본인 주사위 번호(1~8)
   dmWhirlwindDone?: boolean; // P3 회오리(BAF8=리미트컷 자리) 발동됨 → 이후 알테마 회전 안내 생략(겹침 방지)
   dmMudTargets?: string[]; // P3 지진(C571/C572) 혼돈의 진흙(644) 대상 2명 이름 (힐러 고지용)
+  dmBhDir?: { [id: string]: number }; // P3 블랙홀(줄) id→카디널 방위(0북1동2남3서). AddedCombatant서 수집
+  dmTetherRound?: number; // P3 블랙홀 줄 라운드(1~10). 테더 버스트마다 증가
+  dmRoundDirs?: number[]; // P3 현재 줄의 테더 달린 블랙홀 방위들(수집, 정렬=북동남서 우선순위)
+  dmSetDirs?: number[]; // P3 현재 세트의 카디널 방향(스폰서 저장). 풀/스왑/leftover 계산 참조
+  dmFirstRoundDirs?: number[]; // P3 세트 첫 줄(1·9)이 쓴 방향. 둘째 줄(2·10) leftover 계산용
   dmKefkaDir?: number; // P3 거대 케프카 직전 위치(0=북~7=북서). 전멸기 직전 '방향 보고 중앙 대기'용
   dmIamCount?: number; // P3 '있는 그대로의 나'(BAEC/BAED) 횟수. 2번째(마지막)에 전멸기 시퀀스 안내
   dmEnrageHit?: number; // P3 전멸기 탑/쉐어 1라운드 피격 처리 플래그(스왑 1회만)
@@ -941,6 +947,51 @@ const dmLimitCutOutputs = {
   fallback: { en: '#${num} (check Ultima dir)', ko: '${num}번 (알테마 직접 확인)' },
 } as const;
 
+// P3 블랙홀 줄(테더) 기믹.
+// 머리징(공격=attack/속박=bind/금지=ignore, dmSigns) 기반. 각 줄의 활성 마커(번호순)=인덱스.
+const dmTetherActive: { [round: number]: string[] } = {
+  1: ['attack1'],
+  2: ['attack1', 'attack2'],
+  3: ['attack1', 'attack2', 'attack3'],
+  4: ['bind1', 'attack2', 'attack3'],
+  5: ['bind1', 'bind2', 'attack3'],
+  6: ['bind1', 'bind2', 'bind3'],
+  7: ['ignore1', 'bind2', 'bind3'],
+  8: ['ignore1', 'ignore2', 'bind3'],
+  9: ['ignore1', 'ignore2'],
+  10: ['ignore2'],
+};
+// 스왑 줄: 새 마커(to)가 이전 마커(from)의 줄을 가져옴.
+const dmTetherSwap: { [round: number]: { to: string; from: string } } = {
+  4: { to: 'bind1', from: 'attack1' },
+  5: { to: 'bind2', from: 'attack2' },
+  7: { to: 'ignore1', from: 'bind1' },
+  8: { to: 'ignore2', from: 'bind2' },
+};
+// 블랙홀 카디널 좌표 → 방위(0북1동2남3서). 비카디널(무의 파동용)은 -1.
+const dmBhCardinal = (x: number, y: number): number => {
+  const dx = x - 100;
+  const dy = y - 100;
+  if (Math.abs(dx) < 3 && Math.abs(dy) > 10)
+    return dy < 0 ? 0 : 2; // 북/남
+  if (Math.abs(dy) < 3 && Math.abs(dx) > 10)
+    return dx > 0 ? 1 : 3; // 동/서
+  return -1;
+};
+// 머리징 id → KR 라벨(공격1 등). 스왑 'from' 출력용.
+const dmMarkerLabel = (m: string): string => {
+  const t = m.startsWith('attack') ? '공격' : m.startsWith('bind') ? '속박' : '금지';
+  return t + m.slice(-1);
+};
+// 방위(0북1동2남3서) 공유 outputStrings + 키 헬퍼 (줄 안내/줄 스왑 안내 공용).
+const dmDirOutputs = {
+  n: { en: 'N', ko: '북쪽' },
+  e: { en: 'E', ko: '동쪽' },
+  s: { en: 'S', ko: '남쪽' },
+  w: { en: 'W', ko: '서쪽' },
+} as const;
+const dmDirKey = (d: number): 'n' | 'e' | 's' | 'w' => (['n', 'e', 's', 'w'] as const)[d] ?? 'n';
+
 const triggerSet: TriggerSet<Data> = {
   id: 'DancingMadUltimate',
   zoneId: ZoneId.DancingMadUltimate,
@@ -1064,12 +1115,18 @@ const triggerSet: TriggerSet<Data> = {
       netRegex: { id: 'C3F7', source: '케프카', capture: false },
       run: (data) => {
         data.dmAfterImplosion = false; // 내파 플래그
+        data.dmImplosionCount = 0; // 내파 시퀀스 횟수(디버프 자리=1번째만)
         data.dmKnockbackFace = undefined; // 넉백 시선 디버프
         data.dmUltimaDirs = []; // 알테마 회전 방위 수집
         data.dmUltimaStart = undefined; // 알테마 시작/회전 확정값
         data.dmUltimaCw = undefined;
         data.dmLimitCut = undefined; // 리미트컷 번호
         data.dmWhirlwindDone = false; // 회오리 발동 플래그
+        data.dmBhDir = {}; // 블랙홀 id→방위
+        data.dmTetherRound = 0; // 블랙홀 줄 라운드
+        data.dmRoundDirs = []; // 현재 줄 테더 방위
+        data.dmSetDirs = []; // 세트 카디널 방향
+        data.dmFirstRoundDirs = []; // 첫 줄 사용 방향(leftover용)
         data.dmKefkaDir = undefined; // 거대 케프카 직전 위치
         data.dmIamCount = 0; // '있는 그대로의 나' 횟수
         data.dmEnrageHit = 0; // 전멸기 탑/쉐어 피격 플래그
@@ -2319,6 +2376,7 @@ const triggerSet: TriggerSet<Data> = {
       netRegex: { id: ['BAFD', 'BAFE'], source: '카오스' },
       preRun: (data) => {
         data.dmImplosionStrike = 0;
+        data.dmImplosionCount = (data.dmImplosionCount ?? 0) + 1; // 내파 시퀀스 카운트
         data.dmAfterImplosion = true; // 이후 디버프 만료 = 2번째 디버프
       },
       durationSeconds: 4.7, // 시전 끝나면 '이동!'으로 교체(겹침 방지)
@@ -2344,6 +2402,7 @@ const triggerSet: TriggerSet<Data> = {
     {
       // 내파 2번째 충격파(BAFF) 기점 → 두번째 디버프(혼돈의 물/불 남은쪽) 자리로.
       //   충격파=한 타당 크리스탈 2개(동시) → suppress로 합치고, 카운터로 2번째 타격에만 발동.
+      //   **1번째 내파에만**(dmImplosionCount===1) — 2번째 이후 내파는 발동 X.
       //   2번째 충격파→2라운드 디버프(640/641) 만료까지 2.1초(양 풀 일치) → 디버프 소실 시점에 종료.
       id: 'DancingMad 내파 후 디버프 자리',
       type: 'Ability',
@@ -2354,7 +2413,7 @@ const triggerSet: TriggerSet<Data> = {
       durationSeconds: 2.1,
       suppressSeconds: 1, // 동시 2크리스탈 합치기(타격 간 ~2s는 분리)
       infoText: (data, _matches, output) => {
-        if (data.dmImplosionStrike === 2) // 2번째 충격파에만
+        if (data.dmImplosionStrike === 2 && data.dmImplosionCount === 1) // 1번째 내파의 2번째 충격파만
           return output.text!();
       },
       outputStrings: {
@@ -2619,6 +2678,148 @@ const triggerSet: TriggerSet<Data> = {
       alertText: (_data, _matches, output) => output.text!(),
       outputStrings: {
         text: { en: 'Behind Chaos', ko: '카오스 뒤로' },
+      },
+    },
+    // ───── P3 블랙홀 줄(테더) — 머리징(공격/속박/금지) 순서대로 줄 처리 (10줄/4세트) ─────
+    {
+      // 블랙홀 위치 수집: 카디널(테더용)만 id→방위 저장. 비카디널(무의 파동)은 제외.
+      //   + 세트 카디널 방향(dmSetDirs): 스폰이 세트당 3개 동시(줄 시작 ~1s 전)라 미리 확보 →
+      //     풀 라운드(3개 다 달림)·스왑 줄은 테더 안 기다리고 즉시 계산. 4번째 카디널=새 세트→리셋.
+      id: 'DancingMad 블랙홀 위치 수집',
+      type: 'AddedCombatant',
+      netRegex: { name: '블랙홀' },
+      run: (data, matches) => {
+        const d = dmBhCardinal(parseFloat(matches.x), parseFloat(matches.y));
+        if (d < 0)
+          return;
+        (data.dmBhDir ??= {})[matches.id] = d;
+        const s = (data.dmSetDirs ??= []);
+        if (s.length >= 3)
+          data.dmSetDirs = [d]; // 새 세트(4번째 카디널)
+        else if (!s.includes(d))
+          s.push(d);
+      },
+    },
+    {
+      // 줄 라운드 카운터/리셋: 테더 버스트 첫 테더(suppress로 줄당 1회)에 라운드++ 및 수집 초기화.
+      //   (수집·안내보다 먼저 = preRun 동기 리셋 후 같은 테더부터 수집/판정.)
+      id: 'DancingMad 줄 라운드 리셋',
+      type: 'Tether',
+      netRegex: { source: '블랙홀', capture: false },
+      preRun: (data) => {
+        data.dmTetherRound = (data.dmTetherRound ?? 0) + 1;
+        data.dmRoundDirs = [];
+      },
+      suppressSeconds: 4, // 줄당 1회(줄 간 ~5s)
+    },
+    {
+      // 줄 테더 수집(리셋 뒤·안내 앞, preRun=동기): 각 테더의 블랙홀 방위를 현재 줄 dirs에 누적(중복 제거).
+      //   동기라 같은 테더에서 '줄 안내'의 완료 판정이 방금 추가분까지 본다.
+      id: 'DancingMad 줄 테더 수집',
+      type: 'Tether',
+      netRegex: { source: '블랙홀' },
+      preRun: (data, matches) => {
+        const d = data.dmBhDir?.[matches.sourceId];
+        if (d === undefined)
+          return;
+        data.dmRoundDirs ??= [];
+        if (!data.dmRoundDirs.includes(d))
+          data.dmRoundDirs.push(d);
+      },
+    },
+    {
+      // 줄 안내(수집 뒤): 줄별 방향 결정해 출력. **수집 완료 즉시 발동**(고정 딜레이 X).
+      //   - 줄1·9(세트 첫, 부분): dmRoundDirs가 그 줄 블랙홀 수만큼 모이면 발동 → 모인 방향. 사용분은 저장(2·10 leftover용).
+      //   - 줄2·10(세트 둘째): leftover = 세트 3개 − 첫 줄 사용분. 첫 테더에 즉시(테더 안 기다림). (줄2 키프 판정 제거: 무조건 우선순위.)
+      //   - 줄3·6(세트 첫, 풀): 세트 3개 전부(dmSetDirs). 첫 테더에 즉시.
+      //   - 줄4·5·7·8(스왑): '줄 스왑 안내'(무의파동)가 담당 → skip.
+      id: 'DancingMad 줄 안내',
+      type: 'Tether',
+      netRegex: { source: '블랙홀', capture: false },
+      condition: (data) => {
+        const round = data.dmTetherRound ?? 0;
+        if (dmTetherSwap[round] !== undefined)
+          return false; // 스왑은 무의파동 트리거가 담당
+        const active = dmTetherActive[round];
+        if (active === undefined)
+          return false;
+        if (round === 1 || round === 9)
+          return (data.dmRoundDirs?.length ?? 0) >= active.length; // 수집 완료 시 발동
+        return true; // 풀(3·6)·leftover(2·10) = 즉시
+      },
+      durationSeconds: 5,
+      suppressSeconds: 4, // 줄당 1회
+      infoText: (data, _matches, output) => {
+        const round = data.dmTetherRound ?? 0;
+        const myMark = data.dmSigns?.[data.me ?? ''];
+        if (myMark === undefined)
+          return;
+        const active = dmTetherActive[round];
+        if (active === undefined)
+          return;
+        const idx = active.indexOf(myMark);
+        if (idx < 0)
+          return; // 이 줄 비활성
+        let dirs: number[];
+        if (round === 2 || round === 10) {
+          // leftover = 세트 카디널 − 첫 줄(1·9) 사용분
+          const used = data.dmFirstRoundDirs ?? [];
+          dirs = [...(data.dmSetDirs ?? [])].filter((d) => !used.includes(d)).sort((a, b) => a - b);
+        } else if (round === 1 || round === 9) {
+          dirs = [...(data.dmRoundDirs ?? [])].sort((a, b) => a - b); // 모인 테더 방향
+        } else {
+          dirs = [...(data.dmSetDirs ?? [])].sort((a, b) => a - b); // 풀(3·6)
+        }
+        const myDir = dirs[idx];
+        if (myDir === undefined)
+          return;
+        return output.handle!({ round: round, dir: output[dmDirKey(myDir)]!() });
+      },
+      run: (data) => {
+        const round = data.dmTetherRound ?? 0;
+        if (round === 1 || round === 9)
+          data.dmFirstRoundDirs = [...(data.dmRoundDirs ?? [])]; // 둘째 줄(2·10) leftover용
+      },
+      outputStrings: {
+        ...dmDirOutputs,
+        handle: { en: '${round}: ${dir} tether', ko: '${round}줄: ${dir} 줄 처리' },
+      },
+    },
+    {
+      // 스왑 줄(4·5·7·8) 안내: **이전 줄 무의 파동(BAFC 피격) 기점**에 다음 줄 스왑 예고(가로채기 전 이동 시간 확보).
+      //   카디널(테더) 블랙홀 source만(스프레딩 무의파동 제외), suppress로 웨이브당 1회. 다음 줄=dmTetherRound+1.
+      //   새 마커(swap.to)만, 방향=세트 스폰 dmSetDirs[이전 마커 슬롯].
+      id: 'DancingMad 줄 스왑 안내',
+      type: 'Ability',
+      netRegex: { id: 'BAFC' },
+      condition: (data, matches) => data.dmBhDir?.[matches.sourceId] !== undefined,
+      durationSeconds: 5,
+      suppressSeconds: 3, // 무의 파동 웨이브당 1회
+      infoText: (data, _matches, output) => {
+        const round = (data.dmTetherRound ?? 0) + 1; // 다음 줄
+        const swap = dmTetherSwap[round];
+        if (swap === undefined)
+          return; // 다음 줄이 스왑(4·5·7·8) 아니면 안내 X
+        const myMark = data.dmSigns?.[data.me ?? ''];
+        if (myMark !== swap.to)
+          return; // 새로 가져오는 마커만
+        const slot = parseInt(swap.from.slice(-1), 10) - 1;
+        const dirs = [...(data.dmSetDirs ?? [])].sort((a, b) => a - b);
+        const myDir = dirs[slot];
+        if (myDir === undefined)
+          return;
+        return output.take!({
+          round: round,
+          dir: output[dmDirKey(myDir)]!(),
+          from: dmMarkerLabel(swap.from),
+        });
+      },
+      outputStrings: {
+        ...dmDirOutputs,
+        take: {
+          en: '${round}: ${dir} take ${from} tether',
+          ko: '${round}줄: ${dir} ${from} 줄 가져오기',
+        },
       },
     },
     // ───── P3 전멸기 직전: 블리자가 → 탑/쉐어 2라운드(스왑) → 돌출 ─────
