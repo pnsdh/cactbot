@@ -943,8 +943,8 @@ const dmLimitCutText = (data: Data, output: Output): string | undefined => {
 
 // 리미트컷 자리 출력 문자열(즉시/지연 두 트리거 공유). dmLimitCutText가 text·fallback 키 사용.
 const dmLimitCutOutputs = {
-  text: { en: '#${num}: ${clock} o\'clock', ko: '${num}번, ${clock}시로' },
-  fallback: { en: '#${num} (check Ultima dir)', ko: '${num}번 (알테마 직접 확인)' },
+  text: { en: '#${num}: ${clock} o\'clock', ko: '주사위 ${num}번: ${clock}시로' },
+  fallback: { en: '#${num} (check Ultima dir)', ko: '주사위 ${num}번' },
 } as const;
 
 // P3 블랙홀 줄(테더) 기믹.
