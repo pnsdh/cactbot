@@ -169,12 +169,12 @@ hideall "--sync--"
 # 611.7 "회오리" Ability { id: "BAF8", source: "카오스" }
 
 # 알테마 블래스터 8회전 — 케프카 BAE3(14s, ~2s 간격) / 주사위 BAE4(1.6s, ~0.2s 간격). 1번 시작~8번 종료를 duration 바로.
-620.3 "알테마 블래스터" #Ability { id: "BAE3", source: "케프카" } duration 14.1
+620.3 "알테마 블래스터" duration 14.1 #Ability { id: "BAE3", source: "케프카" }
 624.4 "그림자 타격" Ability { id: "BB00", source: "카오스" }
 627.3 "진공파" Ability { id: "BB13", source: "엑스데스" }
 631.3 "회오리" Ability { id: "BAF8", source: "카오스" }
 632.7 "에테르 연결" Ability { id: ["C2E5", "C2E4"], source: ["엑스데스", "카오스"] }
-642.4 "알테마 블래스터 (주사위)" #Ability { id: "BAE4", source: "케프카" } duration 1.6
+642.4 "알테마 블래스터 (주사위)" duration 1.6 #Ability { id: "BAE4", source: "케프카" }
 649.7 "선더가 #2 (1타)" Ability { id: "BB09", source: "엑스데스" }
 652.7 "선더가 #2 (2타)" #Ability { id: "BB0C", source: "엑스데스" }
 657.7 "결전" Ability { id: ["C2E3", "C2E2"], source: ["엑스데스", "카오스"] }
