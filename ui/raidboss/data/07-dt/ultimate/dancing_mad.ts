@@ -66,6 +66,9 @@ export interface Data extends RaidbossData {
   dmLimitCut?: number; // P3 리미트컷 본인 주사위 번호(1~8)
   dmWhirlwindDone?: boolean; // P3 회오리(BAF8=리미트컷 자리) 발동됨 → 이후 알테마 회전 안내 생략(겹침 방지)
   dmMudTargets?: string[]; // P3 지진(C571/C572) 혼돈의 진흙(644) 대상 2명 이름 (힐러 고지용)
+  dmKefkaDir?: number; // P3 거대 케프카 직전 위치(0=북~7=북서). 전멸기 직전 '방향 보고 중앙 대기'용
+  dmIamCount?: number; // P3 '있는 그대로의 나'(BAEC/BAED) 횟수. 2번째(마지막)에 전멸기 시퀀스 안내
+  dmEnrageHit?: number; // P3 전멸기 탑/쉐어 1라운드 피격 처리 플래그(스왑 1회만)
 }
 
 // 머리 사인(표식) waymark 번호 → 영문 사인 id(cactbot 관례). 인게임 전체 캡처로 검증(2026-06-10).
@@ -1067,6 +1070,9 @@ const triggerSet: TriggerSet<Data> = {
         data.dmUltimaCw = undefined;
         data.dmLimitCut = undefined; // 리미트컷 번호
         data.dmWhirlwindDone = false; // 회오리 발동 플래그
+        data.dmKefkaDir = undefined; // 거대 케프카 직전 위치
+        data.dmIamCount = 0; // '있는 그대로의 나' 횟수
+        data.dmEnrageHit = 0; // 전멸기 탑/쉐어 피격 플래그
       },
     },
     {
@@ -2561,23 +2567,26 @@ const triggerSet: TriggerSet<Data> = {
     // ───── P3 거대 케프카(맥시멈 후): 중앙 고정·회전. heading으로 위치 추적(위치=heading 반대편) ─────
     {
       // 철썩철썩 따귀(반쪽 슬랩): StartsUsingExtra(263, 시전 시작)의 heading으로 케프카 위치 산출.
-      //   BAE7=왼손→왼쪽 / BAE6=오른손→오른쪽 (케프카 마주본 상대 좌우, 위치 무관=id가 손). 시전 4.7s.
+      //   케프카 마주본 채 BAE7=왼손→왼쪽 회피+직군 산개 / BAE6=오른손→오른쪽 회피+전체 쉐어 (위치 무관=id가 손).
+      //   처리 피해(산개=충격파 BAEB / 쉐어=겹충격 BAEA)가 시전 시작 +8.4초에 착탄 → 그때까지 유지.
       id: 'DancingMad 철썩철썩 따귀',
       type: 'StartsUsingExtra',
       netRegex: { id: ['BAE6', 'BAE7'], capture: true },
-      durationSeconds: 4.7,
-      alertText: (_data, matches, output) => {
-        const posNum = (Directions.hdgTo8DirNum(parseFloat(matches.heading)) + 4) % 8; // 위치=바라봄 반대편
+      preRun: (data, matches) => {
+        data.dmKefkaDir = (Directions.hdgTo8DirNum(parseFloat(matches.heading)) + 4) % 8; // 직전 위치 저장(전멸기용)
+      },
+      durationSeconds: 8.4, // 시전 시작~처리 피해(BAEB 충격파/BAEA 겹충격) 착탄까지
+      alertText: (data, matches, output) => {
         return output.text!({
-          pos: output[Directions.outputFrom8DirNum(posNum)]!(),
+          pos: output[Directions.outputFrom8DirNum(data.dmKefkaDir!)]!(),
           dodge: matches.id === 'BAE7' ? output.left!() : output.right!(),
         });
       },
       outputStrings: {
         ...Directions.outputStrings8Dir,
-        text: { en: 'Kefka ${pos} / ${dodge}', ko: '케프카 ${pos} / ${dodge}' },
-        left: { en: 'Dodge left', ko: '왼쪽으로' },
-        right: { en: 'Dodge right', ko: '오른쪽으로' },
+        text: { en: 'Kefka ${pos} / ${dodge}', ko: '케프카 ${pos}쪽 / ${dodge}' },
+        left: { en: 'Left: role spread', ko: '왼쪽에서 직군 산개' },
+        right: { en: 'Right: full share', ko: '오른쪽에서 전체 쉐어' },
       },
     },
     {
@@ -2585,17 +2594,99 @@ const triggerSet: TriggerSet<Data> = {
       id: 'DancingMad 있는 그대로의 나',
       type: 'StartsUsingExtra',
       netRegex: { id: ['BAEC', 'BAED'], capture: true },
+      preRun: (data, matches) => {
+        data.dmKefkaDir = (Directions.hdgTo8DirNum(parseFloat(matches.heading)) + 4) % 8; // 직전 위치 저장
+        data.dmIamCount = (data.dmIamCount ?? 0) + 1; // 2번째=마지막 → 전멸기 시퀀스
+      },
       durationSeconds: 3.7,
-      alertText: (_data, matches, output) => {
-        const posNum = (Directions.hdgTo8DirNum(parseFloat(matches.heading)) + 4) % 8;
-        return output.text!({ pos: output[Directions.outputFrom8DirNum(posNum)]!() });
+      alertText: (data, _matches, output) => {
+        return output.text!({ pos: output[Directions.outputFrom8DirNum(data.dmKefkaDir!)]!() });
       },
       outputStrings: {
         ...Directions.outputStrings8Dir,
         text: {
           en: 'Kefka ${pos} / Left or Right (far)',
-          ko: '케프카 ${pos} / 왼쪽 또는 오른쪽 멀리',
+          ko: '케프카 ${pos}쪽 / 좌우로 멀리',
         },
+      },
+    },
+    {
+      // 파멸 포고(BB01, 카오스 자기시전 4.7s): 정면 공격 → 카오스 뒤로. 시전 시작~종료 표시.
+      id: 'DancingMad 파멸 포고',
+      type: 'StartsUsing',
+      netRegex: { id: 'BB01', source: '카오스', capture: false },
+      durationSeconds: 4.7, // 시전 동안만(종료 시 소멸)
+      alertText: (_data, _matches, output) => output.text!(),
+      outputStrings: {
+        text: { en: 'Behind Chaos', ko: '카오스 뒤로' },
+      },
+    },
+    // ───── P3 전멸기 직전: 블리자가 → 탑/쉐어 2라운드(스왑) → 돌출 ─────
+    {
+      // 2번째(마지막) '있는 그대로의 나' 종료(BAEE 착탄) → 직전 케프카 위치 보고 중앙 대기. 블리자가 완료까지.
+      id: 'DancingMad 전멸기 중앙 대기',
+      type: 'Ability',
+      netRegex: { id: 'BAEE', source: '케프카', capture: false },
+      condition: (data) => data.dmIamCount === 2,
+      durationSeconds: 10, // 블리자가(BB0F) 시전 완료 ~ 쉐어 헤드마커까지
+      suppressSeconds: 20,
+      infoText: (data, _matches, output) => {
+        if (data.dmKefkaDir === undefined)
+          return output.center!();
+        return output.text!({ pos: output[Directions.outputFrom8DirNum(data.dmKefkaDir)]!() });
+      },
+      outputStrings: {
+        ...Directions.outputStrings8Dir,
+        text: { en: 'Face ${pos} / wait center', ko: '${pos}쪽이 12시, 중앙에서 블리자가 유도' },
+        center: { en: 'Wait center', ko: '중앙 대기' },
+      },
+    },
+    {
+      // 블리자가 후 쉐어 헤드마커(00A1)=8인 중 1명. 마커 대상과 같은 조(탱힐/딜)=중앙 쉐어 / 다른 조=좌우 탑.
+      //   조=탱힐(4) vs 딜러(4). 마커 대상 직업으로 그 조 판정. (좌우 팀 분류는 캑봇 불가→'좌우 탑'만.)
+      id: 'DancingMad 전멸기 1R 배정',
+      type: 'HeadMarker',
+      netRegex: { id: '00A1' },
+      durationSeconds: 5, // 1라운드 피격까지
+      suppressSeconds: 30, // 1라운드 마커만(2라운드 스왑은 피격으로)
+      alertText: (data, matches, output) => {
+        const markedJob = forsakenJobOf(data, matches.target);
+        const markedIsTh = markedJob !== undefined &&
+          (Util.isTankJob(markedJob) || Util.isHealerJob(markedJob));
+        const myIsTh = data.role === 'tank' || data.role === 'healer';
+        return markedIsTh === myIsTh ? output.share!() : output.tower!();
+      },
+      outputStrings: {
+        share: { en: 'Share (center)', ko: '바닥 설치 후 중앙 쉐어' },
+        tower: { en: 'Tower (sides)', ko: '바닥 설치 후 좌우 탑' },
+      },
+    },
+    {
+      // 1라운드 피격(탑 BAF0 / 쉐어 BB03) 후 조 스왑: 탑맞음→중앙 쉐어 / 쉐어맞음→좌우 탑. 1회만(dmEnrageHit).
+      id: 'DancingMad 전멸기 2R 스왑',
+      type: 'Ability',
+      netRegex: { id: ['BAF0', 'BB03'] },
+      condition: (data, matches) => matches.target === data.me && (data.dmEnrageHit ?? 0) === 0,
+      preRun: (data) => {
+        data.dmEnrageHit = 1; // 2번째 피격엔 다시 안 뜸
+      },
+      durationSeconds: 5, // 2라운드 피격까지
+      alertText: (_data, matches, output) =>
+        matches.id === 'BAF0' ? output.share!() : output.tower!(),
+      outputStrings: {
+        share: { en: 'Share (center)', ko: '중앙 쉐어 처리' },
+        tower: { en: 'Tower (sides)', ko: '좌우 탑 처리' },
+      },
+    },
+    {
+      // 돌출하라(BB05, 2차 착탄 후) 시전 동안 → 계속 움직이며 중앙 피하기. 전멸기 직전 마지막 안내.
+      id: 'DancingMad 전멸기 돌출 중앙 피하기',
+      type: 'StartsUsing',
+      netRegex: { id: 'BB05', source: '카오스', capture: false },
+      durationSeconds: 4.7, // 돌출하라 시전 동안
+      alertText: (_data, _matches, output) => output.text!(),
+      outputStrings: {
+        text: { en: 'Keep moving + avoid center', ko: '계속 움직이기 + 중앙 피하기' },
       },
     },
   ],

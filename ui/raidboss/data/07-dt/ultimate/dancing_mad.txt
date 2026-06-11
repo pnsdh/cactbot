@@ -221,14 +221,15 @@ hideall "--sync--"
 
 # 블리자드 + 타워
 805.3 "--sync--" Ability { id: "C533", source: "케프카" }
+# BB0D/BAF0/BB03/BB11은 한 풀에 여러 번(8~16회) 터져 sync로 쓰면 타임라인이 뒤로 되돌아감 → 표시 전용(#).
 812.4 "블리자가" Ability { id: "BB0F", source: "엑스데스" }
-815.4 "블리자가" Ability { id: "BB0D", source: "엑스데스" }
+815.4 "블리자가" #Ability { id: "BB0D", source: "엑스데스" }
 816.3 "쿵쿵 발 구르기 (시전)" Ability { id: "BAEF", source: "케프카" }
 817.9 "착탄하라" Ability { id: "BB02", source: "카오스" }
-818.0 "쿵쿵 발 구르기" Ability { id: "BAF0", source: "케프카" }
-823.3 "착탄" Ability { id: "BB03", source: "카오스" }
-826.4 "블리자가" Ability { id: "BB11", source: "엑스데스" }
-827.4 "돌출" Ability { id: ["BB05", "BB06"], source: "카오스" }
+818.0 "쿵쿵 발 구르기" #Ability { id: "BAF0", source: "케프카" }
+823.3 "착탄" #Ability { id: "BB03", source: "카오스" }
+826.4 "블리자가" #Ability { id: "BB11", source: "엑스데스" }
+827.4 "돌출" Ability { id: "BB05", source: "카오스" }
 
 # P3 종료 분기: 엑스데스 전멸 / 카오스·엑스데스 전멸 / P4 진입
 839.0 "--sync--" StartsUsing { id: "C61E", source: "엑스데스" } window 839,3 jump "p3-exdeath-enrage"
