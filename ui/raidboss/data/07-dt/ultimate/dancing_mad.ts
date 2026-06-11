@@ -1,7 +1,7 @@
 import Conditions from '../../../../../resources/conditions';
 import { callOverlayHandler } from '../../../../../resources/overlay_plugin_api';
 import { Responses } from '../../../../../resources/responses';
-import Util from '../../../../../resources/util';
+import Util, { Directions } from '../../../../../resources/util';
 import ZoneId from '../../../../../resources/zone_id';
 import { RaidbossData } from '../../../../../types/data';
 import { PluginCombatantState } from '../../../../../types/event';
@@ -65,6 +65,7 @@ export interface Data extends RaidbossData {
   dmUltimaCw?: boolean; // 알테마 회전 시계=true. 리미트컷 자리 계산용
   dmLimitCut?: number; // P3 리미트컷 본인 주사위 번호(1~8)
   dmWhirlwindDone?: boolean; // P3 회오리(BAF8=리미트컷 자리) 발동됨 → 이후 알테마 회전 안내 생략(겹침 방지)
+  dmMudTargets?: string[]; // P3 지진(C571/C572) 혼돈의 진흙(644) 대상 2명 이름 (힐러 고지용)
 }
 
 // 머리 사인(표식) waymark 번호 → 영문 사인 id(cactbot 관례). 인게임 전체 캡처로 검증(2026-06-10).
@@ -2220,6 +2221,34 @@ const triggerSet: TriggerSet<Data> = {
         bodyMove: { en: 'Move to party spot!', ko: '이동! 본대 위치로!' },
       },
     },
+    // ───── P3 결전 (알파/베타 타겟 제한) ─────
+    {
+      // 결전(C2E3/C2E2) 후 부여: 알파(1060)=카오스만 / 베타(1062)=엑스데스만 공격 가능.
+      //   8인+펫에 부여되므로 targetIsYou로 본인만. 디버프 9999s, ~31s 뒤(다음 단계) 제거.
+      id: 'DancingMad 결전 대상',
+      type: 'GainsEffect',
+      netRegex: { effectId: ['1060', '1062'] }, // 1060=결전 α 대상 / 1062=결전 β 대상
+      condition: Conditions.targetIsYou(),
+      durationSeconds: 5,
+      infoText: (_data, matches, output) =>
+        matches.effectId === '1060' ? output.alpha!() : output.beta!(),
+      outputStrings: {
+        alpha: { en: 'Attack Chaos only', ko: '카오스만 공격 가능' },
+        beta: { en: 'Attack Exdeath only', ko: '엑스데스만 공격 가능' },
+      },
+    },
+    {
+      // 결전 알파/베타 대상 디버프 제거 → 타겟 제한 해제. (condition=targetIsYou가 matches 사용 → capture 유지)
+      id: 'DancingMad 결전 해제',
+      type: 'LosesEffect',
+      netRegex: { effectId: ['1060', '1062'] },
+      condition: Conditions.targetIsYou(),
+      durationSeconds: 5,
+      infoText: (_data, _matches, output) => output.text!(),
+      outputStrings: {
+        text: { en: 'Free target', ko: '자유 타겟 가능' },
+      },
+    },
     // ───── P3 불·물·바람 크리스탈 ─────
     {
       // 고통의 심핵 시전 완료 직후 직업군별 안내(여기서 끝, 이후 출력 없음). 방향은 인게임에서 크리스탈 색으로 직접.
@@ -2485,6 +2514,89 @@ const triggerSet: TriggerSet<Data> = {
       suppressSeconds: 30,
       alertText: (data, _matches, output) => dmLimitCutText(data, output),
       outputStrings: dmLimitCutOutputs,
+    },
+    // ───── P3 지진 (C571/C572): 전원 HP 1 + 혼돈의 진흙 2명 — 힐러 고지 ─────
+    {
+      // 지진(C571/C572) 시전 완료 시 전원 HP 1. 힐러에게 시전 시작 경고 + 진흙 대상 수집 초기화.
+      id: 'DancingMad HP 1 지진',
+      type: 'StartsUsing',
+      netRegex: { id: ['C571', 'C572'], source: '카오스', capture: false },
+      condition: (data) => data.role === 'healer',
+      preRun: (data) => {
+        data.dmMudTargets = []; // 혼돈의 진흙 대상 수집 초기화
+      },
+      durationSeconds: 5, // 시전(4.7s)~HP 드롭까지 유지
+      alertText: (_data, _matches, output) => output.text!(),
+      outputStrings: {
+        text: { en: 'HP set to 1', ko: 'HP 1로 고정' },
+      },
+    },
+    {
+      // 혼돈의 진흙(644, 14s) = 2명 대상(cf. 154E 혼돈의 흙=8명). 대상 이름 수집(힐러만).
+      id: 'DancingMad 혼돈의 진흙 수집',
+      type: 'GainsEffect',
+      netRegex: { effectId: '644' },
+      condition: (data) => data.role === 'healer',
+      run: (data, matches) => (data.dmMudTargets ??= []).push(matches.target),
+    },
+    {
+      // 진흙 2명 수집 후 힐러에게 대상자 고지.
+      id: 'DancingMad 혼돈의 진흙 안내',
+      type: 'GainsEffect',
+      netRegex: { effectId: '644', capture: false },
+      condition: (data) => data.role === 'healer',
+      delaySeconds: 0.3, // 동시 부여 2명 모두 수집 대기
+      durationSeconds: 12,
+      suppressSeconds: 5,
+      infoText: (data, _matches, output) => {
+        const targets = data.dmMudTargets ?? [];
+        if (targets.length === 0)
+          return;
+        return output.text!({ players: targets.join(', ') });
+      },
+      outputStrings: {
+        text: { en: 'Mud: ${players}', ko: '진흙 대상자: ${players}' },
+      },
+    },
+    // ───── P3 거대 케프카(맥시멈 후): 중앙 고정·회전. heading으로 위치 추적(위치=heading 반대편) ─────
+    {
+      // 철썩철썩 따귀(반쪽 슬랩): StartsUsingExtra(263, 시전 시작)의 heading으로 케프카 위치 산출.
+      //   BAE7=왼손→왼쪽 / BAE6=오른손→오른쪽 (케프카 마주본 상대 좌우, 위치 무관=id가 손). 시전 4.7s.
+      id: 'DancingMad 철썩철썩 따귀',
+      type: 'StartsUsingExtra',
+      netRegex: { id: ['BAE6', 'BAE7'], capture: true },
+      durationSeconds: 4.7,
+      alertText: (_data, matches, output) => {
+        const posNum = (Directions.hdgTo8DirNum(parseFloat(matches.heading)) + 4) % 8; // 위치=바라봄 반대편
+        return output.text!({
+          pos: output[Directions.outputFrom8DirNum(posNum)]!(),
+          dodge: matches.id === 'BAE7' ? output.left!() : output.right!(),
+        });
+      },
+      outputStrings: {
+        ...Directions.outputStrings8Dir,
+        text: { en: 'Kefka ${pos} / ${dodge}', ko: '케프카 ${pos} / ${dodge}' },
+        left: { en: 'Dodge left', ko: '왼쪽으로' },
+        right: { en: 'Dodge right', ko: '오른쪽으로' },
+      },
+    },
+    {
+      // 있는 그대로의 나(중앙 가로지르는 직선): 케프카 축 따라 직선 → 마주본 채 좌/우 멀리로 회피. 시전 3.7s.
+      id: 'DancingMad 있는 그대로의 나',
+      type: 'StartsUsingExtra',
+      netRegex: { id: ['BAEC', 'BAED'], capture: true },
+      durationSeconds: 3.7,
+      alertText: (_data, matches, output) => {
+        const posNum = (Directions.hdgTo8DirNum(parseFloat(matches.heading)) + 4) % 8;
+        return output.text!({ pos: output[Directions.outputFrom8DirNum(posNum)]!() });
+      },
+      outputStrings: {
+        ...Directions.outputStrings8Dir,
+        text: {
+          en: 'Kefka ${pos} / Left or Right (far)',
+          ko: '케프카 ${pos} / 왼쪽 또는 오른쪽 멀리',
+        },
+      },
     },
   ],
 };
