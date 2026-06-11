@@ -60,7 +60,7 @@ export interface Data extends RaidbossData {
   dmImplosionStrike?: number; // P3 내파 충격파(BAFF) 타격 카운트(2번째=디버프 자리). 내파 시전에 리셋
   dmImplosionCount?: number; // P3 내파 시퀀스 횟수. 디버프 자리는 1번째 내파에만 발동
   dmAfterImplosion?: boolean; // P3 내파 후=true. 2번째 디버프(혼돈물/불) 만료 판정용(만료 시 그림자 유도)
-  dmKnockbackFace?: 'look' | 'away'; // P3 진공파 넉백: 혼돈의 바람(642)=바라보기 / 역풍(643)=보지않기 / 없음
+  dmKnockbackFace?: 'look' | 'away'; // P3 진공파 넉백: 혼돈의 바람(642)=보지않기 / 역풍(643)=바라보기 / 없음
   dmUltimaDirs?: number[]; // P3 알테마 블래스터(BAE3) 시전별 방위(0=북~7=북서/-1=좌표깨짐). 연속쌍으로 회전·시작 산출
   dmUltimaStart?: number; // 알테마 시작 방위(0~7) 확정값. 리미트컷 자리 계산용
   dmUltimaCw?: boolean; // 알테마 회전 시계=true. 리미트컷 자리 계산용
@@ -2447,13 +2447,15 @@ const triggerSet: TriggerSet<Data> = {
       },
     },
     {
-      // 진공파 넉백 시선 디버프 수집: 혼돈의 바람(642)=엑스데스 바라보기 / 역풍(643)=보지 않기.
+      // 진공파 넉백 시선 디버프 수집: 혼돈의 바람(642)=보지 않기 / 역풍(643)=엑스데스 바라보기.
+      //   (status 설명이 둘 다 '잠식된 상태'라 데이터로 face/away 구분 불가 → 팀 인게임 테스트로 확정·수정 2026-06-12.
+      //    역풍=headwind=뒤로 밀림이라 엑스데스 반대로 밀려나려면 엑스데스를 봐야 함.)
       id: 'DancingMad 넉백 시선 수집',
       type: 'GainsEffect',
       netRegex: { effectId: ['642', '643'] },
       condition: Conditions.targetIsYou(),
       run: (data, matches) => {
-        data.dmKnockbackFace = matches.effectId === '642' ? 'look' : 'away';
+        data.dmKnockbackFace = matches.effectId === '642' ? 'away' : 'look';
       },
     },
     {
@@ -2468,7 +2470,7 @@ const triggerSet: TriggerSet<Data> = {
     },
     {
       // 진공파(BB13 엑스데스, 그림자 타격과 동시) 넉백. 시전 시작~완료(7.7s) 동안 시선 안내.
-      //   혼돈의 바람=엑스데스 바라보기 / 역풍=보지 않기 / 둘 다 없으면 넉백만.
+      //   혼돈의 바람=보지 않기 / 역풍=엑스데스 바라보기 / 둘 다 없으면 넉백만.
       id: 'DancingMad 진공파 넉백',
       type: 'StartsUsing',
       netRegex: { id: 'BB13', source: '엑스데스', capture: false },
