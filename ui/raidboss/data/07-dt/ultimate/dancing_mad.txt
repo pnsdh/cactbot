@@ -155,7 +155,7 @@ hideall "--sync--"
 # 불·물·바람 원소 (물/불 라운드 순서는 풀마다 랜덤 → 결합 id. 회오리 584.9·611.7은 타 공략용이라 주석화, 우리 공략은 631.3 1회)
 563.1 "고통의 심핵" Ability { id: "BAF2", source: "카오스" }
 582.1 "혼돈의 물/혼돈의 불" Ability { id: ["BAF3", "BAF6"], source: "카오스" }
-582.1 "선더가 (범위)" #Ability { id: "BB12", source: "엑스데스" }
+582.1 "선더가 (범위)" Ability { id: "BB12", source: "엑스데스" }
 583.1 "해일/화염" Ability { id: ["BAF4", "BAF5"], source: ["카오스", "케프카"] }
 # 584.9 "회오리" Ability { id: "BAF8", source: "카오스" }
 591.3 "선더가 #1 (1타)" Ability { id: "BB09", source: "엑스데스" }
@@ -173,9 +173,9 @@ hideall "--sync--"
 624.4 "그림자 타격" Ability { id: "BB00", source: "카오스" }
 627.3 "진공파" Ability { id: "BB13", source: "엑스데스" }
 631.3 "회오리" Ability { id: "BAF8", source: "카오스" }
-632.7 "에테르 연결" #Ability { id: ["C2E5", "C2E4"], source: ["엑스데스", "카오스"] }
+632.7 "에테르 연결" Ability { id: ["C2E5", "C2E4"], source: ["엑스데스", "카오스"] }
 634.4 "알테마 블래스터" #Ability { id: "BAE3", source: "케프카" }
-642.4 "알테마 블래스터 (한계돌파)" #Ability { id: "BAE4", source: "케프카" }
+642.4 "알테마 블래스터 (주사위)" #Ability { id: "BAE4", source: "케프카" }
 649.7 "선더가 #2 (1타)" Ability { id: "BB09", source: "엑스데스" }
 652.7 "선더가 #2 (2타)" #Ability { id: "BB0C", source: "엑스데스" }
 657.7 "결전" Ability { id: ["C2E3", "C2E2"], source: ["엑스데스", "카오스"] }
@@ -185,39 +185,48 @@ hideall "--sync--"
 668.6 "맥시멈" Ability { id: "BAE5", source: "케프카" }
 669.8 "선더가 #3 (2타)" #Ability { id: "BB0C", source: "엑스데스" }
 671.8 "지진 (HP1)" Ability { id: ["C571", "C572"], source: "카오스" }
-680.5 "지진" Ability { id: "BAFA", source: "카오스" }
-684.1 "지진" Ability { id: "BAFA", source: "카오스" }
-687.4 "철썩철썩 따귀" Ability { id: "BAE7", source: "케프카" }
-690.9 "철썩철썩 따귀" Ability { id: "BAE9", source: "케프카" }
+# 680.5 "지진" Ability { id: "BAFA", source: "카오스" }
+# 684.1 "지진" Ability { id: "BAFA", source: "카오스" }
+687.4 "철썩철썩 따귀 (시전)" Ability { id: ["BAE6", "BAE7"], source: "케프카" }
+# 690.9 "철썩철썩 따귀 (피격)" Ability { id: "BAE9", source: "케프카" }
+691.0 "겹충격/충격파" Ability { id: ["BAEA", "BAEB"], source: "케프카" }
 691.2 "블랙홀" Ability { id: "BAFB", source: "엑스데스" }
-698.3 "무의 파동" Ability { id: "BAFC", source: "블랙홀" }
-705.3 "무의 파동" Ability { id: "BAFC", source: "블랙홀" }
+698.3 "무의 파동 #1" Ability { id: "BAFC", source: "블랙홀" }
+705.3 "무의 파동 #2" Ability { id: "BAFC", source: "블랙홀" }
 708.4 "선더가 #4 (1타)" Ability { id: "BB09", source: "엑스데스" }
 711.4 "선더가 #4 (2타)" #Ability { id: "BB0C", source: "엑스데스" }
-712.7 "지진" Ability { id: "BAFA", source: "카오스" }
+# 712.7 "지진" Ability { id: "BAFA", source: "카오스" }
 716.5 "파멸 포고" Ability { id: "BB01", source: "카오스" }
-717.7 "철썩철썩 따귀" Ability { id: "BAE7", source: "케프카" }
-721.2 "철썩철썩 따귀" Ability { id: "BAE9", source: "케프카" }
-724.6 "검은 불꽃" Ability { id: "BCCD", source: "블랙홀" }
-728.6 "무의 파동" Ability { id: "BAFC", source: "블랙홀" }
-730.2 "지진" Ability { id: "BAFA", source: "카오스" }
-739.0 "무의 파동" Ability { id: "BAFC", source: "블랙홀" }
+717.7 "철썩철썩 따귀 (시전)" Ability { id: ["BAE6", "BAE7"], source: "케프카" }
+# 721.2 "철썩철썩 따귀 (피격)" Ability { id: "BAE9", source: "케프카" }
+721.3 "겹충격/충격파" Ability { id: ["BAEA", "BAEB"], source: "케프카" }
+# 724.6 "검은 불꽃" Ability { id: "BCCD", source: "블랙홀" }
+728.6 "무의 파동 #3" Ability { id: "BAFC", source: "블랙홀" }
+# 730.2 "지진" Ability { id: "BAFA", source: "카오스" }
+733.6 "무의 파동 #4" Ability { id: "BAFC", source: "블랙홀" }
+739.0 "무의 파동 #5" Ability { id: "BAFC", source: "블랙홀" }
 744.0 "파멸 포고" Ability { id: "BB01", source: "카오스" }
-744.4 "있는 그대로의 나" Ability { id: "BAEC", source: "케프카" }
-745.4 "있는 그대로의 나" Ability { id: "BAEE", source: "케프카" }
-747.5 "검은 피" Ability { id: "C4BA", source: "케프카" }
+744.4 "있는 그대로의 나 (시전)" Ability { id: "BAEC", source: "케프카" }
+745.4 "있는 그대로의 나 (피격)" Ability { id: "BAEE", source: "케프카" }
+# 747.5 "검은 피" Ability { id: "C4BA", source: "케프카" }
 749.7 "선더가 #5 (1타)" Ability { id: "BB09", source: "엑스데스" }
 752.7 "선더가 #5 (2타)" #Ability { id: "BB0C", source: "엑스데스" }
-764.4 "지진" Ability { id: "BAFA", source: "카오스" }
+762.8 "무의 파동 #6" Ability { id: "BAFC", source: "블랙홀" }
+# 764.4 "지진" Ability { id: "BAFA", source: "카오스" }
 765.0 "에테르 연결" Ability { id: ["C2E5", "C2E4"], source: ["엑스데스", "카오스"] }
-769.6 "지진" Ability { id: "BAFA", source: "카오스" }
+767.9 "무의 파동 #7" Ability { id: "BAFC", source: "블랙홀" }
+# 769.6 "지진" Ability { id: "BAFA", source: "카오스" }
+773.0 "무의 파동 #8" Ability { id: "BAFC", source: "블랙홀" }
 784.2 "화이트홀" Ability { id: "BD66", source: "엑스데스" }
 784.2 "세로 내파/가로 내파" Ability { id: ["BAFD", "BAFE"], source: "카오스" }
-785.9 "철썩철썩 따귀" Ability { id: "BAE6", source: "케프카" }
-789.3 "겹충격" Ability { id: "BAEA", source: "케프카" }
-792.5 "검은 불꽃" Ability { id: "BCCD", source: ["블랙홀", "케프카"] }
-802.2 "있는 그대로의 나" Ability { id: "BAED", source: "케프카" }
-803.2 "있는 그대로의 나" Ability { id: "BAEE", source: "케프카" }
+785.9 "철썩철썩 따귀 (시전)" Ability { id: ["BAE6", "BAE7"], source: "케프카" }
+# 789.2 "철썩철썩 따귀 (피격)" Ability { id: "BAE9", source: "케프카" }
+789.3 "겹충격/충격파" Ability { id: ["BAEA", "BAEB"], source: "케프카" }
+# 792.5 "검은 불꽃" Ability { id: "BCCD", source: ["블랙홀", "케프카"] }
+796.4 "무의 파동 #9" Ability { id: "BAFC", source: "블랙홀" }
+802.2 "있는 그대로의 나 (시전)" Ability { id: "BAED", source: "케프카" }
+803.2 "있는 그대로의 나 (피격)" Ability { id: "BAEE", source: "케프카" }
+803.5 "무의 파동 #10" Ability { id: "BAFC", source: "블랙홀" }
 
 # 블리자드 + 타워
 805.3 "--sync--" Ability { id: "C533", source: "케프카" }
