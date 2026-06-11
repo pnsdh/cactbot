@@ -16,10 +16,11 @@ type ForsakenMethod = 'jamjam' | '09stop'; // 행방불명 처리법 옵션
 type ForsakenSpot = { side: 'L' | 'R' | 'N'; clock: string };
 
 // 페이즈 구분(업스트림 방식 채택): 보스 단계. dmStatueCount(P1 세부 단계)와는 별개·보완 관계.
-type Phase = 'p1' | 'p2' | 'p3';
+type Phase = 'p1' | 'p2' | 'p3' | 'p4';
 const phases: { [id: string]: Phase } = {
   'C24C': 'p2', // 종말의 포옹 (God 케프카)
   'C3F7': 'p3', // 갈기갈기 에어로가 (카오스·엑스데스)
+  'C2DC': 'p4', // 꼭두각시 영혼 (케프카·카오스·네오 엑스데스) — P4 첫 스킬(고유). C3FD는 P4→P5 전환에도 재사용돼 부적합
 };
 
 export interface Data extends RaidbossData {
@@ -1103,7 +1104,7 @@ const triggerSet: TriggerSet<Data> = {
     {
       id: 'DancingMad Phase Tracker',
       type: 'StartsUsing',
-      // 종말의 포옹(C24C)=P2 / 갈기갈기 에어로가(C3F7)=P3 진입 시점에 data.phase 갱신.
+      // 종말의 포옹(C24C)=P2 / 갈기갈기 에어로가(C3F7)=P3 / 꼭두각시 영혼(C2DC)=P4 진입 시점에 data.phase 갱신.
       netRegex: { id: Object.keys(phases) },
       run: (data, matches) => data.phase = phases[matches.id] ?? 'unknown',
     },
@@ -1250,6 +1251,7 @@ const triggerSet: TriggerSet<Data> = {
       type: 'HeadMarker',
       // 보스 머리 고리: 02A1 = ?(산개<->쉐어 반전), 02A2 = ? 없음.
       netRegex: { id: ['02A1', '02A2'] },
+      condition: (data) => data.phase === 'p1', // P4에도 유사 알쏭달쏭 → P1 한정
       run: (data, matches) => data.dmHeadInvert = matches.id === '02A1',
     },
     {
@@ -1257,6 +1259,7 @@ const triggerSet: TriggerSet<Data> = {
       type: 'HeadMarker',
       // 선더가 고리: 02A5 = 거짓(?→안으로), 02A6 = 진실(→밖으로). (라벨 3개로 검증됨)
       netRegex: { id: ['02A5', '02A6'] },
+      condition: (data) => data.phase === 'p1', // P4에도 유사 알쏭달쏭 → P1 한정
       run: (data, matches) => data.dmThunderInner = matches.id === '02A5',
     },
     {
@@ -1264,12 +1267,14 @@ const triggerSet: TriggerSet<Data> = {
       type: 'HeadMarker',
       // 007F = 산개(base), 0080 = 쉐어(base).
       netRegex: { id: ['007F', '0080'] },
+      condition: (data) => data.phase === 'p1', // P4에도 유사 알쏭달쏭 → P1 한정
       run: (data, matches) => data.dmSpreadBase = matches.id === '007F',
     },
     {
       id: 'DancingMad 블리자가 유무 수집',
       type: 'StartsUsing',
       netRegex: { id: ['BA98', 'BA9B'], source: '케프카', capture: false },
+      condition: (data) => data.phase === 'p1', // P4 BA9B(널리널리 블리자가) 재등장 → P1 한정
       run: (data) => data.dmBlizzardCombo = true,
     },
     // 출력기: 위 수집 결과로 조합별 콜. (조합1=알쏭1 / 조합2=알쏭2 / 단독 블리자가 / 단독 산개쉐어)
@@ -1279,6 +1284,7 @@ const triggerSet: TriggerSet<Data> = {
       type: 'StartsUsing',
       // BA98=정상(안전=구슬축 수직), BA9B=?(안전=구슬축=텔레그래프). BA9E 제외(BA9B가 텔레그래프 축).
       netRegex: { id: ['BA98', 'BA9B'], source: '케프카' },
+      condition: (data) => data.phase === 'p1', // P4에도 유사 알쏭달쏭 → P1 한정
       // 로그 측정: 구슬 위치는 시전 직전(~0.09s 전) 확정·이후 고정, 마커도 선도착 → 큰 대기 불필요.
       delaySeconds: 0.3, // promise/수집 안전 버퍼만
       durationSeconds: 4.7, // 콜(+0.3) → 널리널리 블리자가 발동까지(끝 시점 동일 유지)
@@ -1328,6 +1334,7 @@ const triggerSet: TriggerSet<Data> = {
       id: 'DancingMad 알쏭달쏭2',
       type: 'StartsUsing',
       netRegex: { id: ['BA98', 'BA9B'], source: '케프카' },
+      condition: (data) => data.phase === 'p1', // P4에도 유사 알쏭달쏭 → P1 한정
       delaySeconds: 0.3, // 구슬·마커 선확정 → 버퍼만 (알쏭달쏭1과 동일 근거)
       durationSeconds: 4.7, // 끝 시점 동일 유지
       suppressSeconds: 5,
@@ -1365,6 +1372,7 @@ const triggerSet: TriggerSet<Data> = {
       // BA98=진실(바닥 피하고) / BA9B=거짓?(바닥 밟고). 둘 다 쉐어 처리(중력/암석 그룹 공통).
       // 그룹별 이동(중앙/시계방향)은 '중력탄 암석탄 이동' 콜이 별도로 처리.
       netRegex: { id: ['BA98', 'BA9B'], source: '케프카' },
+      condition: (data) => data.phase === 'p1', // P4 BA9B(널리널리 블리자가) 재등장 → P1 한정
       delaySeconds: 0.3, // 구슬·마커 선확정 → 버퍼만
       durationSeconds: 4.7, // 끝 시점 동일 유지
       suppressSeconds: 5,
@@ -1384,6 +1392,7 @@ const triggerSet: TriggerSet<Data> = {
       id: 'DancingMad 산개쉐어',
       type: 'HeadMarker',
       netRegex: { id: ['007F', '0080'] },
+      condition: (data) => data.phase === 'p1', // P4에도 유사 알쏭달쏭 → P1 한정
       delaySeconds: 0.2, // 플래그/마커뿐(promise 없음). dmBlizzardCombo(+0.09s) 본 뒤면 충분 → 0.2
       durationSeconds: 4.4, // 콜(+0.2) → 원소 해소(끝 시점 동일 유지)
       suppressSeconds: 3,
@@ -1411,6 +1420,7 @@ const triggerSet: TriggerSet<Data> = {
       id: 'DancingMad 알쏭달쏭 마법 정리',
       type: 'StartsUsing',
       netRegex: { id: 'BA94', source: '케프카', capture: false },
+      condition: (data) => data.phase === 'p1', // P4 BA94(알쏭달쏭 마법) 재등장 → P1 한정
       delaySeconds: 2.5, // 위 출력들(+0.5/+0.6)이 플래그를 다 쓴 뒤
       suppressSeconds: 2,
       run: (data) => {
@@ -1696,7 +1706,9 @@ const triggerSet: TriggerSet<Data> = {
       // 시전을 앵커로. 마커(선더가 02A5/02A6, 산개쉐어 007F/0080, 머리? 02A1/02A2)는 BA94 직전 부여됨.
       // dmStatueCount===3 + dmThunderInner로 combo3만 (combo1/2의 BA94 제외).
       netRegex: { id: 'BA94', source: '케프카', capture: false },
-      condition: (data) => data.dmStatueCount === 3 && data.dmThunderInner !== undefined,
+      // dmStatueCount는 리셋 안 돼 P4에서도 ===3 참 → P1 게이팅 필수 (P4 BA94 알쏭달쏭 재등장)
+      condition: (data) =>
+        data.phase === 'p1' && data.dmStatueCount === 3 && data.dmThunderInner !== undefined,
       delaySeconds: 0.2, // 플래그/마커뿐(promise 없음). 헤드마커 BA94보다 0.09s 먼저 도착(측정) → 0.2
       durationSeconds: 5.8, // 콜 → 선더가/태만 발동(끝 시점 동일 유지)
       suppressSeconds: 5,
