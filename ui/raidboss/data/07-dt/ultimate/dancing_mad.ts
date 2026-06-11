@@ -2862,6 +2862,7 @@ const triggerSet: TriggerSet<Data> = {
       id: 'DancingMad 전멸기 1R 배정',
       type: 'HeadMarker',
       netRegex: { id: '00A1' },
+      condition: (data) => data.phase === 'p3', // 00A1은 P5 기믹에도 재사용되는 범용 마커 → P3 전멸기 한정
       durationSeconds: 5, // 1라운드 피격까지
       suppressSeconds: 30, // 1라운드 마커만(2라운드 스왑은 피격으로)
       alertText: (data, matches, output) => {
