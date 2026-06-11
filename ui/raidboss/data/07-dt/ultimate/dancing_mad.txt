@@ -95,28 +95,28 @@ hideall "--sync--"
 # ⚠ P3는 아직 FFLOGS 기반(미보정). (종말의 포옹은 49740=C24C / 10512 두 id 존재, P2는 49740.)
 220.0 "종말의 포옹" Ability { id: "C24C", source: "케프카" } window 220,5
 235.3 "행방불명" Ability { id: "BABC", source: "케프카" }
-248.5 "빛의 파동 1" Ability { id: "BABE", source: "케프카" }
+248.5 "빛의 파동 #1" Ability { id: "BABE", source: "케프카" }
 249.2 "위험한 주문" #Ability { id: ["BAC0", "BAC1", "BAC2"], source: "케프카" }
 257.8 "미래/과거의 종언" Ability { id: ["BAD2", "BAD3"], source: "케프카" }
-258.5 "빛의 파동 2" Ability { id: "BABE", source: "케프카" }
+258.5 "빛의 파동 #2" Ability { id: "BABE", source: "케프카" }
 259.2 "위험한 주문" #Ability { id: ["BAC0", "BAC1", "BAC2"], source: "케프카" }
 264.3 "소멸의 발차기" #Ability { id: ["BADC", "BADD"], source: "케프카" }
-269.5 "빛의 파동 3" Ability { id: "BABE", source: "케프카" }
+269.5 "빛의 파동 #3" Ability { id: "BABE", source: "케프카" }
 270.2 "위험한 주문" #Ability { id: ["BAC0", "BAC1", "BAC2"], source: "케프카" }
 278.9 "미래/과거의 종언" Ability { id: ["BAD2", "BAD3"], source: "케프카" }
-279.5 "빛의 파동 4" Ability { id: "BABE", source: "케프카" }
+279.5 "빛의 파동 #4" Ability { id: "BABE", source: "케프카" }
 280.2 "위험한 주문" #Ability { id: ["BAC0", "BAC1", "BAC2"], source: "케프카" }
 285.3 "소멸의 발차기" #Ability { id: ["BADC", "BADD"], source: "케프카" }
-290.6 "빛의 파동 5" Ability { id: "BABE", source: "케프카" }
+290.6 "빛의 파동 #5" Ability { id: "BABE", source: "케프카" }
 291.3 "위험한 주문" #Ability { id: ["BAC0", "BAC1", "BAC2"], source: "케프카" }
 300.0 "미래/과거의 종언" Ability { id: ["BAD2", "BAD3"], source: "케프카" }
-300.6 "빛의 파동 6" Ability { id: "BABE", source: "케프카" }
+300.6 "빛의 파동 #6" Ability { id: "BABE", source: "케프카" }
 301.3 "위험한 주문" #Ability { id: ["BAC0", "BAC1", "BAC2"], source: "케프카" }
 306.4 "소멸의 발차기" #Ability { id: ["BADC", "BADD"], source: "케프카" }
-311.6 "빛의 파동 7" Ability { id: "BABE", source: "케프카" }
+311.6 "빛의 파동 #7" Ability { id: "BABE", source: "케프카" }
 312.3 "위험한 주문" #Ability { id: ["BAC0", "BAC1", "BAC2"], source: "케프카" }
 321.0 "미래/과거의 종언" Ability { id: ["BAD2", "BAD3"], source: "케프카" }
-321.6 "빛의 파동 8" Ability { id: "BABE", source: "케프카" }
+321.6 "빛의 파동 #8" Ability { id: "BABE", source: "케프카" }
 322.3 "위험한 주문" #Ability { id: ["BAC0", "BAC1", "BAC2"], source: "케프카" }
 327.4 "소멸의 발차기" #Ability { id: ["BADC", "BADD"], source: "케프카" }
 341.5 "심판의 빛" Ability { id: "BABD", source: "케프카" }
@@ -230,11 +230,14 @@ hideall "--sync--"
 # 블리자드 + 타워
 805.3 "--sync--" Ability { id: "C533", source: "케프카" }
 # BB0D/BAF0/BB03/BB11은 한 풀에 여러 번(8~16회) 터져 sync로 쓰면 타임라인이 뒤로 되돌아감 → 표시 전용(#).
+# 탑(BAF0)/쉐어(BB03)는 조 스왑 2세트: 1세트(818.0 탑+쉐어) → 2세트(탑 820.6 + 쉐어 823.5). 탑은 2명씩 순차로 4명.
 812.4 "블리자가" Ability { id: "BB0F", source: "엑스데스" }
 815.4 "블리자가" #Ability { id: "BB0D", source: "엑스데스" }
 816.3 "쿵쿵 발 구르기 (시전)" Ability { id: "BAEF", source: "케프카" }
 817.9 "착탄하라" Ability { id: "BB02", source: "카오스" }
 818.0 "쿵쿵 발 구르기" #Ability { id: "BAF0", source: "케프카" }
+818.0 "착탄" #Ability { id: "BB03", source: "카오스" }
+820.6 "쿵쿵 발 구르기" #Ability { id: "BAF0", source: "케프카" }
 823.3 "착탄" #Ability { id: "BB03", source: "카오스" }
 826.4 "블리자가" #Ability { id: "BB11", source: "엑스데스" }
 827.4 "돌출" Ability { id: "BB05", source: "카오스" }
