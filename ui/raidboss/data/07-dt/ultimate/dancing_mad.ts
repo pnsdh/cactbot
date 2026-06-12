@@ -90,6 +90,14 @@ export interface Data extends RaidbossData {
   dmCurseMine?: number; // P4 내가 마안 대상이면 내 저주 만료시각(ms). 그룹 매칭용
   dmChaosTruth?: boolean; // P4 카오스 808 460=진실/45F=거짓(검증). 해일/화염→혼돈 불물 진실거짓
   dmChaosMove?: { [id: string]: boolean }; // P4 혼돈 불(15AB)/물(15AC): true=이동(근접)/false=대기(도넛)
+  // P4 바닥(알쏭달쏭/찌릿찌릿/널리널리/마력방출) — 블리자가 고리 02A4=진실 / 선더가 고리 02A6=진실
+  dmP4Blizzard?: boolean; // 최신 블리자가 고리(02A4=진실)
+  dmP4Thunder?: boolean; // 최신 선더가 고리(02A6=진실)
+  dmP4StdBlizzard?: boolean; // 독립 널리널리 블리자가 진실 (마력방출 XNOR용)
+  dmP4StdThunder?: boolean; // 독립 찌릿찌릿 선더가 진실
+  dmP4ThunderDone?: boolean; // 찌릿찌릿 발동됨 → 다음 블리자가=널리널리 (널리널리가 false로 되돌림)
+  dmP4MagicBlizzard?: boolean; // 마력방출 블리자가 고리 (시전 시 스냅샷)
+  dmP4MagicThunder?: boolean; // 마력방출 선더가 고리
 }
 
 // 머리 사인(표식) waymark 번호 → 영문 사인 id(cactbot 관례). 인게임 전체 캡처로 검증(2026-06-10).
@@ -1010,6 +1018,42 @@ const dmDirOutputs = {
   w: { en: 'W', ko: '서쪽' },
 } as const;
 const dmDirKey = (d: number): 'n' | 'e' | 's' | 'w' => (['n', 'e', 's', 'w'] as const)[d] ?? 'n';
+
+// 블리자가+선더가 통합 출력(dmBlizzardThunder 옵션). P1 알쏭달쏭2 + P4 알쏭달쏭/마력방출 공용.
+//   blizzardTrue: BA98/고리02A4=true · thunderTrue: 고리02A6=true · safeNwSe: dir옵션 방향(없으면 ???).
+const dmBlizThunStrings = {
+  combo2: { en: '${dir} / ${inout}', ko: '${dir}에서 ${inout}' },
+  inner: { en: 'In', ko: '안으로' },
+  outer: { en: 'Out', ko: '밖으로' },
+  dirNeSw: { en: 'NE/SW', ko: '북동/남서' },
+  dirNwSe: { en: 'NW/SE', ko: '북서/남동' },
+  dirUnknown: { en: '???', ko: '???' },
+  dodgeBoth: { en: 'Dodge both', ko: '둘 다 피하기' },
+  stepFan: { en: 'Step on fan only', ko: '부채꼴만 밟기' },
+  stepLine: { en: 'Step on line only', ko: '직선만 밟기' },
+  stepBoth: { en: 'Step on both', ko: '둘 다 밟기' },
+} as const;
+const dmBlizThunText = (
+  data: Data,
+  blizzardTrue: boolean,
+  thunderTrue: boolean,
+  safeNwSe: boolean | undefined,
+  output: Output,
+): string => {
+  if (data.triggerSetConfig.dmBlizzardThunder === 'stepDodge') {
+    if (blizzardTrue && thunderTrue)
+      return output.dodgeBoth!();
+    if (!blizzardTrue && thunderTrue)
+      return output.stepFan!(); // 블리자가만 거짓
+    if (blizzardTrue && !thunderTrue)
+      return output.stepLine!(); // 선더가만 거짓
+    return output.stepBoth!();
+  }
+  const dir = safeNwSe === undefined
+    ? output.dirUnknown!()
+    : (safeNwSe ? output.dirNwSe!() : output.dirNeSw!());
+  return output.combo2!({ dir: dir, inout: thunderTrue ? output.outer!() : output.inner!() });
+};
 
 const triggerSet: TriggerSet<Data> = {
   id: 'DancingMadUltimate',
@@ -3166,7 +3210,7 @@ const triggerSet: TriggerSet<Data> = {
       },
       delaySeconds: (_data, matches) => Math.max(parseFloat(matches.duration) - 5, 0),
       durationSeconds: 5,
-      alertText: (data, matches, output) =>
+      infoText: (data, matches, output) =>
         output.center!({
           next: (data.dmChaosMove?.[matches.effectId] ?? false) ? output.move!() : output.wait!(),
         }),
@@ -3184,12 +3228,109 @@ const triggerSet: TriggerSet<Data> = {
       condition: (data, matches) => matches.target === data.me,
       delaySeconds: (_data, matches) => parseFloat(matches.duration),
       durationSeconds: 5,
-      alertText: (data, matches, output) =>
+      infoText: (data, matches, output) =>
         (data.dmChaosMove?.[matches.effectId] ?? false) ? output.move!() : output.wait!(),
       outputStrings: {
         move: { en: 'Move', ko: '이동' },
         wait: { en: 'Wait', ko: '대기' },
       },
+    },
+    // ───────── P4 바닥: 알쏭달쏭 ×3 / 찌릿찌릿 선더가 / 널리널리 블리자가 / 마력 방출 ─────────
+    // 블리자가 고리 02A4=진실 / 선더가 고리 02A6=진실. 출력은 dmBlizzardThunder 옵션(P1과 동일).
+    {
+      id: 'DancingMad P4 진입 초기화',
+      type: 'StartsUsing',
+      netRegex: { id: 'C2DC', source: '케프카', capture: false },
+      run: (data) => {
+        data.dmP4ThunderDone = false; // 직전 풀 잔여 방지
+        data.dmP4StdBlizzard = undefined;
+        data.dmP4StdThunder = undefined;
+      },
+    },
+    {
+      id: 'DancingMad P4 블리자가 고리 수집',
+      type: 'HeadMarker',
+      netRegex: { id: ['02A3', '02A4'] }, // 02A4=진실 / 02A3=거짓 (시전 BA98/BA9B와 일치 검증)
+      condition: (data) => data.phase === 'p4',
+      run: (data, matches) => data.dmP4Blizzard = matches.id === '02A4',
+    },
+    {
+      id: 'DancingMad P4 선더가 고리 수집',
+      type: 'HeadMarker',
+      netRegex: { id: ['02A5', '02A6'] }, // 02A6=진실 / 02A5=거짓
+      condition: (data) => data.phase === 'p4',
+      run: (data, matches) => data.dmP4Thunder = matches.id === '02A6',
+    },
+    {
+      // 알쏭달쏭 마법 ×3: 블리자가+선더가 고리 → 옵션 출력(P1 알쏭달쏭2와 동일)
+      id: 'DancingMad P4 알쏭달쏭',
+      type: 'StartsUsing',
+      netRegex: { id: 'BA94', source: '케프카', capture: false },
+      condition: (data) => data.phase === 'p4',
+      suppressSeconds: 1,
+      alertText: (data, _matches, output) =>
+        dmBlizThunText(
+          data,
+          data.dmP4Blizzard ?? true,
+          data.dmP4Thunder ?? true,
+          undefined,
+          output,
+        ),
+      outputStrings: dmBlizThunStrings,
+    },
+    {
+      // 찌릿찌릿 선더가(단독): 선더가 고리만. 진실→피하기/거짓→밟기. 진실값 저장(마력방출 XNOR용)
+      id: 'DancingMad P4 찌릿찌릿 선더가',
+      type: 'StartsUsing',
+      netRegex: { id: 'C5DE', source: '케프카', capture: false },
+      condition: (data) => data.phase === 'p4',
+      preRun: (data) => {
+        data.dmP4StdThunder = data.dmP4Thunder ?? true;
+        data.dmP4ThunderDone = true; // 다음 블리자가 = 널리널리
+      },
+      alertText: (data, _matches, output) =>
+        (data.dmP4Thunder ?? true) ? output.avoid!() : output.step!(),
+      outputStrings: {
+        avoid: { en: 'Avoid floor', ko: '바닥 피하기' },
+        step: { en: 'Step on floor', ko: '바닥 밟기' },
+      },
+    },
+    {
+      // 널리널리 블리자가(단독): 찌릿찌릿 다음 블리자가. 시전 id로 진실. 진실값 저장(마력방출 XNOR용)
+      id: 'DancingMad P4 널리널리 블리자가',
+      type: 'StartsUsing',
+      netRegex: { id: ['BA98', 'BA9B'], source: '케프카' },
+      condition: (data) => data.phase === 'p4' && data.dmP4ThunderDone === true,
+      preRun: (data, matches) => {
+        data.dmP4StdBlizzard = matches.id === 'BA98';
+        data.dmP4ThunderDone = false; // 마력방출 후 전조 블리자가에 재발동 방지
+      },
+      suppressSeconds: 3,
+      alertText: (_data, matches, output) =>
+        matches.id === 'BA98' ? output.avoid!() : output.step!(),
+      outputStrings: {
+        avoid: { en: 'Avoid floor', ko: '바닥 피하기' },
+        step: { en: 'Step on floor', ko: '바닥 밟기' },
+      },
+    },
+    {
+      // 마력 방출: 마력방출 고리(시전 시 스냅샷) XNOR 독립 찌릿찌릿/널리널리 → 끝나자마자(시전시간 후) 합친 안내
+      //   거짓의 거짓=진실 → 최종 = (독립 == 마력방출). 전조 방향은 달라질 수 있어 stepDodge(밟기/피하기) 기준.
+      id: 'DancingMad P4 마력 방출',
+      type: 'StartsUsing',
+      netRegex: { id: 'BAA5', source: '케프카' },
+      condition: (data) => data.phase === 'p4',
+      preRun: (data) => {
+        data.dmP4MagicBlizzard = data.dmP4Blizzard ?? true;
+        data.dmP4MagicThunder = data.dmP4Thunder ?? true;
+      },
+      delaySeconds: (_data, matches) => parseFloat(matches.castTime), // 마력방출 끝나자마자(전조 등장)
+      alertText: (data, _matches, output) => {
+        const blizzard = (data.dmP4StdBlizzard ?? true) === (data.dmP4MagicBlizzard ?? true);
+        const thunder = (data.dmP4StdThunder ?? true) === (data.dmP4MagicThunder ?? true);
+        return dmBlizThunText(data, blizzard, thunder, undefined, output);
+      },
+      outputStrings: dmBlizThunStrings,
     },
     {
       id: 'DancingMad 무의 범람',
