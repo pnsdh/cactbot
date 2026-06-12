@@ -30,6 +30,8 @@ export interface Data extends RaidbossData {
     dmForsakenSwap: 'upper' | 'lower';
     dmFakeMeleeCaster: 'fwd' | 'rev';
     dmBlizzardKnockback: 'kbSouth' | 'roleSide';
+    dmBlizzardThunder: 'stepDodge' | 'dir';
+    dmTrineMethod: '09stop' | 'yan';
   };
   phase: Phase | 'unknown';
   combatantData?: PluginCombatantState[];
@@ -779,6 +781,10 @@ const dmTrineSpots = [
 // 1:1:1 담당 영역: idx별 0=T1 / 1=T2 / 2=본진. (T1 북서·남서 / T2 북·남 / 본진 북동·남동)
 const dmTrineZone = [1, 2, 2, 1, 0, 0] as const;
 
+// '얀' 우선순위: 1트라인 3칸 중 자리 1개씩 선점(미사용 칸은 미표시). idx 시계: 0북 1북동 2남동 3남 4남서 5북서.
+const dmTrineTankOrder = [4, 5, 0, 1, 2, 3] as const; // 탱커 2명: 남서(4)부터 시계방향
+const dmTrineBodyOrder = [3, 2, 1, 0, 5, 4] as const; // 본대: 남(3)부터 반시계방향
+
 // (x,y) → 가장 가까운 육각 칸 idx(0~5).
 const dmTrineNearest = (x: number, y: number): number => {
   let best = 0;
@@ -1049,6 +1055,33 @@ const triggerSet: TriggerSet<Data> = {
       default: 'kbSouth',
     },
     {
+      id: 'dmBlizzardThunder',
+      name: {
+        en: 'P1 Blizzard + Thunder guidance',
+        ko: 'P1 알쏭달쏭2 (블리자가+선더가) 안내',
+      },
+      comment: {
+        en: 'Blizzard(fan) + Thunder(line) truth/false combo. ' +
+          'Step/Dodge = call which shape to stand on by truth (default): both true → dodge both, blizzard false → step on fan only, thunder false → step on line only, both false → step on both. ' +
+          'Direction + In/Out = call Blizzard safe diagonal + Thunder in/out (previous behavior).',
+        ko: '블리자가(부채꼴)+선더가(직선) 진실/거짓 조합 안내 방식. ' +
+          '안밖(밟기/피하기) = 진실/거짓으로 밟을 도형 안내(기본): 둘 다 진실→둘 다 피하기, 블리자가만 거짓→부채꼴만 밟기, 선더가만 거짓→직선만 밟기, 둘 다 거짓→둘 다 밟기. ' +
+          '방향 + 안밖 = 블리자가 안전 대각선 + 선더가 안/밖(기존 방식).',
+      },
+      type: 'select',
+      options: {
+        en: {
+          'Step / Dodge (default)': 'stepDodge',
+          'Direction + In/Out': 'dir',
+        },
+        ko: {
+          '블리자가 안밖 + 선더가 안밖 (기본)': 'stepDodge',
+          '블리자가 방향 + 선더가 안밖': 'dir',
+        },
+      },
+      default: 'stepDodge',
+    },
+    {
       id: 'dmForsakenMethod',
       name: {
         en: 'P2 Forsaken strategy',
@@ -1095,6 +1128,31 @@ const triggerSet: TriggerSet<Data> = {
         },
       },
       default: 'lower',
+    },
+    {
+      id: 'dmTrineMethod',
+      name: {
+        en: 'P2 Trine strategy',
+        ko: 'P2 트라인 처리법',
+      },
+      comment: {
+        en: '09STOP = announce T1/T2/body trine spots with left/mid/right labels (current). ' +
+          'Yan = priority assignment: both tanks share one spot (clockwise from SW), the rest one spot (CCW from S); the unused trine spot is not shown.',
+        ko: '09STOP = T1/T2/본진 트라인 자리를 왼/중/오 라벨로 안내(기존). ' +
+          '얀 = 우선순위 배정: 탱커 2명이 한 자리(남서부터 시계), 본대가 한 자리(남쪽부터 반시계). 사용 안 하는 트라인은 표시 안 함.',
+      },
+      type: 'select',
+      options: {
+        en: {
+          '09STOP (current)': '09stop',
+          'Yan': 'yan',
+        },
+        ko: {
+          '09STOP (기존)': '09stop',
+          '얀': 'yan',
+        },
+      },
+      default: '09stop',
     },
   ],
   timelineFile: 'dancing_mad.txt',
@@ -1329,7 +1387,8 @@ const triggerSet: TriggerSet<Data> = {
         south: { en: 'South', ko: '아래' },
       },
     },
-    // 출력: 2번째 알쏭달쏭 (블리자가 방향 + 선더가 안/밖) — 산개/쉐어 마커가 없을 때만
+    // 출력: 2번째 알쏭달쏭 (블리자가+선더가) — 산개/쉐어 마커가 없을 때만
+    //   옵션 dmBlizzardThunder: stepDodge(밟기/피하기, 기본) / dir(블리자가 방향 + 선더가 안밖)
     {
       id: 'DancingMad 알쏭달쏭2',
       type: 'StartsUsing',
@@ -1342,16 +1401,32 @@ const triggerSet: TriggerSet<Data> = {
         // 2번째(블리자가+선더가)만: 산개/쉐어 없고 선더가 있음
         if (data.dmSpreadBase !== undefined || data.dmThunderInner === undefined)
           return; // (combatantData 공유 경합 방지)
+        // stepDodge는 방향(구슬 위치) 불필요 → 조회 생략
+        if (data.triggerSetConfig.dmBlizzardThunder === 'stepDodge')
+          return;
         data.combatantData = await fetchCombatants(matches.sourceId);
       },
       alertText: (data, matches, output) => {
         if (data.dmSpreadBase !== undefined || data.dmThunderInner === undefined)
           return;
+        // 진실=피하기 / 거짓=밟기. 블리자가: BA98=진실·BA9B=거짓 / 선더가: 02A6(밖)=진실·02A5(안)=거짓
+        const blizzardTrue = matches.id === 'BA98';
+        const thunderTrue = !data.dmThunderInner;
+        if (data.triggerSetConfig.dmBlizzardThunder === 'stepDodge') {
+          // 블리자가=부채꼴 / 선더가=직선
+          if (blizzardTrue && thunderTrue)
+            return output.dodgeBoth!();
+          if (!blizzardTrue && thunderTrue)
+            return output.stepFan!(); // 블리자가만 거짓
+          if (blizzardTrue && !thunderTrue)
+            return output.stepLine!(); // 선더가만 거짓
+          return output.stepBoth!(); // 둘 다 거짓
+        }
+        // dir 옵션(기존): 블리자가 안전 대각선 + 선더가 안/밖
         const safeNwSe = getBlizzardSafeNwSe(data.combatantData?.[0], matches.id);
         const dir = safeNwSe === undefined
           ? output.dirUnknown!()
           : (safeNwSe ? output.dirNwSe!() : output.dirNeSw!());
-        // 선더가: 02A5=?(안으로) / 02A6=진실(밖으로)  ※ 라벨 3개로 검증됨
         const inout = data.dmThunderInner ? output.inner!() : output.outer!();
         return output.combo2!({ dir: dir, inout: inout });
       },
@@ -1362,6 +1437,10 @@ const triggerSet: TriggerSet<Data> = {
         dirNeSw: { en: 'NE/SW', ko: '북동/남서' },
         dirNwSe: { en: 'NW/SE', ko: '북서/남동' },
         dirUnknown: { en: '???', ko: '???' },
+        dodgeBoth: { en: 'Dodge both', ko: '둘 다 피하기' },
+        stepFan: { en: 'Step on fan only', ko: '부채꼴만 밟기' },
+        stepLine: { en: 'Step on line only', ko: '직선만 밟기' },
+        stepBoth: { en: 'Step on both', ko: '둘 다 밟기' },
       },
     },
     // 출력: 단독 널리널리 블리자가 (알쏭달쏭/선더가 없음) — 안전 대각선만
@@ -2231,9 +2310,6 @@ const triggerSet: TriggerSet<Data> = {
         if (tris.length !== 3) // 칸 위 3개 미수집(타이밍/불완전 풀) → 생략
           return;
         const idxs = tris.map((c) => dmTrineNearest(c.PosX, c.PosY)).sort((x, y) => x - y);
-        const assign = dmTrineAssign(idxs);
-        if (assign === undefined)
-          return;
         const dirs = [
           output.dirN!(),
           output.dirNE!(),
@@ -2242,6 +2318,19 @@ const triggerSet: TriggerSet<Data> = {
           output.dirSW!(),
           output.dirNW!(),
         ];
+        // 얀: 우선순위로 한 자리만 선점(탱커=남서부터 시계 / 본대=남부터 반시계). 미사용 칸은 미표시.
+        if (data.triggerSetConfig.dmTrineMethod === 'yan') {
+          const set = new Set(idxs);
+          const order = data.role === 'tank' ? dmTrineTankOrder : dmTrineBodyOrder;
+          const spot = order.find((i) => set.has(i));
+          if (spot === undefined)
+            return;
+          return output.yan!({ spot: dirs[spot]! });
+        }
+        // 09STOP(기존): T1/T2/본진 + 왼/중/오 라벨
+        const assign = dmTrineAssign(idxs);
+        if (assign === undefined)
+          return;
         const rels: { [k: string]: string } = {
           'left': output.relLeft!(),
           'mid': output.relMid!(),
@@ -2279,6 +2368,7 @@ const triggerSet: TriggerSet<Data> = {
         relOne: { en: '1 away', ko: '1칸' },
         tank: { en: 'Then ${type} - ${left} + ${right}', ko: '이후 ${type} - ${left} + ${right}' },
         body: { en: 'Then ${type} - ${spot}', ko: '이후 ${type} - ${spot}' },
+        yan: { en: 'Then ${spot}', ko: '이후 ${spot}' },
       },
     },
     {
