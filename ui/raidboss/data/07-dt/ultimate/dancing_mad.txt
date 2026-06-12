@@ -261,32 +261,36 @@ hideall "--sync--"
 995.0 "--sync--" StartsUsing { id: "C2DC", source: "케프카" } window 995,12000
 1000.0 "꼭두각시 영혼" Ability { id: "C2DC", source: "케프카" }
 1003.1 "--sync--" Ability { id: "C3FD", source: "케프카" }
-1009.4 "알쏭달쏭 마법 1" Ability { id: "BA94", source: "케프카" }
-1013.7 "그랜드크로스" Ability { id: "BB14", source: "네오 엑스데스" }
+1009.4 "알쏭달쏭 마법 #1" Ability { id: "BA94", source: "케프카" }
+1013.7 "그랜드크로스 #1" Ability { id: "BB14", source: "네오 엑스데스" }
 1018.7 "화염/해일" Ability { id: ["BB20", "BB21"], source: "카오스" }
-1024.1 "알쏭달쏭 마법 2" Ability { id: "BA94", source: "케프카" }
-1028.4 "그랜드크로스" Ability { id: "BB14", source: "네오 엑스데스" }
+1024.1 "알쏭달쏭 마법 #2" Ability { id: "BA94", source: "케프카" }
+1028.4 "그랜드크로스 #2" Ability { id: "BB14", source: "네오 엑스데스" }
 1033.5 "해일/화염" Ability { id: ["BB21", "BB20"], source: "카오스" }
-1039.2 "알쏭달쏭 마법 3" Ability { id: "BA94", source: "케프카" }
-1043.3 "그랜드크로스" Ability { id: "BB14", source: "네오 엑스데스" }
+1039.2 "알쏭달쏭 마법 #3" Ability { id: "BA94", source: "케프카" }
+1043.3 "그랜드크로스 #3" Ability { id: "BB14", source: "네오 엑스데스" }
 1045.3 "--sync--" Ability { id: "C554", source: "케프카" }
 1055.4 "무의 범람" Ability { id: ["C392", "C393", "C3A1", "C3A2"], source: "네오 엑스데스" }
-1055.8 "생사의 갈림길" Ability { id: "C396", source: "네오 엑스데스" }
-1055.8 "산 자/죽은 자의 암흑광" #Ability { id: ["C394", "C395"], source: "네오 엑스데스" }
+1055.8 "암흑광/생사의 갈림길" #Ability { id: ["C394", "C395", "C396"], source: "네오 엑스데스" }
 1059.0 "--sync--" Ability { id: "C555", source: "케프카" }
-1059.7 "죽음의 격동" Ability { id: "BB1D", source: "네오 엑스데스" }
+# 1059.7 "죽음의 격동" Ability { id: "BB1D", source: "네오 엑스데스" }
 1064.1 "마력 충전" Ability { id: "BAA4", source: "케프카" }
 1064.4 "죽음의 번개/죽음의 파도" #Ability { id: ["BB18", "BB1A"], source: "네오 엑스데스" }
 1072.4 "찌릿찌릿 선더가" Ability { id: "C5DE", source: "케프카" }
 1073.4 "죽음의 비명" Ability { id: ["BB16", "BB17"], source: "네오 엑스데스" }
+# 혼돈의 불 디버프(15AB) 만료=장판 설치(8명 동일, 터짐 BB23은 +5s). LosesEffect라 표시 전용.
+1080.8 "혼돈의 불 (만료)"
 1082.5 "두근두근 알테마" Ability { id: "C24A", source: "케프카" }
-1085.3 "혼돈의 불" Ability { id: ["BB22", "BB23"], source: "카오스" }
-1089.4 "죽음의 파도" Ability { id: "BB1B", source: "네오 엑스데스" }
-1089.4 "죽음의 번개/죽음의 폭탄" #Ability { id: ["BB19", "BB15"], source: "네오 엑스데스" }
+1085.3 "혼돈의 불 (발동)" Ability { id: ["BB22", "BB23"], source: "카오스" }
+1089.4 "죽음의 번개/죽음의 파도" #Ability { id: ["BB18", "BB1A"], source: "네오 엑스데스" }
 1090.4 "널리널리 블리자가" Ability { id: "BA9B", source: "케프카" }
 1097.2 "죽음의 비명" Ability { id: ["BB16", "BB17"], source: "네오 엑스데스" }
 1103.5 "마력 방출" Ability { id: "BAA5", source: "케프카" }
-1107.6 "혼돈의 물" Ability { id: "BB25", source: "카오스" }
+# 혼돈의 물 디버프(15AC) 만료=장판 설치(8명 동일, 터짐 BB24는 +5s). LosesEffect라 표시 전용.
+1103.6 "혼돈의 물 (만료)"
+1107.6 "혼돈의 물 (발동)" Ability { id: "BB25", source: "카오스" }
+# 마력 방출 후 전조 블리자가+선더가 착탄(BAA5 착탄 +5.08s, 실측). id 반복이라 표시 전용.
+1108.6 "선더가 + 블리자가" #Ability { id: ["BA98", "BA9B", "BAA1", "BA9F"], source: "케프카" }
 # 전멸기 컷오프: 1112.7에 케프카 타겟 불가(고정). 여기까지 못 죽이면 BABB 전멸기 → 딜 판단용.
 1112.7 "--untargetable--" # 케프카 (전멸기 컷오프, 실로그 2026-06-10 검증)
 1112.8 "--sync--" StartsUsing { id: "BABB", source: "케프카" } jump "p1-and-p4-enrage"

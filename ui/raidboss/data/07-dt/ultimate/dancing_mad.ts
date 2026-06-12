@@ -3267,6 +3267,7 @@ const triggerSet: TriggerSet<Data> = {
       type: 'StartsUsing',
       netRegex: { id: 'BA94', source: '케프카', capture: false },
       condition: (data) => data.phase === 'p4',
+      durationSeconds: 5, // 시전 시작~착탄(castTime 4.7 + 0.3)
       suppressSeconds: 1,
       alertText: (data, _matches, output) =>
         dmBlizThunText(
@@ -3288,6 +3289,7 @@ const triggerSet: TriggerSet<Data> = {
         data.dmP4StdThunder = data.dmP4Thunder ?? true;
         data.dmP4ThunderDone = true; // 다음 블리자가 = 널리널리
       },
+      durationSeconds: 5, // 시전 시작~착탄
       alertText: (data, _matches, output) =>
         (data.dmP4Thunder ?? true) ? output.avoid!() : output.step!(),
       outputStrings: {
@@ -3305,6 +3307,7 @@ const triggerSet: TriggerSet<Data> = {
         data.dmP4StdBlizzard = matches.id === 'BA98';
         data.dmP4ThunderDone = false; // 마력방출 후 전조 블리자가에 재발동 방지
       },
+      durationSeconds: 5, // 시전 시작~착탄
       suppressSeconds: 3,
       alertText: (_data, matches, output) =>
         matches.id === 'BA98' ? output.avoid!() : output.step!(),
@@ -3325,6 +3328,7 @@ const triggerSet: TriggerSet<Data> = {
         data.dmP4MagicThunder = data.dmP4Thunder ?? true;
       },
       delaySeconds: (_data, matches) => parseFloat(matches.castTime), // 마력방출 끝나자마자(전조 등장)
+      durationSeconds: 5.4, // 마력방출 착탄~전조 착탄까지
       alertText: (data, _matches, output) => {
         const blizzard = (data.dmP4StdBlizzard ?? true) === (data.dmP4MagicBlizzard ?? true);
         const thunder = (data.dmP4StdThunder ?? true) === (data.dmP4MagicThunder ?? true);
