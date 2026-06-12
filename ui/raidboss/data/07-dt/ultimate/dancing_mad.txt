@@ -131,6 +131,8 @@ hideall "--sync--"
 370.0 "파괴의 날개 (양쪽)" #Ability { id: "BACF", source: "케프카" }
 377.1 "종말의 포옹" Ability { id: "C24C", source: "케프카" }
 
+# 케프카 전멸기 컷오프: 380.4에 타겟 불가(고정). 여기까지 못 죽이면 BAE1 전멸기 → 딜 판단용으로 미리 표시.
+380.4 "--untargetable--" # 케프카 (전멸기 컷오프, 실로그 2026-06-11 검증)
 # P2 분기: 전멸기(BAE1) vs 성공(C3F7 갈기갈기 에어로가 → P3)
 380.5 "--sync--" StartsUsing { id: "BAE1", source: "케프카" } jump "p2-enrage"
 383.5 "--sync--" StartsUsing { id: "C3F7", source: "케프카" } jump "p2-success"
@@ -149,6 +151,7 @@ hideall "--sync--"
 # ↳ 선더가 탱버는 모두 2연타(BB09+BB0C 2회, 2타=+3.0s) → '선더가 1타'(BB09 싱크) + '선더가 2타'(#BB0C 표시전용)로 분리.
 #   (582 BB12는 단일 레이드와이드라 분리 안 함.)
 537.7 "재구성" Ability { id: "BAE2", source: "케프카" }
+540.7 "--targetable--" # 카오스·엑스데스 타겟 가능(출현)
 543.8 "결전" Ability { id: ["C2E3", "C2E2"], source: ["엑스데스", "카오스"] }
 548.0 "--sync--" Ability { id: "C554", source: "케프카" }
 
@@ -244,6 +247,8 @@ hideall "--sync--"
 
 # P3 종료 분기: 엑스데스 전멸 / 카오스·엑스데스 전멸 / P4 진입
 839.0 "--sync--" StartsUsing { id: "C61E", source: "엑스데스" } window 839,3 jump "p3-exdeath-enrage"
+# 전멸기 컷오프: 840.6에 카오스·엑스데스 동시 타겟 불가(고정). 여기까지 못 죽이면 C258/C259 전멸기 → 딜 판단용.
+840.6 "--untargetable--" # 카오스·엑스데스 (전멸기 컷오프, 실로그 2026-06-10 검증)
 840.8 "--sync--" StartsUsing { id: "C258", source: "엑스데스" } jump "p3-enrage"
 840.8 "--sync--" StartsUsing { id: "C259", source: "카오스" } jump "p3-enrage"
 845.8 "메테오 (P3 전멸기)" #Ability { id: "C258", source: "엑스데스" }
@@ -251,6 +256,8 @@ hideall "--sync--"
 
 
 # =================================== P4: 케프카 · 카오스 · 네오 엑스데스 ===================================
+# ※ P3→P4 타겟 토글은 카오스·엑스데스 격파 타이밍(DPS 의존)에 좌우되고 C2DC 재동기화 이전 가변 구간이라
+#   고정 마커 불가 → 생략. P4는 C2DC(꼭두각시 영혼) 넓은 window로 재동기화.
 995.0 "--sync--" StartsUsing { id: "C2DC", source: "케프카" } window 995,12000
 1000.0 "꼭두각시 영혼" Ability { id: "C2DC", source: "케프카" }
 1003.1 "--sync--" Ability { id: "C3FD", source: "케프카" }
@@ -263,20 +270,25 @@ hideall "--sync--"
 1039.2 "알쏭달쏭 마법 3" Ability { id: "BA94", source: "케프카" }
 1043.3 "그랜드크로스" Ability { id: "BB14", source: "네오 엑스데스" }
 1045.3 "--sync--" Ability { id: "C554", source: "케프카" }
-1055.4 "무의 범람" Ability { id: "C393", source: "네오 엑스데스" }
+1055.4 "무의 범람" Ability { id: ["C392", "C393", "C3A1", "C3A2"], source: "네오 엑스데스" }
 1055.8 "생사의 갈림길" Ability { id: "C396", source: "네오 엑스데스" }
+1055.8 "산 자/죽은 자의 암흑광" #Ability { id: ["C394", "C395"], source: "네오 엑스데스" }
 1059.0 "--sync--" Ability { id: "C555", source: "케프카" }
 1059.7 "죽음의 격동" Ability { id: "BB1D", source: "네오 엑스데스" }
 1064.1 "마력 충전" Ability { id: "BAA4", source: "케프카" }
+1064.4 "죽음의 번개/죽음의 파도" #Ability { id: ["BB18", "BB1A"], source: "네오 엑스데스" }
 1072.4 "찌릿찌릿 선더가" Ability { id: "C5DE", source: "케프카" }
-1073.4 "죽음의 비명" Ability { id: "BB16", source: "네오 엑스데스" }
+1073.4 "죽음의 비명" Ability { id: ["BB16", "BB17"], source: "네오 엑스데스" }
 1082.5 "두근두근 알테마" Ability { id: "C24A", source: "케프카" }
-1085.3 "혼돈의 불" Ability { id: "BB23", source: "카오스" }
+1085.3 "혼돈의 불" Ability { id: ["BB22", "BB23"], source: "카오스" }
 1089.4 "죽음의 파도" Ability { id: "BB1B", source: "네오 엑스데스" }
+1089.4 "죽음의 번개/죽음의 폭탄" #Ability { id: ["BB19", "BB15"], source: "네오 엑스데스" }
 1090.4 "널리널리 블리자가" Ability { id: "BA9B", source: "케프카" }
-1097.2 "죽음의 비명" Ability { id: "BB17", source: "네오 엑스데스" }
+1097.2 "죽음의 비명" Ability { id: ["BB16", "BB17"], source: "네오 엑스데스" }
 1103.5 "마력 방출" Ability { id: "BAA5", source: "케프카" }
 1107.6 "혼돈의 물" Ability { id: "BB25", source: "카오스" }
+# 전멸기 컷오프: 1112.7에 케프카 타겟 불가(고정). 여기까지 못 죽이면 BABB 전멸기 → 딜 판단용.
+1112.7 "--untargetable--" # 케프카 (전멸기 컷오프, 실로그 2026-06-10 검증)
 1112.8 "--sync--" StartsUsing { id: "BABB", source: "케프카" } jump "p1-and-p4-enrage"
 1114.8 "--sync--" Ability { id: "C3FD", source: "케프카" } window 90,5 jump "p4-success"
 1117.8 "심판의 빛 (P4 전멸기)" #Ability { id: "BABB", source: "케프카" }
@@ -286,7 +298,9 @@ hideall "--sync--"
 1255.6 label "p4-success"
 1255.6 "--sync--" Ability { id: "C3FD", source: "케프카" }
 1261.9 "두근두근 알테마" Ability { id: "C24A", source: "케프카" }
-1300.0 "연속 알테마" Ability { id: "BB40", source: "케프카" }
+1262.4 "--untargetable--" # 케프카 (P4→P5 연출)
+1293.3 "--targetable--" # 케프카 (P5 본격 시작)
+1300.0 "연속 알테마" Ability { id: "BB40", source: "케프카" } duration 3.4 # BB41 4연타(~3.4s)
 1305.4 "--sync--" Ability { id: "C652", source: "케프카" }
 1306.3 "마격" Ability { id: ["C653", "C654", "C655"], source: "케프카" }
 1308.6 "--sync--" Ability { id: "C652", source: "케프카" }
@@ -294,51 +308,69 @@ hideall "--sync--"
 1311.7 "--sync--" Ability { id: "C652", source: "케프카" }
 1312.6 "마격" Ability { id: ["C653", "C654", "C655"], source: "케프카" }
 1317.9 "플러드" Ability { id: "C13F", source: "케프카" }
+1318.9 "혼돈의 홍수/플러드 (4연속)" duration 3.0 #Ability { id: ["BB4F", "C269"], source: "케프카" }
 1330.9 "광기의 오케스트라" Ability { id: "BB50", source: "케프카" }
 1331.8 "홀리" Ability { id: "BB54", source: "케프카" }
+1331.8 "플레어" #Ability { id: "BB52", source: "케프카" }
 1334.0 "광기의 오케스트라" Ability { id: "BB51", source: "케프카" }
 1334.9 "홀리" Ability { id: "BB54", source: "케프카" }
+1334.9 "혼돈의 플레어" #Ability { id: "BB53", source: "케프카" }
+1338.3 "확산 플레어" Ability { id: "BB55", source: "케프카" }
 1338.3 "혼돈의 홀리" Ability { id: "BB56", source: "케프카" }
 1342.2 "--sync--" Ability { id: "C652", source: "케프카" }
 1343.1 "마격" Ability { id: ["C653", "C654", "C655"], source: "케프카" }
 1345.4 "--sync--" Ability { id: "C652", source: "케프카" }
 1346.3 "마격" Ability { id: ["C653", "C654", "C655"], source: "케프카" }
 1352.9 "세 개의 별" Ability { id: "BB42", source: "케프카" }
-# ↑ 여기까지 실로그 검증(~1352s). ↓ 이하 P5 후반은 도달 로그 없어 업스트림 추정값.
-1361.3 "두 가지 선택의 참사" Ability { id: "C24F", source: "케프카" }
+# ↑ ~1352s까지 + ↓ 1361~1453s(행방불명1)는 실로그 검증(섬세 2026-06-10, P5 전멸 직전 도달).
+#   두 가지 선택의 참사(C24E/C24F)·퀘이크/토네이도(BB4A/BB4B) 풀마다 랜덤→결합 id. 혼돈종말 이후 +2.1s 보정.
+#   ※ 행방불명2~4(BB36)·소실(BB3A)만 도달 로그 없어 추정 유지.
+1361.3 "두 가지 선택의 참사" Ability { id: ["C24E", "C24F"], source: "케프카" }
 1362.0 "파이가/블리자가/선더가" Ability { id: ["BB43", "BB44", "BB45"], source: "케프카" }
-1362.1 "토네이도" Ability { id: "BB4B", source: "케프카" }
+1362.1 "퀘이크/토네이도" Ability { id: ["BB4A", "BB4B"], source: "케프카" }
 1368.0 "파이가/블리자가/선더가" Ability { id: ["BB43", "BB44", "BB45"], source: "케프카" }
-1373.4 "두 가지 선택의 참사" Ability { id: "C24E", source: "케프카" }
+1373.4 "두 가지 선택의 참사" Ability { id: ["C24E", "C24F"], source: "케프카" }
 1374.0 "파이가/블리자가/선더가" Ability { id: ["BB43", "BB44", "BB45"], source: "케프카" }
-1374.2 "퀘이크" Ability { id: "BB4A", source: "케프카" }
-1382.2 "연속 알테마" Ability { id: "BB40", source: "케프카" }
+1374.2 "퀘이크/토네이도" Ability { id: ["BB4A", "BB4B"], source: "케프카" }
+1382.2 "연속 알테마" Ability { id: "BB40", source: "케프카" } duration 3.4 # BB41 4연타(~3.4s)
 1387.6 "--sync--" Ability { id: "C652", source: "케프카" }
 1388.5 "마격" Ability { id: ["C653", "C654", "C655"], source: "케프카" }
 1390.8 "--sync--" Ability { id: "C652", source: "케프카" }
 1391.7 "마격" Ability { id: ["C653", "C654", "C655"], source: "케프카" }
-1397.1 "혼돈의 종말" Ability { id: "BB3B", source: "케프카" }
-1412.0 "혼돈의 와류" Ability { id: "BB3E", source: "케프카" }
-1412.9 "혼돈의 와류" Ability { id: "BB3F", source: "케프카" }
-1421.1 "광기의 오케스트라" Ability { id: "BB50", source: "케프카" }
-1422.0 "홀리" Ability { id: "BB54", source: "케프카" }
-1424.2 "광기의 오케스트라" Ability { id: "BB51", source: "케프카" }
-1425.1 "홀리" Ability { id: "BB54", source: "케프카" }
-1428.7 "확산 플레어" Ability { id: "BB55", source: "케프카" }
-1432.5 "--sync--" Ability { id: "C652", source: "케프카" }
-1433.4 "마격" Ability { id: ["C653", "C654", "C655"], source: "케프카" }
-1435.7 "--sync--" Ability { id: "C652", source: "케프카" }
-1436.6 "마격" Ability { id: ["C653", "C654", "C655"], source: "케프카" }
-1438.9 "--sync--" Ability { id: "C652", source: "케프카" }
-1439.8 "마격" Ability { id: ["C653", "C654", "C655"], source: "케프카" }
+# 혼돈의 종말(BB3B 시전) → 분신 6웨이브(BB3C VFX/BB3D 범위 x6, ~11s). 이 다단히트로 이후 ~+2.1s 드리프트 발생.
+1397.1 "혼돈의 종말" Ability { id: "BB3B", source: "케프카" } duration 11
+# 1414~ 실로그(섬세 2026-06-10) 보정: 혼돈의 종말 이후 전 구간 +2.1s
+1414.1 "혼돈의 와류" Ability { id: "BB3E", source: "케프카" }
+1415.0 "혼돈의 와류" Ability { id: "BB3F", source: "케프카" }
+1423.3 "광기의 오케스트라" Ability { id: "BB50", source: "케프카" }
+1424.2 "홀리" Ability { id: "BB54", source: "케프카" }
+1424.2 "플레어" #Ability { id: "BB52", source: "케프카" }
+1426.4 "광기의 오케스트라" Ability { id: "BB51", source: "케프카" }
+1427.3 "홀리" Ability { id: "BB54", source: "케프카" }
+1427.3 "혼돈의 플레어" #Ability { id: "BB53", source: "케프카" }
+1428.0 "확산 플레어" Ability { id: "BB55", source: "케프카" }
+1430.8 "혼돈의 홀리" Ability { id: "BB56", source: "케프카" }
+1434.6 "--sync--" Ability { id: "C652", source: "케프카" }
+1435.4 "마격" Ability { id: ["C653", "C654", "C655"], source: "케프카" }
+1437.8 "--sync--" Ability { id: "C652", source: "케프카" }
+1438.6 "마격" Ability { id: ["C653", "C654", "C655"], source: "케프카" }
+1440.9 "--sync--" Ability { id: "C652", source: "케프카" }
+1441.7 "마격" Ability { id: ["C653", "C654", "C655"], source: "케프카" }
 
-# P5 전멸 시퀀스
-1451.1 "행방불명 1" Ability { id: "BB35", source: "케프카" }
-1459.1 "행방불명 2" Ability { id: "BB36", source: "케프카" }
-1467.1 "행방불명 3" Ability { id: "BB36", source: "케프카" }
-1475.1 "행방불명 4" Ability { id: "BB36", source: "케프카" }
-1485.1 "--sync--" StartsUsing { id: "BB3A", source: "케프카" }
-1511.1 "행방불명: 소실 (P5 전멸기)" Ability { id: "BB3A", source: "케프카" }
+# P5 전멸 시퀀스 — 행방불명 1=BB35(실로그 검증 1453.0), 2~4=BB36(+8s 간격), 소실=BB3A(전멸기)
+#   ※ BB36 2~4·BB3A는 도달 로그 없어 BB35 기준 오피셜 간격 유지(추정). 각 행방불명 후 지면(BB37)/유대(BB39) 후속.
+#   ※ 행방불명 BB35~BB36은 소프트 전멸기(케프카 타겟 가능 유지, 로그 검증). 하드 전멸=BB3A(소실)에서 언타겟(추정).
+1453.0 "행방불명 1" Ability { id: "BB35", source: "케프카" }
+1458.0 "행방불명 (지면/유대)" #Ability { id: ["BB37", "BB39"], source: "케프카" }
+1461.0 "행방불명 2" Ability { id: "BB36", source: "케프카" }
+1466.0 "행방불명 (지면/유대)" #Ability { id: ["BB37", "BB39"], source: "케프카" }
+1469.0 "행방불명 3" Ability { id: "BB36", source: "케프카" }
+1474.0 "행방불명 (지면/유대)" #Ability { id: ["BB37", "BB39"], source: "케프카" }
+1477.0 "행방불명 4" Ability { id: "BB36", source: "케프카" }
+1482.0 "행방불명 (지면/유대)" #Ability { id: ["BB37", "BB39"], source: "케프카" }
+1486.9 "--untargetable--" # 케프카 (하드 전멸 컷오프, BB3A 직전 / 추정 — 도달 로그 없음)
+1487.0 "--sync--" StartsUsing { id: "BB3A", source: "케프카" }
+1513.0 "행방불명: 소실 (P5 전멸기)" Ability { id: "BB3A", source: "케프카" }
 
 
 # === 전멸 시퀀스 라벨 ===
@@ -489,8 +521,9 @@ hideall "--sync--"
 # BB14 그랜드크로스
 # BB20 화염
 # BB21 해일
-# C392 무의 범람
+# C392 무의 범람 (※ C392/C393/C3A1/C3A2 풀마다 랜덤 변종 → 타임라인 결합 id)
 # C393 무의 범람
+# C3A1 무의 범람 (오피셜 사전엔 없음, 섬세 로그서 확인)
 # C3A2 무의 범람
 # C396 생사의 갈림길
 # C394 산 자의 암흑광
