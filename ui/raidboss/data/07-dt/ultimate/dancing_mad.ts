@@ -78,6 +78,18 @@ export interface Data extends RaidbossData {
   dmKefkaDir?: number; // P3 거대 케프카 직전 위치(0=북~7=북서). 전멸기 직전 '방향 보고 중앙 대기'용
   dmIamCount?: number; // P3 '있는 그대로의 나'(BAEC/BAED) 횟수. 2번째(마지막)에 전멸기 시퀀스 안내
   dmEnrageHit?: number; // P3 전멸기 탑/쉐어 1라운드 피격 처리 플래그(스왑 1회만)
+  // P4 진실/거짓 디버프 — 무의 범람(데이터 기반: 실제 빔 읽으면 진실/거짓 상쇄)
+  dmFloodWound?: 'living' | 'dead'; // 산 자의 상처(15A5/보라) / 죽은 자의 상처(15A6/파랑)
+  dmFloodMod?: 'defy' | 'allagan'; // 죽음 초월(566)=상처와 같은색 / 알라그 필드(1C6)=다른색
+  dmFloodLiving?: { x: number; y: number }; // 산 자의 암흑광(C394, 보라 빔) 시전 좌표
+  dmFloodDead?: { x: number; y: number }; // 죽은 자의 암흑광(C395, 파랑 빔) 시전 좌표
+  dmFloodTruth?: boolean; // 네오 808 param 462=진실=true / 461=거짓=false. 무의범람·GC 공용(부여 시점에 읽기)
+  dmForkMine?: { expiry: number; spread: boolean }; // P4 내 갈래번개/물압축: 만료(ms)·산개여부. 세트 매칭+행동
+  dmAccelMine?: { expiry: number; stop: boolean }; // P4 내 가속도 폭탄: 만료(ms)·정지여부. 만료=세트와 같으면 합침
+  dmCurseTruth?: { [key: number]: boolean }; // P4 마안(저주의 외침) 그룹 진실(보지않기): key=만료(초). 비대상자도 방향 필요
+  dmCurseMine?: number; // P4 내가 마안 대상이면 내 저주 만료시각(ms). 그룹 매칭용
+  dmChaosTruth?: boolean; // P4 카오스 808 460=진실/45F=거짓(검증). 해일/화염→혼돈 불물 진실거짓
+  dmChaosMove?: { [id: string]: boolean }; // P4 혼돈 불(15AB)/물(15AC): true=이동(근접)/false=대기(도넛)
 }
 
 // 머리 사인(표식) waymark 번호 → 영문 사인 id(cactbot 관례). 인게임 전체 캡처로 검증(2026-06-10).
@@ -2993,6 +3005,245 @@ const triggerSet: TriggerSet<Data> = {
       alertText: (_data, _matches, output) => output.text!(),
       outputStrings: {
         text: { en: 'Keep moving + avoid center', ko: '계속 움직이기 + 중앙 피하기' },
+      },
+    },
+    // ───────── P4 진실/거짓 디버프: 무의 범람 ─────────
+    // 데이터 기반 — 실제 빔(C394 산자/보라, C395 죽은자/파랑) 위치를 읽으면 진실/거짓이 자동 상쇄.
+    //   타겟색 = 죽음초월(566)→상처와 같은색 / 알라그필드(1C6)→다른색. (GC3·무의범람 진실거짓 불필요)
+    {
+      id: 'DancingMad 무의 범람 상처 수집',
+      type: 'GainsEffect',
+      // 15A5 산 자의 상처=보라 / 15A6 죽은 자의 상처=파랑 (GC3서 부여, dur 9999)
+      netRegex: { effectId: ['15A5', '15A6'] },
+      condition: (data, matches) => matches.target === data.me,
+      run: (data, matches) => data.dmFloodWound = matches.effectId === '15A5' ? 'living' : 'dead',
+    },
+    {
+      id: 'DancingMad 무의 범람 알라그초월 수집',
+      type: 'GainsEffect',
+      // 566 죽음 초월=상처와 같은색 / 1C6 알라그 필드=다른색 (GC3서 부여)
+      netRegex: { effectId: ['1C6', '566'] },
+      condition: (data, matches) => matches.target === data.me,
+      run: (data, matches) => data.dmFloodMod = matches.effectId === '566' ? 'defy' : 'allagan',
+    },
+    {
+      id: 'DancingMad 무의 범람 보라빔 수집',
+      type: 'StartsUsing',
+      netRegex: { id: 'C394', source: '네오 엑스데스' }, // 산 자의 암흑광(보라)
+      run: (data, matches) =>
+        data.dmFloodLiving = { x: parseFloat(matches.x), y: parseFloat(matches.y) },
+    },
+    {
+      id: 'DancingMad 무의 범람 파랑빔 수집',
+      type: 'StartsUsing',
+      netRegex: { id: 'C395', source: '네오 엑스데스' }, // 죽은 자의 암흑광(파랑)
+      run: (data, matches) =>
+        data.dmFloodDead = { x: parseFloat(matches.x), y: parseFloat(matches.y) },
+    },
+    {
+      id: 'DancingMad 네오 진실거짓 수집',
+      type: 'GainsEffect',
+      // 네오 808 status param: 462=진실 / 461=거짓. 매 GC·무의범람 직전 갱신 → 최신값이 곧 직전 캐스트의 진실/거짓.
+      //   무의범람(보이는 색)·갈래번개/물압축(GC 진실거짓) 공용. 부여 시점에 읽어 저장할 것.
+      netRegex: { effectId: '808', target: '네오 엑스데스' },
+      run: (data, matches) => data.dmFloodTruth = matches.count === '462',
+    },
+    // ───────── P4 갈래 번개 / 물속성 압축 / 가속도 폭탄 (만료 5초 전 통합 안내) ─────────
+    // GC1/GC2가 각각 갈래번개(15A8)2·물압축(15A9)2·가속도(15AA) 부여. 8명=positioning은 서로 다른 세트.
+    //   갈래: GC진실→산개/거짓→쉐어 · 물압축: GC진실→쉐어/거짓→산개 → 세트마다 6쉐어·2산개.
+    //   가속도: GC진실→정지/거짓→움직이기. 만료시각이 세트와 같아(raw dur는 GC교차로 다름) 한 줄로 합쳐 안내.
+    //   ※ 만료 절대시각(timestamp+dur)으로 세트 매칭 → infoText 한 줄(alertText는 2차 바닥 기믹용으로 비움).
+    {
+      id: 'DancingMad 갈래 물압축 수집',
+      type: 'GainsEffect',
+      netRegex: { effectId: ['15A8', '15A9'] }, // 15A8 갈래 번개 / 15A9 물속성 압축
+      condition: (data, matches) => matches.target === data.me,
+      run: (data, matches) => {
+        const truth = data.dmFloodTruth ?? true; // 부여 시점 네오 808 = 해당 GC 진실/거짓
+        const spread = matches.effectId === '15A8' ? truth : !truth; // 갈래 진실=산개 / 물압축 진실=쉐어
+        data.dmForkMine = {
+          expiry: Date.parse(matches.timestamp) + parseFloat(matches.duration) * 1000,
+          spread: spread,
+        };
+      },
+    },
+    {
+      id: 'DancingMad 가속도 폭탄 수집',
+      type: 'GainsEffect',
+      netRegex: { effectId: '15AA' }, // 가속도 폭탄
+      condition: (data, matches) => matches.target === data.me,
+      run: (data, matches) =>
+        data.dmAccelMine = {
+          expiry: Date.parse(matches.timestamp) + parseFloat(matches.duration) * 1000,
+          stop: data.dmFloodTruth ?? true, // GC 진실=정지
+        },
+    },
+    {
+      id: 'DancingMad 갈래 물압축 안내',
+      type: 'GainsEffect',
+      // positioning 디버프 기준 세트당 1회(suppress, 세트 간 ~15s), 만료 5초 전(delay=dur-5).
+      netRegex: { effectId: ['15A8', '15A9'] },
+      delaySeconds: (_data, matches) => Math.max(parseFloat(matches.duration) - 5, 0),
+      suppressSeconds: 10,
+      infoText: (data, matches, output) => {
+        const setExpiry = Date.parse(matches.timestamp) + parseFloat(matches.duration) * 1000;
+        // 산개/쉐어: 내 positioning이 이 세트(만료시각 일치)면 내 행동, 아니면 쉐어
+        const fork = data.dmForkMine;
+        const isMyFork = fork !== undefined && Math.abs(fork.expiry - setExpiry) < 2000;
+        const pos = isMyFork ? (fork.spread ? output.spread!() : output.stack!()) : output.stack!();
+        // 가속도: 내 가속도 만료가 이 세트와 같으면 합쳐서 안내
+        const accel = data.dmAccelMine;
+        if (accel === undefined || Math.abs(accel.expiry - setExpiry) >= 2000)
+          return pos;
+        return output.combo!({ pos: pos, accel: accel.stop ? output.stop!() : output.move!() });
+      },
+      outputStrings: {
+        combo: { en: '${pos} + ${accel}', ko: '${pos} + ${accel}' },
+        spread: { en: 'Spread', ko: '산개' },
+        stack: { en: 'Stack', ko: '쉐어' },
+        stop: { en: 'Stop', ko: '정지' },
+        move: { en: 'Move', ko: '움직이기' },
+      },
+    },
+    // ───────── P4 저주의 외침(마안, 15A7) — 만료 5초 전 보기/보지않기 ─────────
+    // 그룹당 2명, GC1(이른 만료)·GC2(늦은 만료) 2그룹(만료 안 뒤섞임, 고정). 진실→보지않기 / 거짓→보기.
+    //   모두 2명을 함께 보거나 피함. 내가 대상이면 나머지 1명만 처리 → 앞에 '내가 '. (다른 대상 식별 불필요)
+    {
+      id: 'DancingMad 저주의 외침 대상 수집',
+      type: 'GainsEffect',
+      netRegex: { effectId: '15A7' },
+      condition: (data, matches) => matches.target === data.me,
+      run: (data, matches) =>
+        data.dmCurseMine = Date.parse(matches.timestamp) + parseFloat(matches.duration) * 1000,
+    },
+    {
+      id: 'DancingMad 저주의 외침 안내',
+      type: 'GainsEffect',
+      netRegex: { effectId: '15A7' },
+      // preRun: 그룹 진실(네오 808)을 만료시각 키로 저장(비대상자도 방향 필요·만료 땐 808이 바뀜). 그룹당 1회(suppress).
+      preRun: (data, matches) => {
+        const key = Math.round(
+          (Date.parse(matches.timestamp) + parseFloat(matches.duration) * 1000) / 1000,
+        );
+        (data.dmCurseTruth ??= {})[key] = data.dmFloodTruth ?? true; // 진실=보지않기
+      },
+      delaySeconds: (_data, matches) => Math.max(parseFloat(matches.duration) - 5, 0),
+      suppressSeconds: 10,
+      infoText: (data, matches, output) => {
+        const expiry = Date.parse(matches.timestamp) + parseFloat(matches.duration) * 1000;
+        const away = data.dmCurseTruth?.[Math.round(expiry / 1000)] ?? true;
+        const dir = away ? output.away!() : output.look!();
+        const mine = data.dmCurseMine !== undefined && Math.abs(data.dmCurseMine - expiry) < 2000;
+        return mine ? output.mine!({ dir: dir }) : output.notMine!({ dir: dir });
+      },
+      outputStrings: {
+        mine: { en: 'My ${dir}', ko: '내가 ${dir}' },
+        notMine: { en: '${dir}', ko: '${dir}' },
+        away: { en: 'Evil Eye: Look Away', ko: '마안: 보지 않기' },
+        look: { en: 'Evil Eye: Look', ko: '마안: 보기' },
+      },
+    },
+    // ───────── P4 혼돈의 불(15AB)/물(15AC) — 만료시 근접/도넛 장판 ─────────
+    // 각자 불+물 둘 다(불이 먼저 만료, 해일/화염 순서 무관). 진실/거짓=카오스 808(해일/화염 시전).
+    //   불 진실=근접(이동)/거짓=도넛(대기) · 물은 반대 → move(이동) = (불 === 진실).
+    //   만료 5초 전 '중앙으로 (이후 이동/대기)' → 만료시 '이동/대기'(장판 발동 ~만료+5s까지).
+    {
+      id: 'DancingMad 카오스 진실거짓 수집',
+      type: 'GainsEffect',
+      // 카오스 808 param 460=진실 / 45F=거짓 (검증 2026-06-11: 808이 원소와 무관=진실거짓. 화염거짓=45F·해일진실=460)
+      netRegex: { effectId: '808', target: '카오스' },
+      run: (data, matches) => data.dmChaosTruth = matches.count === '460',
+    },
+    {
+      id: 'DancingMad 혼돈 불물 중앙',
+      type: 'GainsEffect',
+      netRegex: { effectId: ['15AB', '15AC'] }, // 15AB 혼돈의 불 / 15AC 혼돈의 물
+      condition: (data, matches) => matches.target === data.me,
+      // preRun: 부여 시점 카오스 진실로 move(이동/근접) 계산해 effectId별 저장(불·물 만료시각 달라 각각)
+      preRun: (data, matches) => {
+        (data.dmChaosMove ??= {})[matches.effectId] =
+          (matches.effectId === '15AB') === (data.dmChaosTruth ?? true);
+      },
+      delaySeconds: (_data, matches) => Math.max(parseFloat(matches.duration) - 5, 0),
+      durationSeconds: 5,
+      alertText: (data, matches, output) =>
+        output.center!({
+          next: (data.dmChaosMove?.[matches.effectId] ?? false) ? output.move!() : output.wait!(),
+        }),
+      outputStrings: {
+        center: { en: 'To center (then ${next})', ko: '중앙으로 (이후 ${next})' },
+        move: { en: 'Move', ko: '이동' },
+        wait: { en: 'Wait', ko: '대기' },
+      },
+    },
+    {
+      id: 'DancingMad 혼돈 불물 처리',
+      type: 'GainsEffect',
+      // 만료시(장판 발동 ~+5s까지): 이동(근접 피하기)/대기(도넛 안). '중앙' 트리거 preRun이 저장한 move 사용.
+      netRegex: { effectId: ['15AB', '15AC'] },
+      condition: (data, matches) => matches.target === data.me,
+      delaySeconds: (_data, matches) => parseFloat(matches.duration),
+      durationSeconds: 5,
+      alertText: (data, matches, output) =>
+        (data.dmChaosMove?.[matches.effectId] ?? false) ? output.move!() : output.wait!(),
+      outputStrings: {
+        move: { en: 'Move', ko: '이동' },
+        wait: { en: 'Wait', ko: '대기' },
+      },
+    },
+    {
+      id: 'DancingMad 무의 범람',
+      type: 'StartsUsing',
+      // 무의 범람 4변종(풀마다 랜덤). 빔 수집(C394/C395)은 같은 시각·로그상 먼저 → 본 트리거서 조합.
+      //   네오는 8고정 위치 중 랜덤(항상 중앙 향함) → 플레이어가 네오 보는 방향 + 타겟 빔 좌우(외적) 안내.
+      netRegex: { id: ['C392', 'C393', 'C3A1', 'C3A2'], source: '네오 엑스데스' },
+      // 빔 수집(C394/C395)이 메인보다 늦게 올 수 있어(로그 순서 풀마다 가변) 약간 지연 후 출력.
+      delaySeconds: 0.5,
+      durationSeconds: 4.5, // 시전~피격까지(지연 0.5 보정)
+      alertText: (data, matches, output) => {
+        const wound = data.dmFloodWound;
+        const mod = data.dmFloodMod;
+        if (wound === undefined || mod === undefined)
+          return;
+        // 실제 타겟 빔: 죽음초월(defy)→상처와 같은 / 알라그(allagan)→반대 (산자=C394/보라, 죽은자=C395/파랑)
+        const targetLiving = mod === 'defy' ? wound === 'living' : wound !== 'living';
+        const target = targetLiving ? data.dmFloodLiving : data.dmFloodDead;
+        // 보이는 색 = 실제색(산자=보라)을 무의범람 거짓(808 param=461)이면 반전 (사람이 보는 색에 맞춤)
+        const visiblePurple = data.dmFloodTruth === false ? !targetLiving : targetLiving;
+        const color = visiblePurple ? output.purple!() : output.blue!();
+        const neoX = parseFloat(matches.x);
+        const neoY = parseFloat(matches.y);
+        // 네오 방향(8방위, 플레이어가 바라볼 쪽) = 네오 좌표를 중앙 기준 방위로
+        const facing = output[
+          Directions.output8Dir[Directions.xyTo8DirNum(neoX, neoY, 100, 100)] ??
+            'unknown'
+        ]!();
+        if (target === undefined)
+          return output.colorOnly!({ facing: facing, color: color }); // 빔 좌표 미수집 → 방향+색만
+        // 좌우: F=(네오−중앙) 향함, T=(타겟빔−중앙). 외적>0=오른쪽 (실측 보정: 산자 북=서향 시 우).
+        const cross = (neoX - 100) * (target.y - 100) - (neoY - 100) * (target.x - 100);
+        const side = cross > 0 ? output.right!() : output.left!();
+        return output.go!({ facing: facing, side: side, color: color });
+      },
+      outputStrings: {
+        go: {
+          en: 'Face ${facing}, ${side} ${color} beam',
+          ko: '${facing}을 보고 ${side} ${color} 빔 맞기',
+        },
+        colorOnly: { en: 'Face ${facing}, ${color} beam', ko: '${facing}을 보고 ${color} 빔 맞기' },
+        purple: { en: 'Purple', ko: '보라' },
+        blue: { en: 'Blue', ko: '파랑' },
+        left: { en: 'left', ko: '왼쪽' },
+        right: { en: 'right', ko: '오른쪽' },
+        dirN: { en: 'N', ko: '북쪽' },
+        dirNE: { en: 'NE', ko: '북동쪽' },
+        dirE: { en: 'E', ko: '동쪽' },
+        dirSE: { en: 'SE', ko: '남동쪽' },
+        dirS: { en: 'S', ko: '남쪽' },
+        dirSW: { en: 'SW', ko: '남서쪽' },
+        dirW: { en: 'W', ko: '서쪽' },
+        dirNW: { en: 'NW', ko: '북서쪽' },
+        unknown: { en: '?', ko: '?' },
       },
     },
   ],
