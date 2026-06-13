@@ -3045,10 +3045,14 @@ const triggerSet: TriggerSet<Data> = {
     {
       id: 'DancingMad 무의 범람 알라그초월 수집',
       type: 'GainsEffect',
-      // 566 죽음 초월=상처와 같은색 / 1C6 알라그 필드=다른색 (GC3서 부여)
-      netRegex: { effectId: ['1C6', '566'] },
+      // 죽음 초월(=상처와 같은색) = 566 또는 1558 / 알라그 필드(=다른색) = 1C6. GC3서 부여(시전 ~6초 전).
+      //   초월 ID는 상처 패밀리와 1:1: 상처 1317/1318↔초월 1558, 상처 15A5/15A6↔초월 566. → 1558도 봐야 함.
+      netRegex: { effectId: ['1C6', '566', '1558'] },
       condition: (data, matches) => matches.target === data.me,
-      run: (data, matches) => data.dmFloodMod = matches.effectId === '566' ? 'defy' : 'allagan',
+      run: (data, matches) =>
+        data.dmFloodMod = (matches.effectId === '566' || matches.effectId === '1558')
+          ? 'defy'
+          : 'allagan',
     },
     {
       id: 'DancingMad 무의 범람 보라빔 수집',
