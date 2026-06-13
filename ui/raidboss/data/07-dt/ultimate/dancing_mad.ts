@@ -3032,10 +3032,15 @@ const triggerSet: TriggerSet<Data> = {
     {
       id: 'DancingMad 무의 범람 상처 수집',
       type: 'GainsEffect',
-      // 15A5 산 자의 상처=보라 / 15A6 죽은 자의 상처=파랑 (GC3서 부여, dur 9999)
-      netRegex: { effectId: ['15A5', '15A6'] },
+      // 상처 4종: 1317/15A5 산 자(보라) · 1318/15A6 죽은 자(파랑), dur 9999.
+      //   GC3 원본 상처는 풀마다 1317/1318 또는 15A5/15A6 패밀리(둘 다 무의범람 시전 ~6초 전 부여).
+      //   15A5/15A6은 빔 맞은 뒤 변형으로도 재등장하나 시전(안내 발동)보다 뒤라 무관 → 4개 다 봐야 원본 잡힘.
+      netRegex: { effectId: ['15A5', '15A6', '1317', '1318'] },
       condition: (data, matches) => matches.target === data.me,
-      run: (data, matches) => data.dmFloodWound = matches.effectId === '15A5' ? 'living' : 'dead',
+      run: (data, matches) =>
+        data.dmFloodWound = (matches.effectId === '15A5' || matches.effectId === '1317')
+          ? 'living'
+          : 'dead',
     },
     {
       id: 'DancingMad 무의 범람 알라그초월 수집',
