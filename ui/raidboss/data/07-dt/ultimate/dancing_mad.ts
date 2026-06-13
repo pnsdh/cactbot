@@ -965,14 +965,25 @@ const dmLimitCutText = (data: Data, output: Output): string | undefined => {
     return output.fallback!({ num: num }); // 알테마 끝까지 미집계 → 번호만
   const r = (start + 4) % 8; // 반대편 기준 방위(0~7)
   const idx = cw ? (((r - num) % 8) + 8) % 8 : (r + num - 1) % 8; // 칸 인덱스
-  const hours = [1, 2, 4, 5, 7, 8, 10, 11]; // 칸=징 사이 시계 위치
-  return output.text!({ num: num, clock: hours[idx]! });
+  const hours = [1, 2, 4, 5, 7, 8, 10, 11] as const; // 칸=징 사이 시계 위치
+  // 시계 값(1·2·4·5·7·8·10·11시)을 각각 outputStrings 키(clockN)로 빼서 편집 UI에 노출.
+  //   → 사용자가 '1시' 대신 자기 방위징을 직접 입력 가능.
+  return output.text!({ num: num, clock: output[`clock${hours[idx]!}`]!() });
 };
 
-// 리미트컷 자리 출력 문자열(즉시/지연 두 트리거 공유). dmLimitCutText가 text·fallback 키 사용.
+// 리미트컷 자리 출력 문자열(즉시/지연 두 트리거 공유). dmLimitCutText가 text·fallback·clockN 키 사용.
+//   clockN은 편집 가능한 시계 라벨(기본 'N시로'/'N o'clock'). 사용자가 방위징으로 교체.
 const dmLimitCutOutputs = {
-  text: { en: '#${num}: ${clock} o\'clock', ko: '주사위 ${num}번: ${clock}시로' },
+  text: { en: '#${num}: ${clock}', ko: '주사위 ${num}번: ${clock}' },
   fallback: { en: '#${num} (check Ultima dir)', ko: '주사위 ${num}번' },
+  clock1: { en: '1 o\'clock', ko: '1시로' },
+  clock2: { en: '2 o\'clock', ko: '2시로' },
+  clock4: { en: '4 o\'clock', ko: '4시로' },
+  clock5: { en: '5 o\'clock', ko: '5시로' },
+  clock7: { en: '7 o\'clock', ko: '7시로' },
+  clock8: { en: '8 o\'clock', ko: '8시로' },
+  clock10: { en: '10 o\'clock', ko: '10시로' },
+  clock11: { en: '11 o\'clock', ko: '11시로' },
 } as const;
 
 // P3 블랙홀 줄(테더) 기믹.
