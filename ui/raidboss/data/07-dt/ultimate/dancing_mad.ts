@@ -92,6 +92,7 @@ export interface Data extends RaidbossData {
   dmChaosMove?: { [id: string]: boolean }; // P4 혼돈 불(15AB)/물(15AC): true=이동(근접)/false=대기(도넛)
   // P4 바닥(알쏭달쏭/찌릿찌릿/널리널리/마력방출) — 블리자가 고리 02A4=진실 / 선더가 고리 02A6=진실
   dmP4Blizzard?: boolean; // 최신 블리자가 고리(02A4=진실)
+  dmP4BlizzardDir?: boolean; // 최신 블리자가 구슬 안전 대각선(true=북서/남동) — dir 옵션용
   dmP4Thunder?: boolean; // 최신 선더가 고리(02A6=진실)
   dmP4StdBlizzard?: boolean; // 독립 널리널리 블리자가 진실 (마력방출 XNOR용)
   dmP4StdThunder?: boolean; // 독립 찌릿찌릿 선더가 진실
@@ -161,12 +162,12 @@ const fetchCombatants = async (sourceId: string): Promise<PluginCombatantState[]
 // 블리자가 구슬 heading으로 안전 대각선 판정.
 // 반환: true=북서+남동 안전 / false=북동+남서 안전 / undefined=heading 불명(폴백)
 const getBlizzardSafeNwSe = (
-  orb: PluginCombatantState | undefined,
+  heading: number | undefined,
   blizzardId: string,
 ): boolean | undefined => {
-  if (orb === undefined)
+  if (heading === undefined)
     return undefined;
-  const a = ((orb.Heading % Math.PI) + Math.PI) % Math.PI;
+  const a = ((heading % Math.PI) + Math.PI) % Math.PI;
   const near3Q = Math.abs(a - (3 * Math.PI) / 4) < 0.4;
   const nearQ = Math.abs(a - Math.PI / 4) < 0.4;
   if (!near3Q && !nearQ)
@@ -1069,8 +1070,7 @@ const triggerSet: TriggerSet<Data> = {
         en:
           'When the party runs 2 casters, which one plays the melee (fake-melee) spot in mechanics that split DPS into melee/ranged sides. The higher-priority caster is the fake melee. The two presets are exact reverses, so any caster pair can pick either side. ' +
           '(Currently used by P2 Forsaken; kept fight-wide for future use.)',
-        ko:
-          '캐스터 2명 구성에서, 딜러를 근딜/원딜로 가르는 기믹에서 어느 캐스터가 근딜 자리(fake-melee)를 맡을지. 우선순위 높은(왼쪽) 캐스터가 근딜 자리.',
+        ko: '2캐스터 구성에서 어느 캐스터가 근딜 자리를 맡을지 설정. 우선순위 높은(왼쪽) 캐스터가 근딜 자리',
       },
       type: 'select',
       options: {
@@ -1079,50 +1079,23 @@ const triggerSet: TriggerSet<Data> = {
           'PCT > BLM > SMN > RDM': 'rev',
         },
         ko: {
-          '적마>소환>흑마>픽토': 'fwd',
-          '픽토>흑마>소환>적마': 'rev',
+          '적마 > 소환 > 흑마 > 픽토 (기본값)': 'fwd',
+          '픽토 > 흑마 > 소환 > 적마': 'rev',
         },
       },
       default: 'fwd',
     },
     {
-      id: 'dmBlizzardKnockback',
-      name: {
-        en: 'P1 Blizzard + knockback positioning',
-        ko: 'P1 알쏭달쏭1 (블리자가+넉백) 위치',
-      },
-      comment: {
-        en:
-          'How to split into 4 corners for Blizzard + spread/stack + knockback. KB-group South = knockback group takes south corners, non-KB north, W/E by Blizzard safe diagonal (current). TH-left/DPS-right = tanks+healers go west, DPS east, N/S by Blizzard safe; handle the knockback yourself.',
-        ko:
-          '알쏭달쏭1의 처리 방식 안내. 넉백조 남쪽 = 넉백 걸린 조가 남쪽 고정. 좌우로 위치를 안내함 vs 탱힐 왼쪽/딜러 오른쪽 = 탱힐은 서쪽·딜러는 동쪽 고정, 위아래로 위치를 안내함',
-      },
-      type: 'select',
-      options: {
-        en: {
-          'KB-group South (current)': 'kbSouth',
-          'TH left / DPS right': 'roleSide',
-        },
-        ko: {
-          '넉백조 남쪽 (기존)': 'kbSouth',
-          '탱힐 왼쪽 / 딜러 오른쪽': 'roleSide',
-        },
-      },
-      default: 'kbSouth',
-    },
-    {
       id: 'dmBlizzardThunder',
       name: {
-        en: 'P1 Blizzard + Thunder guidance',
-        ko: 'P1 알쏭달쏭2 (블리자가+선더가) 안내',
+        en: 'Blizzard + Thunder guidance',
+        ko: '블리자가 + 선더가 안내',
       },
       comment: {
         en: 'Blizzard(fan) + Thunder(line) truth/false combo. ' +
           'Step/Dodge = call which shape to stand on by truth (default): both true → dodge both, blizzard false → step on fan only, thunder false → step on line only, both false → step on both. ' +
           'Direction + In/Out = call Blizzard safe diagonal + Thunder in/out (previous behavior).',
-        ko: '블리자가(부채꼴)+선더가(직선) 진실/거짓 조합 안내 방식. ' +
-          '안밖(밟기/피하기) = 진실/거짓으로 밟을 도형 안내(기본): 둘 다 진실→둘 다 피하기, 블리자가만 거짓→부채꼴만 밟기, 선더가만 거짓→직선만 밟기, 둘 다 거짓→둘 다 밟기. ' +
-          '방향 + 안밖 = 블리자가 안전 대각선 + 선더가 안/밖(기존 방식).',
+        ko: '블리자가 안내를 밟기, 안 밟기 기준으로 표시할지, 안전 방향을 안내할지를 설정',
       },
       type: 'select',
       options: {
@@ -1131,11 +1104,35 @@ const triggerSet: TriggerSet<Data> = {
           'Direction + In/Out': 'dir',
         },
         ko: {
-          '블리자가 안밖 + 선더가 안밖 (기본)': 'stepDodge',
+          '블리자가 안밖 + 선더가 안밖 (기본값)': 'stepDodge',
           '블리자가 방향 + 선더가 안밖': 'dir',
         },
       },
       default: 'stepDodge',
+    },
+    {
+      id: 'dmBlizzardKnockback',
+      name: {
+        en: 'P1 Blizzard + knockback positioning',
+        ko: 'P1 알쏭달쏭1 (블리자가+파이가+넉백) 위치',
+      },
+      comment: {
+        en:
+          'How to split into 4 corners for Blizzard + spread/stack + knockback. KB-group South = knockback group takes south corners, non-KB north, W/E by Blizzard safe diagonal (current). TH-left/DPS-right = tanks+healers go west, DPS east, N/S by Blizzard safe; handle the knockback yourself.',
+        ko: '알쏭달쏭1의 처리 방식 안내. 넉백 걸린 조가 남쪽 고정인지, 혹은 탱힐/딜러가 좌우 고정하는지 설정',
+      },
+      type: 'select',
+      options: {
+        en: {
+          'KB-group South': 'kbSouth',
+          'TH left / DPS right': 'roleSide',
+        },
+        ko: {
+          '넉백조 남쪽': 'kbSouth',
+          '탱힐 왼쪽 / 딜러 오른쪽 (기본값)': 'roleSide',
+        },
+      },
+      default: 'roleSide',
     },
     {
       id: 'dmForsakenMethod',
@@ -1146,7 +1143,7 @@ const triggerSet: TriggerSet<Data> = {
       comment: {
         en:
           'Position strategy for the P2 Forsaken tower phase. A/B group, order, and timing are identical.',
-        ko: '행방불명 공략별 위치 안내 방식 설정',
+        ko: '행방불명 공략에 따른 위치 안내 방식 설정',
       },
       type: 'select',
       options: {
@@ -1156,7 +1153,7 @@ const triggerSet: TriggerSet<Data> = {
         },
         ko: {
           '잼잼': 'jamjam',
-          '09STOP': '09stop',
+          '09STOP (기본값)': '09stop',
         },
       },
       default: '09stop',
@@ -1170,7 +1167,7 @@ const triggerSet: TriggerSet<Data> = {
       comment: {
         en:
           'When two same markers land on one tower, who moves to the other tower: Lower = relative-south person (default), Upper = relative-north person.',
-        ko: '09STOP에서 한 탑에 같은 마커 2명이 겹치면 누가 반대 탑으로 넘어가는지 설정. 아랫사람=상대남(기본) / 윗사람=상대북.',
+        ko: '09STOP에서 한 탑에 같은 마커 2명이 겹치면 누가 반대 탑으로 넘어가는지 설정',
       },
       type: 'select',
       options: {
@@ -1179,8 +1176,8 @@ const triggerSet: TriggerSet<Data> = {
           'Upper (rel. north)': 'upper',
         },
         ko: {
-          '아랫사람 (상대남)': 'lower',
-          '윗사람 (상대북)': 'upper',
+          '아랫사람 (기본값)': 'lower',
+          '윗사람': 'upper',
         },
       },
       default: 'lower',
@@ -1194,8 +1191,7 @@ const triggerSet: TriggerSet<Data> = {
       comment: {
         en: '09STOP = announce T1/T2/body trine spots with left/mid/right labels (current). ' +
           'Yan = priority assignment: both tanks share one spot (clockwise from SW), the rest one spot (CCW from S); the unused trine spot is not shown.',
-        ko: '09STOP = T1/T2/본진 트라인 자리를 왼/중/오 라벨로 안내(기존). ' +
-          '얀 = 우선순위 배정: 탱커 2명이 한 자리(남서부터 시계), 본대가 한 자리(남쪽부터 반시계). 사용 안 하는 트라인은 표시 안 함.',
+        ko: '공략에 따른 트라인 안내 방식 설정',
       },
       type: 'select',
       options: {
@@ -1204,7 +1200,7 @@ const triggerSet: TriggerSet<Data> = {
           'Yan': 'yan',
         },
         ko: {
-          '09STOP (기존)': '09stop',
+          '09STOP (기본값)': '09stop',
           '얀': 'yan',
         },
       },
@@ -1411,7 +1407,7 @@ const triggerSet: TriggerSet<Data> = {
       alertText: (data, matches, output) => {
         if (data.dmSpreadBase === undefined)
           return; // 산개/쉐어 없음 = 1번째 아님 (2번째는 아래 트리거)
-        const safeNwSe = getBlizzardSafeNwSe(data.combatantData?.[0], matches.id);
+        const safeNwSe = getBlizzardSafeNwSe(data.combatantData?.[0]?.Heading, matches.id);
         const isKb = data.dmKnockbackGroup === true;
         const spread = data.dmHeadInvert ? !data.dmSpreadBase : data.dmSpreadBase;
         const ss = spread ? output.spread!() : output.stack!();
@@ -1466,38 +1462,17 @@ const triggerSet: TriggerSet<Data> = {
         if (data.dmSpreadBase !== undefined || data.dmThunderInner === undefined)
           return;
         // 진실=피하기 / 거짓=밟기. 블리자가: BA98=진실·BA9B=거짓 / 선더가: 02A6(밖)=진실·02A5(안)=거짓
-        const blizzardTrue = matches.id === 'BA98';
-        const thunderTrue = !data.dmThunderInner;
-        if (data.triggerSetConfig.dmBlizzardThunder === 'stepDodge') {
-          // 블리자가=부채꼴 / 선더가=직선
-          if (blizzardTrue && thunderTrue)
-            return output.dodgeBoth!();
-          if (!blizzardTrue && thunderTrue)
-            return output.stepFan!(); // 블리자가만 거짓
-          if (blizzardTrue && !thunderTrue)
-            return output.stepLine!(); // 선더가만 거짓
-          return output.stepBoth!(); // 둘 다 거짓
-        }
-        // dir 옵션(기존): 블리자가 안전 대각선 + 선더가 안/밖
-        const safeNwSe = getBlizzardSafeNwSe(data.combatantData?.[0], matches.id);
-        const dir = safeNwSe === undefined
-          ? output.dirUnknown!()
-          : (safeNwSe ? output.dirNwSe!() : output.dirNeSw!());
-        const inout = data.dmThunderInner ? output.inner!() : output.outer!();
-        return output.combo2!({ dir: dir, inout: inout });
+        // 출력은 P4 알쏭달쏭/마력방출과 공유하는 dmBlizThunText 헬퍼(stepDodge/dir 옵션 분기).
+        const safeNwSe = getBlizzardSafeNwSe(data.combatantData?.[0]?.Heading, matches.id);
+        return dmBlizThunText(
+          data,
+          matches.id === 'BA98',
+          !data.dmThunderInner,
+          safeNwSe,
+          output,
+        );
       },
-      outputStrings: {
-        combo2: { en: '${dir} / ${inout}', ko: '${dir}에서 ${inout}' },
-        inner: { en: 'In', ko: '안으로' },
-        outer: { en: 'Out', ko: '밖으로' },
-        dirNeSw: { en: 'NE/SW', ko: '북동/남서' },
-        dirNwSe: { en: 'NW/SE', ko: '북서/남동' },
-        dirUnknown: { en: '???', ko: '???' },
-        dodgeBoth: { en: 'Dodge both', ko: '둘 다 피하기' },
-        stepFan: { en: 'Step on fan only', ko: '부채꼴만 밟기' },
-        stepLine: { en: 'Step on line only', ko: '직선만 밟기' },
-        stepBoth: { en: 'Step on both', ko: '둘 다 밟기' },
-      },
+      outputStrings: dmBlizThunStrings,
     },
     // 출력: 단독 널리널리 블리자가 (알쏭달쏭/선더가 없음) — 안전 대각선만
     {
@@ -3245,6 +3220,7 @@ const triggerSet: TriggerSet<Data> = {
         data.dmP4ThunderDone = false; // 직전 풀 잔여 방지
         data.dmP4StdBlizzard = undefined;
         data.dmP4StdThunder = undefined;
+        data.dmP4BlizzardDir = undefined;
       },
     },
     {
@@ -3253,6 +3229,16 @@ const triggerSet: TriggerSet<Data> = {
       netRegex: { id: ['02A3', '02A4'] }, // 02A4=진실 / 02A3=거짓 (시전 BA98/BA9B와 일치 검증)
       condition: (data) => data.phase === 'p4',
       run: (data, matches) => data.dmP4Blizzard = matches.id === '02A4',
+    },
+    {
+      // 블리자가 구슬(중앙, P1과 동일 heading ±0.79/2.36) 시전 heading → 안전 대각선(dir 옵션용).
+      //   알쏭달쏭/널리널리 구슬마다 갱신. 마력방출엔 새 구슬이 없어 직전 널리널리 값이 그대로 쓰임.
+      id: 'DancingMad P4 블리자가 방향 수집',
+      type: 'StartsUsing',
+      netRegex: { id: ['BA98', 'BA9B'], source: '케프카' },
+      condition: (data) => data.phase === 'p4',
+      run: (data, matches) =>
+        data.dmP4BlizzardDir = getBlizzardSafeNwSe(parseFloat(matches.heading), matches.id),
     },
     {
       id: 'DancingMad P4 선더가 고리 수집',
@@ -3274,7 +3260,7 @@ const triggerSet: TriggerSet<Data> = {
           data,
           data.dmP4Blizzard ?? true,
           data.dmP4Thunder ?? true,
-          undefined,
+          data.dmP4BlizzardDir, // dir 옵션: 블리자가 구슬 안전 대각선(stepDodge면 무시)
           output,
         ),
       outputStrings: dmBlizThunStrings,
@@ -3318,7 +3304,7 @@ const triggerSet: TriggerSet<Data> = {
     },
     {
       // 마력 방출: 마력방출 고리(시전 시 스냅샷) XNOR 독립 찌릿찌릿/널리널리 → 끝나자마자(시전시간 후) 합친 안내
-      //   거짓의 거짓=진실 → 최종 = (독립 == 마력방출). 전조 방향은 달라질 수 있어 stepDodge(밟기/피하기) 기준.
+      //   거짓의 거짓=진실 → 최종 = (독립 == 마력방출). dir 옵션 방향은 직전 널리널리 구슬을 XNOR로 반전.
       id: 'DancingMad P4 마력 방출',
       type: 'StartsUsing',
       netRegex: { id: 'BAA5', source: '케프카' },
@@ -3332,7 +3318,11 @@ const triggerSet: TriggerSet<Data> = {
       alertText: (data, _matches, output) => {
         const blizzard = (data.dmP4StdBlizzard ?? true) === (data.dmP4MagicBlizzard ?? true);
         const thunder = (data.dmP4StdThunder ?? true) === (data.dmP4MagicThunder ?? true);
-        return dmBlizThunText(data, blizzard, thunder, undefined, output);
+        // dir 옵션: 직전 널리널리 구슬 안전 대각선을 마력방출 블리자가 거짓이면 반전(전조 구슬 재시전 없음)
+        const safeNwSe = data.dmP4BlizzardDir === undefined
+          ? undefined
+          : ((data.dmP4MagicBlizzard ?? true) ? data.dmP4BlizzardDir : !data.dmP4BlizzardDir);
+        return dmBlizThunText(data, blizzard, thunder, safeNwSe, output);
       },
       outputStrings: dmBlizThunStrings,
     },
