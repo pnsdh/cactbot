@@ -2998,19 +2998,38 @@ const triggerSet: TriggerSet<Data> = {
         return output.handle!({ round: round, dir: output[dmDirKey(myDir)]!() });
       },
       infoText: (data, _matches, output) => {
-        // 그룹 선행(비처리자): 줄1에서 공격2에게 줄2 자리(남은 1자리) 미리 안내(초록)
-        if ((data.dmTetherRound ?? 0) !== 1)
+        // 그룹 선행(비처리자): 그룹 앞쪽 라운드에서 뒤쪽 진입자에게 자리 미리 안내(초록)
+        const round = data.dmTetherRound ?? 0;
+        const myMark = data.dmSigns?.[data.me ?? ''];
+        if (myMark === undefined)
           return;
-        if (data.dmSigns?.[data.me ?? ''] !== 'attack2')
-          return;
-        const first = (data.dmRoundDirs ?? [])[0];
-        if (first === undefined)
-          return;
-        const a1 = (first + 2) % 4; // 공격1의 줄2(반대)
-        const a2 = [...(data.dmSetDirs ?? [])].filter((d) => d !== first && d !== a1)[0];
-        if (a2 === undefined)
-          return;
-        return output.preview!({ dir: output[dmDirKey(a2)]!() });
+        if (round === 1) {
+          // 줄1→줄2: 공격2에게 남은 1자리 미리
+          if (myMark !== 'attack2')
+            return;
+          const first = (data.dmRoundDirs ?? [])[0];
+          if (first === undefined)
+            return;
+          const a1 = (first + 2) % 4; // 공격1의 줄2(반대)
+          const a2 = [...(data.dmSetDirs ?? [])].filter((d) => d !== first && d !== a1)[0];
+          if (a2 === undefined)
+            return;
+          return output.preview!({ dir: output[dmDirKey(a2)]!() });
+        }
+        // 줄3→스왑4·5 / 줄6→스왑7·8: 내가 진입자(swap.to)면 그 슬롯 자리 미리(가져올 줄)
+        const upcoming = round === 3 ? [4, 5] : round === 6 ? [7, 8] : [];
+        for (const s of upcoming) {
+          const swap = dmTetherSwap[s];
+          if (swap === undefined || swap.to !== myMark)
+            continue;
+          const slot = parseInt(swap.from.slice(-1), 10) - 1;
+          const dir = [...(data.dmSetDirs ?? [])].sort((a, b) =>
+            dmBhSortKey(a, data.dmKefkaDir) - dmBhSortKey(b, data.dmKefkaDir)
+          )[slot];
+          if (dir === undefined)
+            return;
+          return output.previewTake!({ dir: output[dmDirKey(dir)]!() });
+        }
       },
       run: (data) => {
         const round = data.dmTetherRound ?? 0;
@@ -3025,6 +3044,7 @@ const triggerSet: TriggerSet<Data> = {
           ko: '${round}줄: ${dir} 줄 처리 (이후 ${next})',
         },
         preview: { en: 'Next: ${dir} tether', ko: '이후 ${dir} 줄 처리' },
+        previewTake: { en: 'Next: ${dir} take tether', ko: '이후 ${dir} 줄 가져오기' },
       },
     },
     {
