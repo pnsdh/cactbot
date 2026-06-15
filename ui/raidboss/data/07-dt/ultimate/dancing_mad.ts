@@ -76,6 +76,7 @@ export interface Data extends RaidbossData {
   dmRoundDirs?: number[]; // P3 현재 줄의 테더 달린 블랙홀 방위들(수집, 정렬=북동남서 우선순위)
   dmSetDirs?: number[]; // P3 현재 세트의 카디널 방향(스폰서 저장). 풀/스왑/leftover 계산 참조
   dmFirstRoundDirs?: number[]; // P3 세트 첫 줄(1·9)이 쓴 방향. 둘째 줄(2·10) leftover 계산용
+  dmLineAnnounced?: boolean; // P3 줄 안내 라운드당 1회 잠금. BAFC(라운드 리셋)서 false로 풀림
   dmKefkaDir?: number; // P3 거대 케프카 직전 위치(0=북~7=북서). 전멸기 직전 '방향 보고 중앙 대기'용
   dmIamCount?: number; // P3 '있는 그대로의 나'(BAEC/BAED) 횟수. 2번째(마지막)에 전멸기 시퀀스 안내
   dmEnrageHit?: number; // P3 전멸기 탑/쉐어 1라운드 피격 처리 플래그(스왑 1회만)
@@ -1253,6 +1254,7 @@ const triggerSet: TriggerSet<Data> = {
         data.dmRoundDirs = []; // 현재 줄 테더 방위
         data.dmSetDirs = []; // 세트 카디널 방향
         data.dmFirstRoundDirs = []; // 첫 줄 사용 방향(leftover용)
+        data.dmLineAnnounced = false; // 줄 안내 라운드당 1회 잠금
         data.dmKefkaDir = undefined; // 거대 케프카 직전 위치
         data.dmIamCount = 0; // '있는 그대로의 나' 횟수
         data.dmEnrageHit = 0; // 전멸기 탑/쉐어 피격 플래그
@@ -2886,6 +2888,7 @@ const triggerSet: TriggerSet<Data> = {
       preRun: (data) => {
         data.dmTetherRound = (data.dmTetherRound ?? 1) + 1;
         data.dmRoundDirs = [];
+        data.dmLineAnnounced = false; // 새 줄 → 안내 잠금 해제
       },
       suppressSeconds: 3, // 웨이브당 1회(동시 BAFC 묶기; 웨이브 간 ≥5s)
     },
@@ -2914,6 +2917,8 @@ const triggerSet: TriggerSet<Data> = {
       type: 'Tether',
       netRegex: { source: '블랙홀', capture: false },
       condition: (data) => {
+        if (data.dmLineAnnounced === true)
+          return false; // 라운드당 1회(BAFC서 해제). 테더 재형성 중복·줄9 재안내 차단.
         const round = data.dmTetherRound ?? 0;
         if (dmTetherSwap[round] !== undefined)
           return false; // 스왑은 무의파동 트리거가 담당
@@ -2924,8 +2929,10 @@ const triggerSet: TriggerSet<Data> = {
           return (data.dmRoundDirs?.length ?? 0) >= active.length; // 수집 완료 시 발동
         return true; // 풀(3·6)·leftover(2·10) = 즉시
       },
+      preRun: (data) => {
+        data.dmLineAnnounced = true; // 동기 잠금 → 같은 줄의 후속/동시 테더 차단
+      },
       durationSeconds: 5,
-      suppressSeconds: 4, // 줄당 1회
       infoText: (data, _matches, output) => {
         const round = data.dmTetherRound ?? 0;
         const myMark = data.dmSigns?.[data.me ?? ''];
