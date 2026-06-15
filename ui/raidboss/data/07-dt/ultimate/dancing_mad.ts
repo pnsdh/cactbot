@@ -2924,7 +2924,8 @@ const triggerSet: TriggerSet<Data> = {
       //   - 줄2(세트 둘째): 공격1=줄1 방향의 반대(크로스) / 공격2=남은 1자리. 첫 테더에 즉시(테더 안 기다림).
       //   - 줄10(세트 둘째): leftover(남은 1자리) = 세트 − 줄9 사용분. 즉시.
       //   - 줄3·6(세트 첫, 풀): 세트 3개 전부(dmSetDirs). 첫 테더에 즉시.
-      //   - 줄4·5·7·8(스왑): '줄 스왑 안내'(무의파동)가 담당 → skip.
+      //   - 줄4·5·7·8(스왑): 본 안내는 '줄 스왑 안내'(무의파동) 담당. 단 여기서 발동은 하되 alertText만 skip,
+      //     infoText로 '다음 줄(N+1) 진입자 선행 안내'를 띄움(줄4→줄5속박2 / 줄7→줄8금지2 등).
       id: 'DancingMad 줄 안내',
       type: 'Tether',
       netRegex: { source: '블랙홀', capture: false },
@@ -2932,14 +2933,13 @@ const triggerSet: TriggerSet<Data> = {
         if (data.dmLineAnnounced === true)
           return false; // 라운드당 1회(BAFC서 해제). 테더 재형성 중복·줄9 재안내 차단.
         const round = data.dmTetherRound ?? 0;
-        if (dmTetherSwap[round] !== undefined)
-          return false; // 스왑은 무의파동 트리거가 담당
         const active = dmTetherActive[round];
         if (active === undefined)
           return false;
+        // 스왑(4·5·7·8)도 발동시킴: 본 안내는 alertText서 skip, 다음 줄 진입자 선행(infoText)만.
         if (round === 1 || round === 9)
           return (data.dmRoundDirs?.length ?? 0) >= active.length; // 수집 완료 시 발동
-        return true; // 풀(3·6)·leftover(2·10) = 즉시
+        return true; // 풀(3·6)·leftover(2·10)·스왑(선행안내) = 즉시
       },
       preRun: (data) => {
         data.dmLineAnnounced = true; // 동기 잠금 → 같은 줄의 후속/동시 테더 차단
@@ -2947,6 +2947,8 @@ const triggerSet: TriggerSet<Data> = {
       durationSeconds: 5,
       alertText: (data, _matches, output) => {
         const round = data.dmTetherRound ?? 0;
+        if (dmTetherSwap[round] !== undefined)
+          return; // 스왑(4·5·7·8) 본 안내는 '줄 스왑 안내'가 담당(여기선 infoText 선행만)
         const myMark = data.dmSigns?.[data.me ?? ''];
         if (myMark === undefined)
           return;
@@ -2998,13 +3000,15 @@ const triggerSet: TriggerSet<Data> = {
         return output.handle!({ round: round, dir: output[dmDirKey(myDir)]!() });
       },
       infoText: (data, _matches, output) => {
-        // 그룹 선행(비처리자): 그룹 앞쪽 라운드에서 뒤쪽 진입자에게 자리 미리 안내(초록)
+        // 그룹 선행(비처리자): 이번 줄(N)에서 **바로 다음 줄(N+1)의 새 진입자**에게 자리 미리(초록).
+        //   줄1→줄2(공격2) / 줄3→줄4(속박1) / 줄4→줄5(속박2) / 줄6→줄7(금지1) / 줄7→줄8(금지2).
         const round = data.dmTetherRound ?? 0;
         const myMark = data.dmSigns?.[data.me ?? ''];
         if (myMark === undefined)
           return;
-        if (round === 1) {
-          // 줄1→줄2: 공격2에게 남은 1자리 미리
+        const next = round + 1;
+        if (next === 2) {
+          // 줄1→줄2: 공격2에게 남은 1자리(공격1 반대 제외)
           if (myMark !== 'attack2')
             return;
           const first = (data.dmRoundDirs ?? [])[0];
@@ -3016,20 +3020,18 @@ const triggerSet: TriggerSet<Data> = {
             return;
           return output.preview!({ dir: output[dmDirKey(a2)]!() });
         }
-        // 줄3→스왑4·5 / 줄6→스왑7·8: 내가 진입자(swap.to)면 그 슬롯 자리 미리(가져올 줄)
-        const upcoming = round === 3 ? [4, 5] : round === 6 ? [7, 8] : [];
-        for (const s of upcoming) {
-          const swap = dmTetherSwap[s];
-          if (swap === undefined || swap.to !== myMark)
-            continue;
-          const slot = parseInt(swap.from.slice(-1), 10) - 1;
-          const dir = [...(data.dmSetDirs ?? [])].sort((a, b) =>
+        // 다음 줄이 스왑이고 내가 진입자(swap.to)면 그 슬롯 자리 미리(가져올 줄)
+        const swap = dmTetherSwap[next];
+        if (swap === undefined || swap.to !== myMark)
+          return;
+        const slot = parseInt(swap.from.slice(-1), 10) - 1;
+        const dir =
+          [...(data.dmSetDirs ?? [])].sort((a, b) =>
             dmBhSortKey(a, data.dmKefkaDir) - dmBhSortKey(b, data.dmKefkaDir)
           )[slot];
-          if (dir === undefined)
-            return;
-          return output.previewTake!({ dir: output[dmDirKey(dir)]!() });
-        }
+        if (dir === undefined)
+          return;
+        return output.previewTake!({ dir: output[dmDirKey(dir)]!() });
       },
       run: (data) => {
         const round = data.dmTetherRound ?? 0;
