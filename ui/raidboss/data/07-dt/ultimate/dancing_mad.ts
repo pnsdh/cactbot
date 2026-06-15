@@ -2311,6 +2311,17 @@ const triggerSet: TriggerSet<Data> = {
       },
     },
     {
+      // P2 광역(심판의 빛 BABD). C622 P1 심판의 빛과 별개. 시전 4.7s 동안 초록 안내.
+      id: 'DancingMad 심판의 빛 P2',
+      type: 'StartsUsing',
+      netRegex: { id: 'BABD', source: '케프카', capture: false },
+      durationSeconds: 4.7,
+      infoText: (_data, _matches, output) => output.text!(),
+      outputStrings: {
+        text: { en: 'AoE', ko: '광역 피해' },
+      },
+    },
+    {
       // 첫 번째 파괴의 날개(한쪽 날개): BACD=왼쪽 날개 빛→오른쪽 회피 / BACE=오른쪽 날개 빛→왼쪽 회피.
       //   (두 번째 파괴의 날개 C487/BACF는 양 날개라 회피 방향 없음 → 트리거 X.)
       id: 'DancingMad 파괴의 날개 회피',
@@ -2426,6 +2437,18 @@ const triggerSet: TriggerSet<Data> = {
       outputStrings: {
         tankMove: { en: 'Move! Farthest / Closest!', ko: '이동! 가장 멀리 / 가까이!' },
         bodyMove: { en: 'Move to party spot!', ko: '이동! 본대 위치로!' },
+      },
+    },
+    {
+      // P2→P3 전환: 갈기갈기 에어로가(C3F7) = 저항불가 넉백(못 들어가면 306 디버프). 시전 2.7s 동안 초록 안내.
+      //   (C3F7 StartsUsing은 Phase Tracker·P3 진입 초기화도 사용 — 별개 트리거라 충돌 없음.)
+      id: 'DancingMad 갈기갈기 에어로가 넉백',
+      type: 'StartsUsing',
+      netRegex: { id: 'C3F7', source: '케프카', capture: false },
+      durationSeconds: 2.7,
+      infoText: (_data, _matches, output) => output.text!(),
+      outputStrings: {
+        text: { en: 'Unavoidable Knockback', ko: '저항불가 넉백' },
       },
     },
     // ───── P3 결전 (알파/베타 타겟 제한) ─────
