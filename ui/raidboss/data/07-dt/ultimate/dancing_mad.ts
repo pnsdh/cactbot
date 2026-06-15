@@ -1,6 +1,5 @@
 import Conditions from '../../../../../resources/conditions';
 import { callOverlayHandler } from '../../../../../resources/overlay_plugin_api';
-import { Responses } from '../../../../../resources/responses';
 import Util, { Directions } from '../../../../../resources/util';
 import ZoneId from '../../../../../resources/zone_id';
 import { RaidbossData } from '../../../../../types/data';
@@ -986,6 +985,11 @@ const dmLimitCutOutputs = {
   clock11: { en: '11 o\'clock', ko: '11시로' },
 } as const;
 
+// 단순 광역 공격 공용 안내(통일성). 여러 광역 스킬이 같은 문구 사용.
+const dmAoeOutputStrings = {
+  aoe: { en: 'AoE', ko: '광역 공격' },
+} as const;
+
 // P3 블랙홀 줄(테더) 기믹.
 // 머리징(공격=attack/속박=bind/금지=ignore, dmSigns) 기반. 각 줄의 활성 마커(번호순)=인덱스.
 const dmTetherActive: { [round: number]: string[] } = {
@@ -1230,11 +1234,13 @@ const triggerSet: TriggerSet<Data> = {
       run: (data, matches) => data.phase = phases[matches.id] ?? 'unknown',
     },
     {
-      // P3(카오스·엑스데스) 진입(C3F7) 시 1운동회(크리스탈~리미트컷) 상태를 1회 초기화.
-      //   1운동회는 P3당 1회뿐 → 크리스탈(BAF2)마다 하던 사이클 리셋을 페이즈 진입 시점으로 이동.
-      id: 'DancingMad P3 진입 초기화',
+      // P2→P3 전환: 갈기갈기 에어로가(C3F7) = 저항불가 넉백(보스 밑으로). 시전 2.7s 동안 초록 안내.
+      //   동시에 P3 1운동회(크리스탈~리미트컷) 상태를 1회 초기화(P3당 1회 → BAF2마다 하던 리셋을 진입 시점으로).
+      id: 'DancingMad 갈기갈기 에어로가',
       type: 'StartsUsing',
       netRegex: { id: 'C3F7', source: '케프카', capture: false },
+      durationSeconds: 2.7,
+      infoText: (_data, _matches, output) => output.text!(),
       run: (data) => {
         data.dmAfterImplosion = false; // 내파 플래그
         data.dmImplosionCount = 0; // 내파 시퀀스 횟수(디버프 자리=1번째만)
@@ -1252,6 +1258,9 @@ const triggerSet: TriggerSet<Data> = {
         data.dmKefkaDir = undefined; // 거대 케프카 직전 위치
         data.dmIamCount = 0; // '있는 그대로의 나' 횟수
         data.dmEnrageHit = 0; // 전멸기 탑/쉐어 피격 플래그
+      },
+      outputStrings: {
+        text: { en: 'Knockback, under boss', ko: '넉백, 보스 밑으로' },
       },
     },
     {
@@ -1279,7 +1288,8 @@ const triggerSet: TriggerSet<Data> = {
       type: 'StartsUsing',
       netRegex: { id: 'C622', source: '케프카', capture: false },
       durationSeconds: 4.7, // 시전 4.7s → 해소
-      response: Responses.aoe(),
+      infoText: (_data, _matches, output) => output.aoe!(),
+      outputStrings: dmAoeOutputStrings,
     },
     {
       id: 'DancingMad 하이퍼드라이브',
@@ -1999,7 +2009,7 @@ const triggerSet: TriggerSet<Data> = {
       // 탑 세트 카운터(dmForsakenSet) 1로 초기화, 마커 수집 리셋.
       netRegex: { id: 'BABC', source: '케프카', capture: false },
       durationSeconds: 6.7, // 시전 6.7s → 해소
-      response: Responses.aoe(),
+      infoText: (_data, _matches, output) => output.aoe!(),
       run: (data) => {
         data.dmForsakenSet = 1;
         data.dmForsakenMarks = {};
@@ -2011,6 +2021,7 @@ const triggerSet: TriggerSet<Data> = {
         data.dmForsakenCurrent = {};
         data.dmForsakenPos = {}; // 09STOP 위치 추적 초기화
       },
+      outputStrings: dmAoeOutputStrings,
     },
     {
       id: 'DancingMad 행방불명 탑 세트 카운터',
@@ -2316,10 +2327,8 @@ const triggerSet: TriggerSet<Data> = {
       type: 'StartsUsing',
       netRegex: { id: 'BABD', source: '케프카', capture: false },
       durationSeconds: 4.7,
-      infoText: (_data, _matches, output) => output.text!(),
-      outputStrings: {
-        text: { en: 'AoE', ko: '광역 피해' },
-      },
+      infoText: (_data, _matches, output) => output.aoe!(),
+      outputStrings: dmAoeOutputStrings,
     },
     {
       // 첫 번째 파괴의 날개(한쪽 날개): BACD=왼쪽 날개 빛→오른쪽 회피 / BACE=오른쪽 날개 빛→왼쪽 회피.
@@ -2437,18 +2446,6 @@ const triggerSet: TriggerSet<Data> = {
       outputStrings: {
         tankMove: { en: 'Move! Farthest / Closest!', ko: '이동! 가장 멀리 / 가까이!' },
         bodyMove: { en: 'Move to party spot!', ko: '이동! 본대 위치로!' },
-      },
-    },
-    {
-      // P2→P3 전환: 갈기갈기 에어로가(C3F7) = 저항불가 넉백(못 들어가면 306 디버프). 시전 2.7s 동안 초록 안내.
-      //   (C3F7 StartsUsing은 Phase Tracker·P3 진입 초기화도 사용 — 별개 트리거라 충돌 없음.)
-      id: 'DancingMad 갈기갈기 에어로가 넉백',
-      type: 'StartsUsing',
-      netRegex: { id: 'C3F7', source: '케프카', capture: false },
-      durationSeconds: 2.7,
-      infoText: (_data, _matches, output) => output.text!(),
-      outputStrings: {
-        text: { en: 'Unavoidable Knockback', ko: '저항불가 넉백' },
       },
     },
     // ───── P3 결전 (알파/베타 타겟 제한) ─────
