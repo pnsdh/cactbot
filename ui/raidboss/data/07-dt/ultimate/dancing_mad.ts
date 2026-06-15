@@ -1249,7 +1249,7 @@ const triggerSet: TriggerSet<Data> = {
         data.dmLimitCut = undefined; // 리미트컷 번호
         data.dmWhirlwindDone = false; // 회오리 발동 플래그
         data.dmBhDir = {}; // 블랙홀 id→방위
-        data.dmTetherRound = 0; // 블랙홀 줄 라운드
+        data.dmTetherRound = 1; // 블랙홀 줄 라운드(=BAFC웨이브+1, 라운드1=BAFC 전 기본)
         data.dmRoundDirs = []; // 현재 줄 테더 방위
         data.dmSetDirs = []; // 세트 카디널 방향
         data.dmFirstRoundDirs = []; // 첫 줄 사용 방향(leftover용)
@@ -2876,16 +2876,18 @@ const triggerSet: TriggerSet<Data> = {
       },
     },
     {
-      // 줄 라운드 카운터/리셋: 테더 버스트 첫 테더(suppress로 줄당 1회)에 라운드++ 및 수집 초기화.
-      //   (수집·안내보다 먼저 = preRun 동기 리셋 후 같은 테더부터 수집/판정.)
+      // 줄 라운드 카운터/리셋: 무의 파동(BAFC=라운드당 1웨이브, 폭발 시점) 기준으로 라운드++.
+      //   테더는 사망/위치이동에 재형성돼 버스트가 흩어져 과다 카운트됨(검증: 실제 2줄인데 4줄). BAFC는
+      //   라운드당 고정 → 안정. dmTetherRound=(BAFC웨이브 수)+1: 줄1=BAFC 전(C3F7서 1), BAFC#N 후=줄 N+1.
+      //   preRun(동기)으로 먼저 증가 → 같은 웨이브의 '줄 스왑 안내'(infoText 지연)가 새 라운드값을 읽음.
       id: 'DancingMad 줄 라운드 리셋',
-      type: 'Tether',
-      netRegex: { source: '블랙홀', capture: false },
+      type: 'Ability',
+      netRegex: { id: 'BAFC', source: '블랙홀', capture: false },
       preRun: (data) => {
-        data.dmTetherRound = (data.dmTetherRound ?? 0) + 1;
+        data.dmTetherRound = (data.dmTetherRound ?? 1) + 1;
         data.dmRoundDirs = [];
       },
-      suppressSeconds: 4, // 줄당 1회(줄 간 ~5s)
+      suppressSeconds: 3, // 웨이브당 1회(동시 BAFC 묶기; 웨이브 간 ≥5s)
     },
     {
       // 줄 테더 수집(리셋 뒤·안내 앞, preRun=동기): 각 테더의 블랙홀 방위를 현재 줄 dirs에 누적(중복 제거).
@@ -2962,7 +2964,8 @@ const triggerSet: TriggerSet<Data> = {
     },
     {
       // 스왑 줄(4·5·7·8) 안내: **이전 줄 무의 파동(BAFC 피격) 기점**에 다음 줄 스왑 예고(가로채기 전 이동 시간 확보).
-      //   카디널(테더) 블랙홀 source만(스프레딩 무의파동 제외), suppress로 웨이브당 1회. 다음 줄=dmTetherRound+1.
+      //   카디널(테더) 블랙홀 source만(스프레딩 무의파동 제외), suppress로 웨이브당 1회. 다음 줄=dmTetherRound
+      //   (같은 BAFC 웨이브의 '줄 라운드 리셋' preRun이 이미 +1 해둠).
       //   새 마커(swap.to)만, 방향=세트 스폰 dmSetDirs[이전 마커 슬롯].
       id: 'DancingMad 줄 스왑 안내',
       type: 'Ability',
@@ -2971,7 +2974,7 @@ const triggerSet: TriggerSet<Data> = {
       durationSeconds: 5,
       suppressSeconds: 3, // 무의 파동 웨이브당 1회
       infoText: (data, _matches, output) => {
-        const round = (data.dmTetherRound ?? 0) + 1; // 다음 줄
+        const round = data.dmTetherRound ?? 0; // 다음 줄(카운터가 BAFC preRun서 이미 증가)
         const swap = dmTetherSwap[round];
         if (swap === undefined)
           return; // 다음 줄이 스왑(4·5·7·8) 아니면 안내 X
