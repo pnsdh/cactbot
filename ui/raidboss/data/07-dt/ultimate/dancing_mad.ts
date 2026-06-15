@@ -64,7 +64,6 @@ export interface Data extends RaidbossData {
   dmImplosionCount?: number; // P3 내파 시퀀스 횟수. 디버프 자리는 1번째 내파에만 발동
   dmAfterImplosion?: boolean; // P3 내파 후=true. 2번째 디버프(혼돈물/불) 만료 판정용(만료 시 그림자 유도)
   dmKnockbackFace?: 'look' | 'away'; // P3 진공파 넉백: 혼돈의 바람(642)=보지않기 / 역풍(643)=바라보기 / 없음
-  dmUltimaDirs?: number[]; // P3 알테마 블래스터(BAE3) 시전별 방위(0=북~7=북서/-1=좌표깨짐). ability 좌표 폴백용
   dmUltimaCloneIds?: string[]; // 알테마 블래스터 분신 ID(시전 순서). getCombatants 메모리 위치로 방위 산출(ability 좌표 ~29% stale 회피)
   dmUltimaCombatants?: PluginCombatantState[]; // 위 분신들의 getCombatants 결과(깨끗한 메모리 위치)
   dmUltimaStart?: number; // 알테마 시작 방위(0~7) 확정값. 리미트컷 자리 계산용
@@ -1243,7 +1242,6 @@ const triggerSet: TriggerSet<Data> = {
         data.dmAfterImplosion = false; // 내파 플래그
         data.dmImplosionCount = 0; // 내파 시퀀스 횟수(디버프 자리=1번째만)
         data.dmKnockbackFace = undefined; // 넉백 시선 디버프
-        data.dmUltimaDirs = []; // 알테마 회전 방위(ability 폴백)
         data.dmUltimaCloneIds = []; // 알테마 분신 ID(시전 순서)
         data.dmUltimaCombatants = undefined; // getCombatants 메모리 위치
         data.dmUltimaStart = undefined; // 알테마 시작/회전 확정값
@@ -2653,15 +2651,12 @@ const triggerSet: TriggerSet<Data> = {
       // 알테마 블래스터(BAE3, 케프카 분신): 중앙 관통 라인이 45°씩 회전하며 총 8회. 분신 위치를 방위로 산출.
       //   ⚠ ability 라인 소스 좌표는 ~29%가 (100,100) stale 글리치 → **getCombatants 메모리 위치**로 읽음(깨끗).
       //   분신 ID(시전 순서)만 ability에서 모으고, 위치는 getCombatants로 조회 → dmUltimaDetermine으로 시작·회전.
-      //   메모리 조회 불가(구 DLL/에뮬) 시 ability 좌표 폴백. BAE3는 시전당 8명 피격 → suppress로 시전당 1회.
+      //   BAE3는 시전당 8명 피격(같은 시각·시전자) → suppress로 시전당 1회 처리(시전 간 ~2s).
       id: 'DancingMad 알테마 블래스터 회전',
       type: 'Ability',
       netRegex: { id: 'BAE3', source: '케프카' },
       preRun: (data, matches) => {
         (data.dmUltimaCloneIds ??= []).push(matches.sourceId); // 분신 ID(시전 순서)
-        (data.dmUltimaDirs ??= []).push( // ability 좌표 방위(폴백)
-          dmUltimaDir(parseFloat(matches.x), parseFloat(matches.y)),
-        );
       },
       durationSeconds: 5,
       suppressSeconds: 1.5, // 한 시전(8타겟) 합치기, 시전 간 ~2s는 분리
@@ -2675,7 +2670,7 @@ const triggerSet: TriggerSet<Data> = {
       infoText: (data, _matches, output) => {
         if (data.dmUltimaStart !== undefined)
           return; // 이미 확정 → 재안내 안 함(1회만)
-        // 메모리(getCombatants) 위치로 방위 → 글리치 면역. 메모리 없으면 ability 좌표 폴백.
+        // 메모리(getCombatants) 위치로 방위 산출 → ability 좌표 stale 글리치 면역.
         const byId: { [id: number]: PluginCombatantState } = {};
         for (const c of data.dmUltimaCombatants ?? [])
           if (c.ID !== undefined)
@@ -2684,9 +2679,9 @@ const triggerSet: TriggerSet<Data> = {
           const c = byId[parseInt(s, 16)];
           return c === undefined ? -1 : dmUltimaDir(c.PosX, c.PosY);
         });
-        const r = dmUltimaDetermine(memDirs) ?? dmUltimaDetermine(data.dmUltimaDirs ?? []);
+        const r = dmUltimaDetermine(memDirs);
         if (r === undefined)
-          return; // 아직 결정 불가(메모리·ability 둘 다)
+          return; // 아직 결정 불가(메모리 위치 부족 등)
         data.dmUltimaStart = r.start; // 회오리 후 늦은 확정도 저장 → 지연 자리 트리거가 사용
         data.dmUltimaCw = r.cw;
         // 회오리(리미트컷 자리)가 이미 발동했으면 늦은 회전 안내는 생략(자리 안내는 리미트컷 자리 트리거가 담당).
