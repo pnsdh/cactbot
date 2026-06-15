@@ -2915,7 +2915,8 @@ const triggerSet: TriggerSet<Data> = {
     {
       // 줄 안내(수집 뒤): 줄별 방향 결정해 출력. **수집 완료 즉시 발동**(고정 딜레이 X).
       //   - 줄1·9(세트 첫, 부분): dmRoundDirs가 그 줄 블랙홀 수만큼 모이면 발동 → 모인 방향. 사용분은 저장(2·10 leftover용).
-      //   - 줄2·10(세트 둘째): leftover = 세트 3개 − 첫 줄 사용분. 첫 테더에 즉시(테더 안 기다림). (줄2 키프 판정 제거: 무조건 우선순위.)
+      //   - 줄2(세트 둘째): 공격1=줄1 방향의 반대(크로스) / 공격2=남은 1자리. 첫 테더에 즉시(테더 안 기다림).
+      //   - 줄10(세트 둘째): leftover(남은 1자리) = 세트 − 줄9 사용분. 즉시.
       //   - 줄3·6(세트 첫, 풀): 세트 3개 전부(dmSetDirs). 첫 테더에 즉시.
       //   - 줄4·5·7·8(스왑): '줄 스왑 안내'(무의파동)가 담당 → skip.
       id: 'DancingMad 줄 안내',
@@ -2952,8 +2953,19 @@ const triggerSet: TriggerSet<Data> = {
         let dirs: number[];
         const k = data.dmKefkaDir; // 케프카 기준(직전 철썩/있는그대로) 시계방향 정렬
         const byKefka = (a: number, b: number) => dmBhSortKey(a, k) - dmBhSortKey(b, k);
-        if (round === 2 || round === 10) {
-          // leftover = 세트 카디널 − 첫 줄(1·9) 사용분
+        if (round === 2) {
+          // 줄2: 공격1=줄1 처리 방향의 반대(북↔남·동↔서) / 공격2=남은 1자리. (줄1 끈 사람이 반대로 크로스)
+          //   세트는 항상 {줄1, 줄1반대, 수직1}이라 반대는 늘 leftover에 존재(로그 검증).
+          const first = (data.dmFirstRoundDirs ?? [])[0];
+          const leftover = [...(data.dmSetDirs ?? [])].filter((d) =>
+            !(data.dmFirstRoundDirs ?? []).includes(d)
+          );
+          const a1 = first === undefined ? undefined : (first + 2) % 4; // 줄1 반대
+          dirs = (a1 !== undefined && leftover.includes(a1))
+            ? [a1, ...leftover.filter((d) => d !== a1)] // [공격1=반대, 공격2=남은자리]
+            : leftover.sort(byKefka); // 폴백(반대 자리 없음=비정상)
+        } else if (round === 10) {
+          // 줄10: leftover(남은 1자리) = 세트 − 줄9 사용분
           const used = data.dmFirstRoundDirs ?? [];
           dirs = [...(data.dmSetDirs ?? [])].filter((d) => !used.includes(d)).sort(byKefka);
         } else if (round === 1 || round === 9) {
