@@ -1,5 +1,6 @@
 import Conditions from '../../../../../resources/conditions';
 import { callOverlayHandler } from '../../../../../resources/overlay_plugin_api';
+import { Responses } from '../../../../../resources/responses';
 import Util, { Directions } from '../../../../../resources/util';
 import ZoneId from '../../../../../resources/zone_id';
 import { RaidbossData } from '../../../../../types/data';
@@ -985,11 +986,6 @@ const dmLimitCutOutputs = {
   clock11: { en: '11 o\'clock', ko: '11시로' },
 } as const;
 
-// 단순 광역 공격 공용 안내(통일성). 여러 광역 스킬이 같은 문구 사용.
-const dmAoeOutputStrings = {
-  aoe: { en: 'AoE', ko: '광역 공격' },
-} as const;
-
 // P3 블랙홀 줄(테더) 기믹.
 // 머리징(공격=attack/속박=bind/금지=ignore, dmSigns) 기반. 각 줄의 활성 마커(번호순)=인덱스.
 const dmTetherActive: { [round: number]: string[] } = {
@@ -1288,8 +1284,7 @@ const triggerSet: TriggerSet<Data> = {
       type: 'StartsUsing',
       netRegex: { id: 'C622', source: '케프카', capture: false },
       durationSeconds: 4.7, // 시전 4.7s → 해소
-      infoText: (_data, _matches, output) => output.aoe!(),
-      outputStrings: dmAoeOutputStrings,
+      response: Responses.aoe(),
     },
     {
       id: 'DancingMad 하이퍼드라이브',
@@ -2009,7 +2004,7 @@ const triggerSet: TriggerSet<Data> = {
       // 탑 세트 카운터(dmForsakenSet) 1로 초기화, 마커 수집 리셋.
       netRegex: { id: 'BABC', source: '케프카', capture: false },
       durationSeconds: 6.7, // 시전 6.7s → 해소
-      infoText: (_data, _matches, output) => output.aoe!(),
+      response: Responses.aoe(),
       run: (data) => {
         data.dmForsakenSet = 1;
         data.dmForsakenMarks = {};
@@ -2021,7 +2016,6 @@ const triggerSet: TriggerSet<Data> = {
         data.dmForsakenCurrent = {};
         data.dmForsakenPos = {}; // 09STOP 위치 추적 초기화
       },
-      outputStrings: dmAoeOutputStrings,
     },
     {
       id: 'DancingMad 행방불명 탑 세트 카운터',
@@ -2327,8 +2321,7 @@ const triggerSet: TriggerSet<Data> = {
       type: 'StartsUsing',
       netRegex: { id: 'BABD', source: '케프카', capture: false },
       durationSeconds: 4.7,
-      infoText: (_data, _matches, output) => output.aoe!(),
-      outputStrings: dmAoeOutputStrings,
+      response: Responses.aoe(),
     },
     {
       // 첫 번째 파괴의 날개(한쪽 날개): BACD=왼쪽 날개 빛→오른쪽 회피 / BACE=오른쪽 날개 빛→왼쪽 회피.
