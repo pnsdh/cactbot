@@ -73,11 +73,11 @@ export interface Data extends RaidbossData {
   dmMudTargets?: string[]; // P3 지진(C571/C572) 혼돈의 진흙(644) 대상 2명 이름 (힐러 고지용)
   dmBhDir?: { [id: string]: number }; // P3 블랙홀(줄) id→카디널 방위(0북1동2남3서). AddedCombatant서 수집
   dmTetherRound?: number; // P3 블랙홀 줄 라운드(1~10). 테더 버스트마다 증가
-  dmRoundDirs?: number[]; // P3 현재 줄의 테더 달린 블랙홀 방위들(수집, 정렬=북동남서 우선순위)
+  dmRoundDirs?: number[]; // P3 현재 줄의 테더 달린 블랙홀 방위들(수집, 정렬=케프카 기준 시계방향 dmBhSortKey)
   dmSetDirs?: number[]; // P3 현재 세트의 카디널 방향(스폰서 저장). 풀/스왑/leftover 계산 참조
   dmFirstRoundDirs?: number[]; // P3 세트 첫 줄(1·9)이 쓴 방향. 둘째 줄(2·10) leftover 계산용
   dmLineAnnounced?: boolean; // P3 줄 안내 라운드당 1회 잠금. BAFC(라운드 리셋)서 false로 풀림
-  dmKefkaDir?: number; // P3 거대 케프카 직전 위치(0=북~7=북서). 전멸기 직전 '방향 보고 중앙 대기'용
+  dmKefkaDir?: number; // P3 거대 케프카 직전 위치(0=북~7=북서). 전멸기 '중앙 대기' + 블랙홀 줄 우선순위 12시 기준
   dmIamCount?: number; // P3 '있는 그대로의 나'(BAEC/BAED) 횟수. 2번째(마지막)에 전멸기 시퀀스 안내
   dmEnrageHit?: number; // P3 전멸기 탑/쉐어 1라운드 피격 처리 플래그(스왑 1회만)
   // P4 진실/거짓 디버프 — 무의 범람(데이터 기반: 실제 빔 읽으면 진실/거짓 상쇄)
@@ -1032,6 +1032,11 @@ const dmDirOutputs = {
   w: { en: 'W', ko: '서쪽' },
 } as const;
 const dmDirKey = (d: number): 'n' | 'e' | 's' | 'w' => (['n', 'e', 's', 'w'] as const)[d] ?? 'n';
+// 줄(블랙홀) 우선순위 정렬 키: 케프카 기준 위치(8방향 dmKefkaDir)부터 시계방향.
+//   카디널 방위(0북1동2남3서)를 8방향(×2: 북0·동2·남4·서6)으로 환산 후 케프카로부터 시계 오프셋.
+//   케프카 미상이면 0(북)=기존 북→동→남→서. 직전 철썩/있는그대로(BAE6/7·BAEC/ED)가 dmKefkaDir 기록.
+const dmBhSortKey = (dir: number, kefkaDir: number | undefined): number =>
+  (dir * 2 - (kefkaDir ?? 0) + 8) % 8;
 
 // 블리자가+선더가 통합 출력(dmBlizzardThunder 옵션). P1 알쏭달쏭2 + P4 알쏭달쏭/마력방출 공용.
 //   blizzardTrue: BA98/고리02A4=true · thunderTrue: 고리02A6=true · safeNwSe: dir옵션 방향(없으면 ???).
@@ -2945,14 +2950,16 @@ const triggerSet: TriggerSet<Data> = {
         if (idx < 0)
           return; // 이 줄 비활성
         let dirs: number[];
+        const k = data.dmKefkaDir; // 케프카 기준(직전 철썩/있는그대로) 시계방향 정렬
+        const byKefka = (a: number, b: number) => dmBhSortKey(a, k) - dmBhSortKey(b, k);
         if (round === 2 || round === 10) {
           // leftover = 세트 카디널 − 첫 줄(1·9) 사용분
           const used = data.dmFirstRoundDirs ?? [];
-          dirs = [...(data.dmSetDirs ?? [])].filter((d) => !used.includes(d)).sort((a, b) => a - b);
+          dirs = [...(data.dmSetDirs ?? [])].filter((d) => !used.includes(d)).sort(byKefka);
         } else if (round === 1 || round === 9) {
-          dirs = [...(data.dmRoundDirs ?? [])].sort((a, b) => a - b); // 모인 테더 방향
+          dirs = [...(data.dmRoundDirs ?? [])].sort(byKefka); // 모인 테더 방향
         } else {
-          dirs = [...(data.dmSetDirs ?? [])].sort((a, b) => a - b); // 풀(3·6)
+          dirs = [...(data.dmSetDirs ?? [])].sort(byKefka); // 풀(3·6)
         }
         const myDir = dirs[idx];
         if (myDir === undefined)
@@ -2989,7 +2996,10 @@ const triggerSet: TriggerSet<Data> = {
         if (myMark !== swap.to)
           return; // 새로 가져오는 마커만
         const slot = parseInt(swap.from.slice(-1), 10) - 1;
-        const dirs = [...(data.dmSetDirs ?? [])].sort((a, b) => a - b);
+        // 케프카 기준 시계방향 정렬(줄 안내와 동일 순서 → from 슬롯 일관)
+        const dirs = [...(data.dmSetDirs ?? [])].sort((a, b) =>
+          dmBhSortKey(a, data.dmKefkaDir) - dmBhSortKey(b, data.dmKefkaDir)
+        );
         const myDir = dirs[slot];
         if (myDir === undefined)
           return;
