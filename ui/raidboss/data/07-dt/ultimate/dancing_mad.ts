@@ -2841,13 +2841,19 @@ const triggerSet: TriggerSet<Data> = {
       },
       durationSeconds: 3.7,
       alertText: (data, _matches, output) => {
-        return output.text!({ pos: output[Directions.outputFrom8DirNum(data.dmKefkaDir!)]!() });
+        const pos = output[Directions.outputFrom8DirNum(data.dmKefkaDir!)]!();
+        // 2번째(마지막)=전멸기 진입 → '왼쪽으로 멀리' / 1번째=기존 '좌우로 멀리'
+        return data.dmIamCount === 2 ? output.text2!({ pos: pos }) : output.text!({ pos: pos });
       },
       outputStrings: {
         ...Directions.outputStrings8Dir,
         text: {
           en: 'Kefka ${pos} / Left or Right (far)',
           ko: '케프카 ${pos}쪽 / 좌우로 멀리',
+        },
+        text2: {
+          en: 'Kefka ${pos} / Left (far)',
+          ko: '케프카 ${pos}쪽 / 왼쪽으로 멀리',
         },
       },
     },
