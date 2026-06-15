@@ -2945,7 +2945,7 @@ const triggerSet: TriggerSet<Data> = {
         data.dmLineAnnounced = true; // 동기 잠금 → 같은 줄의 후속/동시 테더 차단
       },
       durationSeconds: 5,
-      infoText: (data, _matches, output) => {
+      alertText: (data, _matches, output) => {
         const round = data.dmTetherRound ?? 0;
         const myMark = data.dmSigns?.[data.me ?? ''];
         if (myMark === undefined)
@@ -2982,7 +2982,35 @@ const triggerSet: TriggerSet<Data> = {
         const myDir = dirs[idx];
         if (myDir === undefined)
           return;
+        // 그룹 선행(처리자): 줄1 공격1→줄2(반대) / 줄9 ignore2→줄10(leftover)을 뒤에 덧붙임
+        let next: number | undefined;
+        if (round === 1 && myMark === 'attack1')
+          next = (myDir + 2) % 4; // 줄2 = 반대
+        else if (round === 9 && myMark === 'ignore2')
+          next =
+            [...(data.dmSetDirs ?? [])].filter((d) => !(data.dmRoundDirs ?? []).includes(d))[0];
+        if (next !== undefined)
+          return output.handleNext!({
+            round: round,
+            dir: output[dmDirKey(myDir)]!(),
+            next: output[dmDirKey(next)]!(),
+          });
         return output.handle!({ round: round, dir: output[dmDirKey(myDir)]!() });
+      },
+      infoText: (data, _matches, output) => {
+        // 그룹 선행(비처리자): 줄1에서 공격2에게 줄2 자리(남은 1자리) 미리 안내(초록)
+        if ((data.dmTetherRound ?? 0) !== 1)
+          return;
+        if (data.dmSigns?.[data.me ?? ''] !== 'attack2')
+          return;
+        const first = (data.dmRoundDirs ?? [])[0];
+        if (first === undefined)
+          return;
+        const a1 = (first + 2) % 4; // 공격1의 줄2(반대)
+        const a2 = [...(data.dmSetDirs ?? [])].filter((d) => d !== first && d !== a1)[0];
+        if (a2 === undefined)
+          return;
+        return output.preview!({ dir: output[dmDirKey(a2)]!() });
       },
       run: (data) => {
         const round = data.dmTetherRound ?? 0;
@@ -2992,6 +3020,11 @@ const triggerSet: TriggerSet<Data> = {
       outputStrings: {
         ...dmDirOutputs,
         handle: { en: '${round}: ${dir} tether', ko: '${round}줄: ${dir} 줄 처리' },
+        handleNext: {
+          en: '${round}: ${dir} tether (next ${next})',
+          ko: '${round}줄: ${dir} 줄 처리 (이후 ${next})',
+        },
+        preview: { en: 'Next: ${dir} tether', ko: '이후 ${dir} 줄 처리' },
       },
     },
     {
@@ -3005,7 +3038,7 @@ const triggerSet: TriggerSet<Data> = {
       condition: (data, matches) => data.dmBhDir?.[matches.sourceId] !== undefined,
       durationSeconds: 5,
       suppressSeconds: 3, // 무의 파동 웨이브당 1회
-      infoText: (data, _matches, output) => {
+      alertText: (data, _matches, output) => {
         const round = data.dmTetherRound ?? 0; // 다음 줄(카운터가 BAFC preRun서 이미 증가)
         const swap = dmTetherSwap[round];
         if (swap === undefined)
