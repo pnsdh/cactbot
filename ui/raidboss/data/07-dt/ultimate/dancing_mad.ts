@@ -1309,27 +1309,26 @@ const triggerSet: TriggerSet<Data> = {
       id: 'dmKefkaDodge',
       name: {
         en: 'P3 Giant Kefka dodge guidance',
-        ko: 'P3 거대 케프카(철썩·있는그대로) 회피 안내',
+        ko: 'P3 거대 케프카 회피 안내',
       },
       comment: {
         en:
           'Final spot (default): announce your final absolute map direction (Kefka pos = relative N). ' +
           'Kefka position: current style (Kefka position + left/right).',
-        ko:
-          '철썩철썩 따귀·있는 그대로의 나 안내 방식. 최종 회피 장소 = 가야 할 절대방위만(케프카 위치=상대 북) / 케프카 위치 = 기존(케프카 위치 + 좌우).',
+        ko: '철썩철썩 따귀·있는 그대로의 나 안내 방식. 최종 회피 장소 = 가야 할 절대방위만 / 케프카 위치 = 케프카 위치 + 좌우',
       },
       type: 'select',
       options: {
         en: {
-          'Final spot (default)': 'finalSpot',
-          'Kefka position + L/R': 'position',
+          'Final spot': 'finalSpot',
+          'Kefka position + L/R (default)': 'position',
         },
         ko: {
-          '최종 회피 장소 (기본값)': 'finalSpot',
-          '케프카 위치 + 좌우': 'position',
+          '최종 회피 장소': 'finalSpot',
+          '케프카 위치 + 좌우 (기본값)': 'position',
         },
       },
-      default: 'finalSpot',
+      default: 'position',
     },
   ],
   timelineFile: 'dancing_mad.txt',
