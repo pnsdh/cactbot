@@ -2626,7 +2626,7 @@ const triggerSet: TriggerSet<Data> = {
         data.dmAfterImplosion = true; // 이후 디버프 만료 = 2번째 디버프
       },
       durationSeconds: 4.7, // 시전 끝나면 '이동!'으로 교체(겹침 방지)
-      alertText: (_data, matches, output) =>
+      infoText: (_data, matches, output) =>
         matches.id === 'BAFD' ? output.leftRight!() : output.frontBack!(),
       outputStrings: {
         leftRight: { en: 'Left/Right', ko: '카오스 좌우로' },
@@ -2943,7 +2943,7 @@ const triggerSet: TriggerSet<Data> = {
       type: 'StartsUsing',
       netRegex: { id: 'BB01', source: '카오스', capture: false },
       durationSeconds: 4.7, // 시전 동안만(종료 시 소멸)
-      alertText: (_data, _matches, output) => output.text!(),
+      infoText: (_data, _matches, output) => output.text!(),
       outputStrings: {
         text: { en: 'Behind Chaos', ko: '카오스 뒤로' },
       },
