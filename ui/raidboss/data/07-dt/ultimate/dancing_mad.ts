@@ -32,6 +32,7 @@ export interface Data extends RaidbossData {
     dmBlizzardKnockback: 'kbSouth' | 'roleSide';
     dmBlizzardThunder: 'stepDodge' | 'dir';
     dmTrineMethod: '09stop' | 'yan';
+    dmTetherMethod: '09stop' | 'yan';
   };
   phase: Phase | 'unknown';
   combatantData?: PluginCombatantState[];
@@ -1038,6 +1039,60 @@ const dmDirKey = (d: number): 'n' | 'e' | 's' | 'w' => (['n', 'e', 's', 'w'] as 
 const dmBhSortKey = (dir: number, kefkaDir: number | undefined): number =>
   (dir * 2 - (kefkaDir ?? 0) + 8) % 8;
 
+// 줄별 '이 플레이어가 처리하는 방향'(메서드별). 반환: 방향 배열(1개 or 2개=양쪽) / 비처리=undefined.
+//   09stop(기본): 줄1=공격2(1) · 줄2=공격1(양쪽) · 줄9=금지2(양쪽) · 줄10=금지1(1). 그 외는 yan과 동일.
+//   yan: 줄1=공격1 · 줄2=공격1(줄1반대)/공격2(남은) · 줄9=금지1/금지2 · 줄10=금지2.
+//   줄3·6(풀)·4·5·7·8(스왑)은 메서드 무관 active[idx]→케프카정렬 dmSetDirs[idx].
+//   본 안내(alertText)·선행 안내(infoText)·이동 덧붙임이 모두 이 헬퍼로 일관 계산(now/next).
+const dmHandlesRound = (data: Data, round: number, myMark: string): number[] | undefined => {
+  const k = data.dmKefkaDir;
+  const sortK = (arr: number[]) => [...arr].sort((a, b) => dmBhSortKey(a, k) - dmBhSortKey(b, k));
+  const s09 = data.triggerSetConfig.dmTetherMethod === '09stop';
+  if (round === 1) {
+    const d = (data.dmRoundDirs ?? [])[0];
+    if (d === undefined)
+      return undefined;
+    return myMark === (s09 ? 'attack2' : 'attack1') ? [d] : undefined;
+  }
+  if (round === 2) {
+    const used = data.dmFirstRoundDirs ?? [];
+    const leftover = sortK([...(data.dmSetDirs ?? [])].filter((d) => !used.includes(d)));
+    if (s09)
+      return myMark === 'attack1' ? leftover : undefined; // 공격1 양쪽
+    const first = used[0]; // yan: 공격1=줄1 반대 / 공격2=남은
+    if (first === undefined)
+      return undefined;
+    const a1 = (first + 2) % 4;
+    const ok = leftover.includes(a1);
+    if (myMark === 'attack1')
+      return [ok ? a1 : leftover[0]!];
+    if (myMark === 'attack2')
+      return [ok ? leftover.filter((d) => d !== a1)[0]! : leftover[1]!];
+    return undefined;
+  }
+  if (round === 9) {
+    const s = sortK(data.dmRoundDirs ?? []);
+    if (s09)
+      return myMark === 'ignore2' ? s : undefined; // 금지2 양쪽
+    const idx = ['ignore1', 'ignore2'].indexOf(myMark);
+    return idx >= 0 && s[idx] !== undefined ? [s[idx]!] : undefined;
+  }
+  if (round === 10) {
+    const used = data.dmFirstRoundDirs ?? [];
+    const leftover = sortK([...(data.dmSetDirs ?? [])].filter((d) => !used.includes(d)));
+    return myMark === (s09 ? 'ignore1' : 'ignore2') ? leftover : undefined;
+  }
+  // 풀(3·6)·스왑(4·5·7·8): active[idx] → 케프카 정렬 dmSetDirs[idx]
+  const active = dmTetherActive[round];
+  if (active === undefined)
+    return undefined;
+  const idx = active.indexOf(myMark);
+  if (idx < 0)
+    return undefined;
+  const dir = sortK(data.dmSetDirs ?? [])[idx];
+  return dir === undefined ? undefined : [dir];
+};
+
 // 블리자가+선더가 통합 출력(dmBlizzardThunder 옵션). P1 알쏭달쏭2 + P4 알쏭달쏭/마력방출 공용.
 //   blizzardTrue: BA98/고리02A4=true · thunderTrue: 고리02A6=true · safeNwSe: dir옵션 방향(없으면 ???).
 const dmBlizThunStrings = {
@@ -1215,6 +1270,31 @@ const triggerSet: TriggerSet<Data> = {
       options: {
         en: {
           '09STOP (current)': '09stop',
+          'Yan': 'yan',
+        },
+        ko: {
+          '09STOP (기본값)': '09stop',
+          '얀': 'yan',
+        },
+      },
+      default: '09stop',
+    },
+    {
+      id: 'dmTetherMethod',
+      name: {
+        en: 'P3 Black hole tether strategy',
+        ko: 'P3 블랙홀 줄 처리법',
+      },
+      comment: {
+        en:
+          '09STOP (default): line 1 = attack2, line 2 = attack1 takes both, line 9 = ignore2 takes both, line 10 = ignore1. ' +
+          'Yan: line 1 = attack1, line 2 = attack1(opposite)/attack2, line 9 = ignore1/ignore2, line 10 = ignore2. Lines 3-8 identical.',
+        ko: '공략에 따른 블랙홀 줄 처리 방식 (1·2·9·10줄만 다름)',
+      },
+      type: 'select',
+      options: {
+        en: {
+          '09STOP (default)': '09stop',
           'Yan': 'yan',
         },
         ko: {
@@ -2919,13 +2999,13 @@ const triggerSet: TriggerSet<Data> = {
       },
     },
     {
-      // 줄 안내(수집 뒤): 줄별 방향 결정해 출력. **수집 완료 즉시 발동**(고정 딜레이 X).
-      //   - 줄1·9(세트 첫, 부분): dmRoundDirs가 그 줄 블랙홀 수만큼 모이면 발동 → 모인 방향. 사용분은 저장(2·10 leftover용).
-      //   - 줄2(세트 둘째): 공격1=줄1 방향의 반대(크로스) / 공격2=남은 1자리. 첫 테더에 즉시(테더 안 기다림).
-      //   - 줄10(세트 둘째): leftover(남은 1자리) = 세트 − 줄9 사용분. 즉시.
-      //   - 줄3·6(세트 첫, 풀): 세트 3개 전부(dmSetDirs). 첫 테더에 즉시.
-      //   - 줄4·5·7·8(스왑): 본 안내는 '줄 스왑 안내'(무의파동) 담당. 단 여기서 발동은 하되 alertText만 skip,
-      //     infoText로 '다음 줄(N+1) 진입자 선행 안내'를 띄움(줄4→줄5속박2 / 줄7→줄8금지2 등).
+      // 줄 안내(수집 뒤): 줄별 처리 방향을 **dmHandlesRound(메서드별)** 로 계산해 출력. 수집 완료 즉시 발동.
+      //   - 처리 방향·주체는 dmHandlesRound가 메서드(09stop 기본/yan)별로 결정(1·2·9·10줄만 다름).
+      //   - alertText: now=dmHandlesRound(이번 줄). 같은 세트 다음 줄도 처리(자리 이동)면 '(이후 X)' 덧붙임.
+      //     양쪽(09stop 2·9줄)=handleBoth.
+      //   - infoText: 이번 줄 비처리 + 같은 세트 다음 줄(N+1) 처리자(진입자)면 초록 선행. 스왑=가져오기.
+      //   - 줄4·5·7·8(스왑): 본 안내는 '줄 스왑 안내'(무의파동) 담당 → alertText skip, infoText 선행만.
+      //   - 세트 마지막(2·5·8·10)은 다음 줄=새 세트(스폰 전 미상)라 선행/덧붙임 제외.
       id: 'DancingMad 줄 안내',
       type: 'Tether',
       netRegex: { source: '블랙홀', capture: false },
@@ -2952,86 +3032,43 @@ const triggerSet: TriggerSet<Data> = {
         const myMark = data.dmSigns?.[data.me ?? ''];
         if (myMark === undefined)
           return;
-        const active = dmTetherActive[round];
-        if (active === undefined)
-          return;
-        const idx = active.indexOf(myMark);
-        if (idx < 0)
-          return; // 이 줄 비활성
-        let dirs: number[];
-        const k = data.dmKefkaDir; // 케프카 기준(직전 철썩/있는그대로) 시계방향 정렬
-        const byKefka = (a: number, b: number) => dmBhSortKey(a, k) - dmBhSortKey(b, k);
-        if (round === 2) {
-          // 줄2: 공격1=줄1 처리 방향의 반대(북↔남·동↔서) / 공격2=남은 1자리. (줄1 끈 사람이 반대로 크로스)
-          //   세트는 항상 {줄1, 줄1반대, 수직1}이라 반대는 늘 leftover에 존재(로그 검증).
-          const first = (data.dmFirstRoundDirs ?? [])[0];
-          const leftover = [...(data.dmSetDirs ?? [])].filter((d) =>
-            !(data.dmFirstRoundDirs ?? []).includes(d)
-          );
-          const a1 = first === undefined ? undefined : (first + 2) % 4; // 줄1 반대
-          dirs = (a1 !== undefined && leftover.includes(a1))
-            ? [a1, ...leftover.filter((d) => d !== a1)] // [공격1=반대, 공격2=남은자리]
-            : leftover.sort(byKefka); // 폴백(반대 자리 없음=비정상)
-        } else if (round === 10) {
-          // 줄10: leftover(남은 1자리) = 세트 − 줄9 사용분
-          const used = data.dmFirstRoundDirs ?? [];
-          dirs = [...(data.dmSetDirs ?? [])].filter((d) => !used.includes(d)).sort(byKefka);
-        } else if (round === 1 || round === 9) {
-          dirs = [...(data.dmRoundDirs ?? [])].sort(byKefka); // 모인 테더 방향
-        } else {
-          dirs = [...(data.dmSetDirs ?? [])].sort(byKefka); // 풀(3·6)
-        }
-        const myDir = dirs[idx];
-        if (myDir === undefined)
-          return;
-        // 그룹 선행(처리자): 줄1 공격1→줄2(반대) / 줄9 ignore2→줄10(leftover)을 뒤에 덧붙임
-        let next: number | undefined;
-        if (round === 1 && myMark === 'attack1')
-          next = (myDir + 2) % 4; // 줄2 = 반대
-        else if (round === 9 && myMark === 'ignore2')
-          next =
-            [...(data.dmSetDirs ?? [])].filter((d) => !(data.dmRoundDirs ?? []).includes(d))[0];
-        if (next !== undefined)
+        const now = dmHandlesRound(data, round, myMark);
+        if (now === undefined)
+          return; // 이 줄 비처리(선행은 infoText)
+        const nowStr = now.map((d) => output[dmDirKey(d)]!()).join(' + ');
+        // 같은 세트 다음 줄도 처리(자리 이동)면 '(이후 ...)' 덧붙임. 세트 마지막(2·5·8·10)=새 세트라 제외.
+        const next = [2, 5, 8, 10].includes(round)
+          ? undefined
+          : dmHandlesRound(data, round + 1, myMark);
+        if (next !== undefined && next.length === 1 && now.length === 1 && next[0] !== now[0])
           return output.handleNext!({
             round: round,
-            dir: output[dmDirKey(myDir)]!(),
-            next: output[dmDirKey(next)]!(),
+            dir: nowStr,
+            next: output[dmDirKey(next[0]!)]!(),
           });
-        return output.handle!({ round: round, dir: output[dmDirKey(myDir)]!() });
+        return now.length >= 2
+          ? output.handleBoth!({ round: round, dir: nowStr })
+          : output.handle!({ round: round, dir: nowStr });
       },
       infoText: (data, _matches, output) => {
-        // 그룹 선행(비처리자): 이번 줄(N)에서 **바로 다음 줄(N+1)의 새 진입자**에게 자리 미리(초록).
-        //   줄1→줄2(공격2) / 줄3→줄4(속박1) / 줄4→줄5(속박2) / 줄6→줄7(금지1) / 줄7→줄8(금지2).
+        // 선행 안내(비처리자): 같은 세트 다음 줄(N+1) 진입자에게 자리 미리(초록). 세트 경계(2·5·8·10) 제외.
         const round = data.dmTetherRound ?? 0;
         const myMark = data.dmSigns?.[data.me ?? ''];
         if (myMark === undefined)
           return;
-        const next = round + 1;
-        if (next === 2) {
-          // 줄1→줄2: 공격2에게 남은 1자리(공격1 반대 제외)
-          if (myMark !== 'attack2')
-            return;
-          const first = (data.dmRoundDirs ?? [])[0];
-          if (first === undefined)
-            return;
-          const a1 = (first + 2) % 4; // 공격1의 줄2(반대)
-          const a2 = [...(data.dmSetDirs ?? [])].filter((d) => d !== first && d !== a1)[0];
-          if (a2 === undefined)
-            return;
-          return output.preview!({ dir: output[dmDirKey(a2)]!() });
-        }
-        // 다음 줄이 스왑이고 내가 진입자(swap.to)면 그 슬롯 자리 미리(가져올 줄)
-        const swap = dmTetherSwap[next];
-        if (swap === undefined || swap.to !== myMark)
-          return;
-        const slot = parseInt(swap.from.slice(-1), 10) - 1;
-        const dir =
-          [...(data.dmSetDirs ?? [])].sort((a, b) =>
-            dmBhSortKey(a, data.dmKefkaDir) - dmBhSortKey(b, data.dmKefkaDir)
-          )[slot];
-        if (dir === undefined)
-          return;
-        return output.previewTake!({ dir: output[dmDirKey(dir)]!() });
+        if (dmHandlesRound(data, round, myMark) !== undefined)
+          return; // 이 줄 처리자는 alertText
+        if ([2, 5, 8, 10].includes(round))
+          return; // 세트 마지막 줄 → 다음은 새 세트(스폰 전, 미상)
+        const next = dmHandlesRound(data, round + 1, myMark);
+        if (next === undefined)
+          return; // 다음 줄도 비처리
+        const nextStr = next.map((d) => output[dmDirKey(d)]!()).join(' + ');
+        if (dmTetherSwap[round + 1] !== undefined)
+          return output.previewTake!({ dir: nextStr }); // 다음이 스왑=가져오기
+        return next.length >= 2
+          ? output.previewBoth!({ dir: nextStr })
+          : output.preview!({ dir: nextStr });
       },
       run: (data) => {
         const round = data.dmTetherRound ?? 0;
@@ -3041,12 +3078,14 @@ const triggerSet: TriggerSet<Data> = {
       outputStrings: {
         ...dmDirOutputs,
         handle: { en: '${round}: ${dir} tether', ko: '${round}줄: ${dir} 줄 처리' },
+        handleBoth: { en: '${round}: ${dir} (both)', ko: '${round}줄: ${dir} 양쪽 처리' },
         handleNext: {
           en: '${round}: ${dir} tether (next ${next})',
           ko: '${round}줄: ${dir} 줄 처리 (이후 ${next})',
         },
         preview: { en: 'Next: ${dir} tether', ko: '이후 ${dir} 줄 처리' },
         previewTake: { en: 'Next: ${dir} take tether', ko: '이후 ${dir} 줄 가져오기' },
+        previewBoth: { en: 'Next: ${dir} (both)', ko: '이후 ${dir} 양쪽 처리' },
       },
     },
     {
