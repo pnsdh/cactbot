@@ -33,6 +33,7 @@ export interface Data extends RaidbossData {
     dmBlizzardThunder: 'stepDodge' | 'dir';
     dmTrineMethod: '09stop' | 'yan';
     dmTetherMethod: '09stop' | 'yan';
+    dmKefkaDodge: 'finalSpot' | 'position';
   };
   phase: Phase | 'unknown';
   combatantData?: PluginCombatantState[];
@@ -1303,6 +1304,32 @@ const triggerSet: TriggerSet<Data> = {
         },
       },
       default: '09stop',
+    },
+    {
+      id: 'dmKefkaDodge',
+      name: {
+        en: 'P3 Giant Kefka dodge guidance',
+        ko: 'P3 거대 케프카(철썩·있는그대로) 회피 안내',
+      },
+      comment: {
+        en:
+          'Final spot (default): announce your final absolute map direction (Kefka pos = relative N). ' +
+          'Kefka position: current style (Kefka position + left/right).',
+        ko:
+          '철썩철썩 따귀·있는 그대로의 나 안내 방식. 최종 회피 장소 = 가야 할 절대방위만(케프카 위치=상대 북) / 케프카 위치 = 기존(케프카 위치 + 좌우).',
+      },
+      type: 'select',
+      options: {
+        en: {
+          'Final spot (default)': 'finalSpot',
+          'Kefka position + L/R': 'position',
+        },
+        ko: {
+          '최종 회피 장소 (기본값)': 'finalSpot',
+          '케프카 위치 + 좌우': 'position',
+        },
+      },
+      default: 'finalSpot',
     },
   ],
   timelineFile: 'dancing_mad.txt',
@@ -2898,16 +2925,29 @@ const triggerSet: TriggerSet<Data> = {
       },
       durationSeconds: 8.4, // 시전 시작~처리 피해(BAEB 충격파/BAEA 겹충격) 착탄까지
       alertText: (data, matches, output) => {
-        return output.text!({
-          pos: output[Directions.outputFrom8DirNum(data.dmKefkaDir!)]!(),
-          dodge: matches.id === 'BAE7' ? output.left!() : output.right!(),
-        });
+        const kefka = data.dmKefkaDir ?? 0; // 케프카 위치 = 상대 북
+        if (data.triggerSetConfig.dmKefkaDodge === 'position') {
+          return output.text!({
+            pos: output[Directions.outputFrom8DirNum(kefka)]!(),
+            dodge: matches.id === 'BAE7' ? output.left!() : output.right!(),
+          });
+        }
+        // 최종 회피 장소: 절대방위 = (케프카 + 상대방위) % 8
+        if (matches.id === 'BAE7') {
+          // 직군 산개: 탱 북서(7) / 힐 서(6) / 딜 남서(5) [상대]
+          const r = data.role === 'tank' ? 7 : data.role === 'healer' ? 6 : 5;
+          return output.spread!({ dir: output[Directions.outputFrom8DirNum((kefka + r) % 8)]!() });
+        }
+        // 전체 쉐어: 모두 동(2) [상대]
+        return output.share!({ dir: output[Directions.outputFrom8DirNum((kefka + 2) % 8)]!() });
       },
       outputStrings: {
         ...Directions.outputStrings8Dir,
         text: { en: 'Kefka ${pos} / ${dodge}', ko: '케프카 ${pos}쪽 / ${dodge}' },
         left: { en: 'Left: role spread', ko: '왼쪽에서 직군 산개' },
         right: { en: 'Right: full share', ko: '오른쪽에서 전체 쉐어' },
+        spread: { en: '${dir}: role spread', ko: '${dir}쪽에서 직군 산개' },
+        share: { en: '${dir}: full share', ko: '${dir}쪽에서 쉐어' },
       },
     },
     {
@@ -2921,9 +2961,18 @@ const triggerSet: TriggerSet<Data> = {
       },
       durationSeconds: 3.7,
       alertText: (data, _matches, output) => {
-        const pos = output[Directions.outputFrom8DirNum(data.dmKefkaDir!)]!();
-        // 2번째(마지막)=전멸기 진입 → '왼쪽으로 멀리' / 1번째=기존 '좌우로 멀리'
-        return data.dmIamCount === 2 ? output.text2!({ pos: pos }) : output.text!({ pos: pos });
+        const kefka = data.dmKefkaDir ?? 0; // 케프카 위치 = 상대 북
+        const second = data.dmIamCount === 2; // 2번째(마지막)=전멸기 진입 → 왼쪽만
+        if (data.triggerSetConfig.dmKefkaDodge === 'position') {
+          const pos = output[Directions.outputFrom8DirNum(kefka)]!();
+          return second ? output.text2!({ pos: pos }) : output.text!({ pos: pos });
+        }
+        // 최종 회피 장소: 절대방위. 왼쪽=서(6)·오른쪽=동(2) [상대]. 2번째는 왼쪽(서)만.
+        const w = output[Directions.outputFrom8DirNum((kefka + 6) % 8)]!();
+        if (second)
+          return output.finalSingle!({ dir: w });
+        const e = output[Directions.outputFrom8DirNum((kefka + 2) % 8)]!();
+        return output.finalEither!({ dir1: w, dir2: e });
       },
       outputStrings: {
         ...Directions.outputStrings8Dir,
@@ -2935,6 +2984,8 @@ const triggerSet: TriggerSet<Data> = {
           en: 'Kefka ${pos} / Left (far)',
           ko: '케프카 ${pos}쪽 / 왼쪽으로 멀리',
         },
+        finalSingle: { en: '${dir} (far)', ko: '${dir}쪽으로 회피' },
+        finalEither: { en: '${dir1} or ${dir2} (far)', ko: '${dir1}쪽 또는 ${dir2}쪽으로 회피' },
       },
     },
     {
