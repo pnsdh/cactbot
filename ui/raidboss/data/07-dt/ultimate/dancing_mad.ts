@@ -2609,8 +2609,8 @@ const triggerSet: TriggerSet<Data> = {
       outputStrings: {
         tank: { en: 'Thundaga x2: close to Exdeath', ko: '선더가 2연타: 엑스데스와 가까이' },
         nonTank: {
-          en: 'Thundaga x2: away from Exdeath/tank',
-          ko: '선더가 2연타: 엑스데스, 탱커와 멀어지기',
+          en: 'Thundaga: avoid tank',
+          ko: '선더가: 탱커 피하기',
         },
       },
     },
