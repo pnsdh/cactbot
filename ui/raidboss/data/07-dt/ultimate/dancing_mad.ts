@@ -2843,7 +2843,9 @@ const triggerSet: TriggerSet<Data> = {
       id: 'DancingMad 리미트컷 자리',
       type: 'Ability',
       netRegex: { id: 'BAF8', capture: false },
-      condition: (data) => data.dmUltimaStart !== undefined,
+      // 알테마 시작(분신 수집됨) 후의 회오리만 — 알테마 전 회오리(진공파 등)는 무시.
+      condition: (data) =>
+        data.dmUltimaStart !== undefined && (data.dmUltimaCloneIds?.length ?? 0) > 0,
       preRun: (data) => {
         data.dmWhirlwindDone = true; // 이후 알테마 회전 안내 생략(겹침 방지)
       },
@@ -2858,7 +2860,10 @@ const triggerSet: TriggerSet<Data> = {
       id: 'DancingMad 리미트컷 자리 (지연)',
       type: 'Ability',
       netRegex: { id: 'BAF8', capture: false },
-      condition: (data) => data.dmUltimaStart === undefined,
+      // ⚠ 알테마 시작(분신 수집됨) 후의 회오리만 — 알테마 *전* 회오리가 dmWhirlwindDone를 미리 켜
+      //   알테마 회전 안내를 통째로 억제하던 버그 수정(2026-06-18 23:10 풀: 알테마 13초 전 회오리).
+      condition: (data) =>
+        data.dmUltimaStart === undefined && (data.dmUltimaCloneIds?.length ?? 0) > 0,
       preRun: (data) => {
         data.dmWhirlwindDone = true; // 회전 안내 생략(판정은 계속 저장됨)
       },
