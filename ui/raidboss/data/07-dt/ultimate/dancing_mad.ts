@@ -1825,9 +1825,13 @@ const triggerSet: TriggerSet<Data> = {
       type: 'GainsEffect',
       // 남이 걸렸을 때만 일반 타이머(이름 표시 안 함). 본인이 이번 부여에 포함되면 생략('내것'이 처리).
       // suppress 4s로 동시 부여(2명, ~0.001s)는 1회로 묶음(다음 부여는 ≥5.7s 후라 별개 인식).
+      // ★ 첫 부여=둘 다 5초라 dmExpiryWarnDelay=0 → 남의 줄이 먼저 오면 이 infoText가 '내것' preRun보다
+      //   먼저 평가돼 dmTrapMine=false로 읽음(빨강+초록 동시 버그). OverlayPlugin은 줄을 개별 이벤트로
+      //   전달 → 같은 부여라도 내 줄 처리 전에 다음 틱이 돌 수 있음. floor 0.3s로 띄워 두 줄 다 처리된
+      //   뒤 평가(긴 부여는 dur-5≫0.3이라 영향 없음).
       netRegex: { effectId: '13D6' },
       condition: (data, matches) => data.me !== matches.target,
-      delaySeconds: (_data, matches) => dmExpiryWarnDelay(matches),
+      delaySeconds: (_data, matches) => Math.max(dmExpiryWarnDelay(matches), 0.3),
       suppressSeconds: 4,
       countdownSeconds: 5,
       infoText: (data, _matches, output) => {
