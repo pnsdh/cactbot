@@ -3117,6 +3117,13 @@ const triggerSet: TriggerSet<Data> = {
       },
       preRun: (data) => {
         data.dmLineAnnounced = true; // 동기 잠금 → 같은 줄의 후속/동시 테더 차단
+        // ★ dmFirstRoundDirs는 preRun에서 세팅해야 함(run 아님): 같은 트리거의 infoText(선행 미리보기)가
+        //   줄2·10 leftover(=dmSetDirs−dmFirstRoundDirs)를 계산하는데, popup-text 실행순서가
+        //   infoText < run이라 run에 두면 줄1·9 미리보기 시점엔 빈 배열 → leftover=세트 전체(3개)로 오안내.
+        //   preRun은 동기·infoText보다 먼저 + condition이 dmRoundDirs 수집 완료를 보장하므로 안전.
+        const round = data.dmTetherRound ?? 0;
+        if (round === 1 || round === 9)
+          data.dmFirstRoundDirs = [...(data.dmRoundDirs ?? [])]; // 둘째 줄(2·10) leftover용
       },
       durationSeconds: 5,
       alertText: (data, _matches, output) => {
@@ -3163,11 +3170,6 @@ const triggerSet: TriggerSet<Data> = {
         return next.length >= 2
           ? output.previewBoth!({ dir: nextStr })
           : output.preview!({ dir: nextStr });
-      },
-      run: (data) => {
-        const round = data.dmTetherRound ?? 0;
-        if (round === 1 || round === 9)
-          data.dmFirstRoundDirs = [...(data.dmRoundDirs ?? [])]; // 둘째 줄(2·10) leftover용
       },
       outputStrings: {
         ...dmDirOutputs,
