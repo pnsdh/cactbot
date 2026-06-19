@@ -38,6 +38,7 @@ export interface Data extends RaidbossData {
   phase: Phase | 'unknown';
   combatantData?: PluginCombatantState[];
   dmSigns?: { [name: string]: string }; // 현재 머리 사인 {플레이어 이름 → 영문 id(attack1·bind1·ignore1·square 등)}
+  dmTargetCohort?: { [name: string]: 'attack' | 'bind' | 'ignore' }; // P3 블랙홀 표적 디버프(BBC첫=attack×3/BBD둘=bind×3/BBE셋=ignore×2). 안 찍은 마커 보수용(cohort+크기=마커 독립 신호)
   dmKnockbackGroup?: boolean;
   dmHeadInvert?: boolean;
   dmSpreadBase?: boolean; // 007F=true(산개) / 0080=false(쉐어) / undefined=이번 조합엔 없음
@@ -1092,6 +1093,37 @@ const dmHandlesRound = (data: Data, round: number, myMark: string): number[] | u
   return dir === undefined ? undefined : [dir];
 };
 
+// 내 머리징 해석(+ 안 찍은 경우 보수). 줄 안내·줄 스왑 안내가 myMark 읽을 때 이걸로 통일.
+//   기본: dmSigns[me](내가 찍은 마커) 그대로 → 정상 케이스 동작 불변.
+//   보수(유저 룰): 안 찍어 dmSigns에 없을 때, **표적 디버프(cohort)** 로 번호를 추론.
+//     표적 디버프(BBC 첫=공격×3 / BBD 둘=속박×3 / BBE 셋=금지×2)가 cohort+크기를 마커와 **독립**으로 알려줌.
+//     같은 cohort에서 '안 찍힌 번호'가 정확히 1개면 그게 내 번호(=1명 미표시까지만 복구; 2명↑이면 모호 → 미복구).
+//     집계는 **같은 cohort 멤버(동일 디버프) + 해당 prefix 마커**만 → 타 cohort·이전 페이즈 잔존 마커 오염 차단.
+//     과다집계(디버프 일부 미수집 등)면 missing이 늘어 미복구로 빠질 뿐, 오추론은 안 됨(보수적·safe fail).
+const dmResolveMyMark = (data: Data): string | undefined => {
+  const me = data.me ?? '';
+  const direct = data.dmSigns?.[me];
+  if (direct !== undefined)
+    return direct;
+  const cohort = data.dmTargetCohort?.[me];
+  if (cohort === undefined)
+    return undefined; // 디버프 미수집 → 추론 불가(기존처럼 침묵)
+  const size = cohort === 'ignore' ? 2 : 3;
+  const placed = new Set<number>();
+  for (const [name, s] of Object.entries(data.dmSigns ?? {})) {
+    if (data.dmTargetCohort?.[name] !== cohort || !s.startsWith(cohort))
+      continue;
+    const n = parseInt(s.slice(cohort.length), 10);
+    if (!Number.isNaN(n))
+      placed.add(n);
+  }
+  const missing: number[] = [];
+  for (let n = 1; n <= size; n++)
+    if (!placed.has(n))
+      missing.push(n);
+  return missing.length === 1 ? `${cohort}${missing[0]}` : undefined;
+};
+
 // 블리자가+선더가 통합 출력(dmBlizzardThunder 옵션). P1 알쏭달쏭2 + P4 알쏭달쏭/마력방출 공용.
 //   blizzardTrue: BA98/고리02A4=true · thunderTrue: 고리02A6=true · safeNwSe: dir옵션 방향(없으면 ???).
 const dmBlizThunStrings = {
@@ -1357,6 +1389,7 @@ const triggerSet: TriggerSet<Data> = {
         data.dmUltimaCw = undefined;
         data.dmLimitCut = undefined; // 리미트컷 번호
         data.dmBhDir = {}; // 블랙홀 id→방위
+        data.dmTargetCohort = {}; // 표적 디버프 cohort(지진과 함께 부여; 안 찍은 마커 보수용)
         data.dmTetherRound = 1; // 블랙홀 줄 라운드(=BAFC웨이브+1, 라운드1=BAFC 전 기본)
         data.dmRoundDirs = []; // 현재 줄 테더 방위
         data.dmSetDirs = []; // 세트 카디널 방향
@@ -1396,6 +1429,19 @@ const triggerSet: TriggerSet<Data> = {
           if (data.dmSigns[p] === sign)
             delete data.dmSigns[p];
         data.dmSigns[pname] = sign;
+      },
+    },
+    {
+      // P3 블랙홀 표적 디버프 수집(BBC 첫=공격×3 / BBD 둘=속박×3 / BBE 셋=금지×2). 9999s, 지진과 함께 8명 부여.
+      //   cohort는 머리징과 독립 신호 → 안 찍은 마커 보수(dmResolveMyMark)용. 키=이름(dmSigns와 동일).
+      id: 'DancingMad 표적 디버프 수집',
+      type: 'GainsEffect',
+      netRegex: { effectId: ['BBC', 'BBD', 'BBE'] },
+      run: (data, matches) => {
+        data.dmTargetCohort ??= {};
+        data.dmTargetCohort[matches.target] = matches.effectId === 'BBC'
+          ? 'attack'
+          : (matches.effectId === 'BBD' ? 'bind' : 'ignore');
       },
     },
     // ───────── 전체공격 ─────────
@@ -3064,7 +3110,7 @@ const triggerSet: TriggerSet<Data> = {
         const round = data.dmTetherRound ?? 0;
         if (dmTetherSwap[round] !== undefined)
           return; // 스왑(4·5·7·8) 본 안내는 '줄 스왑 안내'가 담당(여기선 infoText 선행만)
-        const myMark = data.dmSigns?.[data.me ?? ''];
+        const myMark = dmResolveMyMark(data); // 내 마커(없으면 표적 디버프 cohort로 보수)
         if (myMark === undefined)
           return;
         const now = dmHandlesRound(data, round, myMark);
@@ -3088,7 +3134,7 @@ const triggerSet: TriggerSet<Data> = {
       infoText: (data, _matches, output) => {
         // 선행 안내(비처리자): 같은 세트 다음 줄(N+1) 진입자에게 자리 미리(초록). 세트 경계(2·5·8·10) 제외.
         const round = data.dmTetherRound ?? 0;
-        const myMark = data.dmSigns?.[data.me ?? ''];
+        const myMark = dmResolveMyMark(data); // 내 마커(없으면 표적 디버프 cohort로 보수)
         if (myMark === undefined)
           return;
         if (dmHandlesRound(data, round, myMark) !== undefined)
@@ -3139,7 +3185,7 @@ const triggerSet: TriggerSet<Data> = {
         const swap = dmTetherSwap[round];
         if (swap === undefined)
           return; // 다음 줄이 스왑(4·5·7·8) 아니면 안내 X
-        const myMark = data.dmSigns?.[data.me ?? ''];
+        const myMark = dmResolveMyMark(data); // 내 마커(없으면 표적 디버프 cohort로 보수)
         if (myMark !== swap.to)
           return; // 새로 가져오는 마커만
         const slot = parseInt(swap.from.slice(-1), 10) - 1;
