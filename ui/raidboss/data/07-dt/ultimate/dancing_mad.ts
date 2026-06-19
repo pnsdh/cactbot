@@ -201,6 +201,14 @@ const marchDir = (id: string): 'up' | 'down' | 'right' | 'left' | undefined => {
   return undefined;
 };
 
+// 디버프 만료 절대시각(ms) = 부여 시각 + 지속. GainsEffect 만료 기준 세트 매칭/안내 공용.
+const dmExpiryMs = (matches: { timestamp: string; duration: string }): number =>
+  Date.parse(matches.timestamp) + parseFloat(matches.duration) * 1000;
+
+// 만료 5초 전까지의 딜레이(초). delaySeconds 콜백용(음수 가드).
+const dmExpiryWarnDelay = (matches: { duration: string }): number =>
+  Math.max(parseFloat(matches.duration) - 5, 0);
+
 // ───── 행방불명(P2) 공통 ─────
 // 위험한 주문 헤드마커 → 역할. 02CB=쉐어 / 02CD=부채꼴 / 02CC=산개.
 const forsakenRole = (id: string): ForsakenRole | undefined => {
@@ -1801,7 +1809,7 @@ const triggerSet: TriggerSet<Data> = {
       netRegex: { effectId: '13D6' },
       condition: Conditions.targetIsYou(),
       preRun: (data) => data.dmTrapMine = true,
-      delaySeconds: (_data, matches) => Math.max(parseFloat(matches.duration) - 5, 0),
+      delaySeconds: (_data, matches) => dmExpiryWarnDelay(matches),
       suppressSeconds: 4,
       countdownSeconds: 5,
       alarmText: (_data, _matches, output) => output.mine!(),
@@ -1819,7 +1827,7 @@ const triggerSet: TriggerSet<Data> = {
       // suppress 4s로 동시 부여(2명, ~0.001s)는 1회로 묶음(다음 부여는 ≥5.7s 후라 별개 인식).
       netRegex: { effectId: '13D6' },
       condition: (data, matches) => data.me !== matches.target,
-      delaySeconds: (_data, matches) => Math.max(parseFloat(matches.duration) - 5, 0),
+      delaySeconds: (_data, matches) => dmExpiryWarnDelay(matches),
       suppressSeconds: 4,
       countdownSeconds: 5,
       infoText: (data, _matches, output) => {
@@ -3344,7 +3352,7 @@ const triggerSet: TriggerSet<Data> = {
         const truth = data.dmFloodTruth ?? true; // 부여 시점 네오 808 = 해당 GC 진실/거짓
         const spread = matches.effectId === '15A8' ? truth : !truth; // 갈래 진실=산개 / 물압축 진실=쉐어
         data.dmForkMine = {
-          expiry: Date.parse(matches.timestamp) + parseFloat(matches.duration) * 1000,
+          expiry: dmExpiryMs(matches),
           spread: spread,
         };
       },
@@ -3356,7 +3364,7 @@ const triggerSet: TriggerSet<Data> = {
       condition: (data, matches) => matches.target === data.me,
       run: (data, matches) =>
         data.dmAccelMine = {
-          expiry: Date.parse(matches.timestamp) + parseFloat(matches.duration) * 1000,
+          expiry: dmExpiryMs(matches),
           stop: data.dmFloodTruth ?? true, // GC 진실=정지
         },
     },
@@ -3365,10 +3373,10 @@ const triggerSet: TriggerSet<Data> = {
       type: 'GainsEffect',
       // positioning 디버프 기준 세트당 1회(suppress, 세트 간 ~15s), 만료 5초 전(delay=dur-5).
       netRegex: { effectId: ['15A8', '15A9'] },
-      delaySeconds: (_data, matches) => Math.max(parseFloat(matches.duration) - 5, 0),
+      delaySeconds: (_data, matches) => dmExpiryWarnDelay(matches),
       suppressSeconds: 10,
       infoText: (data, matches, output) => {
-        const setExpiry = Date.parse(matches.timestamp) + parseFloat(matches.duration) * 1000;
+        const setExpiry = dmExpiryMs(matches);
         // 산개/쉐어: 내 positioning이 이 세트(만료시각 일치)면 내 행동, 아니면 쉐어
         const fork = data.dmForkMine;
         const isMyFork = fork !== undefined && Math.abs(fork.expiry - setExpiry) < 2000;
@@ -3395,8 +3403,7 @@ const triggerSet: TriggerSet<Data> = {
       type: 'GainsEffect',
       netRegex: { effectId: '15A7' },
       condition: (data, matches) => matches.target === data.me,
-      run: (data, matches) =>
-        data.dmCurseMine = Date.parse(matches.timestamp) + parseFloat(matches.duration) * 1000,
+      run: (data, matches) => data.dmCurseMine = dmExpiryMs(matches),
     },
     {
       id: 'DancingMad 저주의 외침 안내',
@@ -3404,15 +3411,13 @@ const triggerSet: TriggerSet<Data> = {
       netRegex: { effectId: '15A7' },
       // preRun: 그룹 진실(네오 808)을 만료시각 키로 저장(비대상자도 방향 필요·만료 땐 808이 바뀜). 그룹당 1회(suppress).
       preRun: (data, matches) => {
-        const key = Math.round(
-          (Date.parse(matches.timestamp) + parseFloat(matches.duration) * 1000) / 1000,
-        );
+        const key = Math.round(dmExpiryMs(matches) / 1000);
         (data.dmCurseTruth ??= {})[key] = data.dmFloodTruth ?? true; // 진실=보지않기
       },
-      delaySeconds: (_data, matches) => Math.max(parseFloat(matches.duration) - 5, 0),
+      delaySeconds: (_data, matches) => dmExpiryWarnDelay(matches),
       suppressSeconds: 10,
       infoText: (data, matches, output) => {
-        const expiry = Date.parse(matches.timestamp) + parseFloat(matches.duration) * 1000;
+        const expiry = dmExpiryMs(matches);
         const away = data.dmCurseTruth?.[Math.round(expiry / 1000)] ?? true;
         const dir = away ? output.away!() : output.look!();
         const mine = data.dmCurseMine !== undefined && Math.abs(data.dmCurseMine - expiry) < 2000;
@@ -3446,7 +3451,7 @@ const triggerSet: TriggerSet<Data> = {
         (data.dmChaosMove ??= {})[matches.effectId] =
           (matches.effectId === '15AB') === (data.dmChaosTruth ?? true);
       },
-      delaySeconds: (_data, matches) => Math.max(parseFloat(matches.duration) - 5, 0),
+      delaySeconds: (_data, matches) => dmExpiryWarnDelay(matches),
       durationSeconds: 5,
       infoText: (data, matches, output) =>
         output.center!({
