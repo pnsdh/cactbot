@@ -1380,13 +1380,22 @@ const triggerSet: TriggerSet<Data> = {
       netRegex: {},
       run: (data, matches) => {
         data.dmSigns ??= {};
+        // ⚠ 로그 targetName이 stale일 수 있음: 매크로 동시 입력으로 마커가 A→B로 옮겨가면 Add 라인의
+        //   targetId=B(맞음)인데 targetName=A(옛 보유자 이름 캐시)로 찍힘 → targetName으로 키 잡으면
+        //   엉뚱한 사람에 저장. → targetId로 이름 재해석(없으면 targetName 폴백).
+        const pname = data.party.nameFromId(matches.targetId) ?? matches.targetName;
         if (matches.operation === 'Delete') {
-          delete data.dmSigns[matches.targetName];
+          delete data.dmSigns[pname];
           return;
         }
-        const name = dmSignNames[matches.waymark];
-        if (name !== undefined)
-          data.dmSigns[matches.targetName] = name;
+        const sign = dmSignNames[matches.waymark];
+        if (sign === undefined)
+          return;
+        // 마커는 1명만 가짐 → 같은 마커를 가진 다른 사람에게서 제거(Delete 누락·이동 대비 유일성).
+        for (const p of Object.keys(data.dmSigns))
+          if (data.dmSigns[p] === sign)
+            delete data.dmSigns[p];
+        data.dmSigns[pname] = sign;
       },
     },
     // ───────── 전체공격 ─────────
