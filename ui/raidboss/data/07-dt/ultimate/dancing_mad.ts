@@ -1071,16 +1071,15 @@ const dmHandlesRound = (data: Data, round: number, myMark: string): number[] | u
     return undefined;
   }
   if (round === 9) {
+    // 줄9·10은 옵션 무관 Yan식 통일(09stop도 공략을 yan식으로 되돌림): 금지1=s[0]·금지2=s[1] / 줄10=금지2.
     const s = sortK(data.dmRoundDirs ?? []);
-    if (s09)
-      return myMark === 'ignore2' ? s : undefined; // 금지2 양쪽
     const idx = ['ignore1', 'ignore2'].indexOf(myMark);
     return idx >= 0 && s[idx] !== undefined ? [s[idx]!] : undefined;
   }
   if (round === 10) {
     const used = data.dmFirstRoundDirs ?? [];
     const leftover = sortK([...(data.dmSetDirs ?? [])].filter((d) => !used.includes(d)));
-    return myMark === (s09 ? 'ignore1' : 'ignore2') ? leftover : undefined;
+    return myMark === 'ignore2' ? leftover : undefined;
   }
   // 풀(3·6)·스왑(4·5·7·8): active[idx] → 케프카 정렬 dmSetDirs[idx]
   const active = dmTetherActive[round];
@@ -1286,10 +1285,9 @@ const triggerSet: TriggerSet<Data> = {
         ko: 'P3 블랙홀 줄 처리법',
       },
       comment: {
-        en:
-          '09STOP (default): line 1 = attack2, line 2 = attack1 takes both, line 9 = ignore2 takes both, line 10 = ignore1. ' +
-          'Yan: line 1 = attack1, line 2 = attack1(opposite)/attack2, line 9 = ignore1/ignore2, line 10 = ignore2. Lines 3-8 identical.',
-        ko: '공략에 따른 블랙홀 줄 처리 방식 (1·2·9·10줄만 다름)',
+        en: '09STOP (default): line 1 = attack2, line 2 = attack1 takes both. ' +
+          'Yan: line 1 = attack1, line 2 = attack1(opposite)/attack2. Lines 3-10 identical (Yan-style).',
+        ko: '공략에 따른 블랙홀 줄 처리 방식 (1·2줄만 다름, 3~10줄은 공통)',
       },
       type: 'select',
       options: {
