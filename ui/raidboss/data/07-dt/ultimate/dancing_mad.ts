@@ -71,7 +71,6 @@ export interface Data extends RaidbossData {
   dmUltimaStart?: number; // 알테마 시작 방위(0~7) 확정값. 리미트컷 자리 계산용
   dmUltimaCw?: boolean; // 알테마 회전 시계=true. 리미트컷 자리 계산용
   dmLimitCut?: number; // P3 리미트컷 본인 주사위 번호(1~8)
-  dmWhirlwindDone?: boolean; // P3 회오리(BAF8=리미트컷 자리) 발동됨 → 이후 알테마 회전 안내 생략(겹침 방지)
   dmMudTargets?: string[]; // P3 지진(C571/C572) 혼돈의 진흙(644) 대상 2명 이름 (힐러 고지용)
   dmBhDir?: { [id: string]: number }; // P3 블랙홀(줄) id→카디널 방위(0북1동2남3서). AddedCombatant서 수집
   dmTetherRound?: number; // P3 블랙홀 줄 라운드(1~10). 테더 버스트마다 증가
@@ -975,7 +974,7 @@ const dmLimitCutText = (data: Data, output: Output): string | undefined => {
   return output.text!({ num: num, clock: output[`clock${hours[idx]!}`]!() });
 };
 
-// 리미트컷 자리 출력 문자열(즉시/지연 두 트리거 공유). dmLimitCutText가 text·fallback·clockN 키 사용.
+// 리미트컷 자리 출력 문자열. dmLimitCutText가 text·fallback·clockN 키 사용.
 //   clockN은 편집 가능한 시계 라벨(기본 'N시로'/'N o'clock'). 사용자가 방위징으로 교체.
 const dmLimitCutOutputs = {
   text: { en: '#${num}: ${clock}', ko: '주사위 ${num}번: ${clock}' },
@@ -1359,7 +1358,6 @@ const triggerSet: TriggerSet<Data> = {
         data.dmUltimaStart = undefined; // 알테마 시작/회전 확정값
         data.dmUltimaCw = undefined;
         data.dmLimitCut = undefined; // 리미트컷 번호
-        data.dmWhirlwindDone = false; // 회오리 발동 플래그
         data.dmBhDir = {}; // 블랙홀 id→방위
         data.dmTetherRound = 1; // 블랙홀 줄 라운드(=BAFC웨이브+1, 라운드1=BAFC 전 기본)
         data.dmRoundDirs = []; // 현재 줄 테더 방위
@@ -2795,11 +2793,8 @@ const triggerSet: TriggerSet<Data> = {
         const r = dmUltimaDetermine(memDirs);
         if (r === undefined)
           return; // 아직 결정 불가(메모리 위치 부족 등)
-        data.dmUltimaStart = r.start; // 회오리 후 늦은 확정도 저장 → 지연 자리 트리거가 사용
+        data.dmUltimaStart = r.start; // 자리 안내(리미트컷)가 사용
         data.dmUltimaCw = r.cw;
-        // 회오리(리미트컷 자리)가 이미 발동했으면 늦은 회전 안내는 생략(자리 안내는 리미트컷 자리 트리거가 담당).
-        if (data.dmWhirlwindDone)
-          return;
         const names = [
           output.n!(),
           output.ne!(),
@@ -2838,36 +2833,14 @@ const triggerSet: TriggerSet<Data> = {
       },
     },
     {
-      // 리미트컷 자리(즉시): 회오리(BAF8, 진공파 뒤 피격) 시점에 알테마가 이미 확정 → 바로 'N번, M시로'.
-      //   규칙: 알테마 시작/회전의 '반대편 + 반대방향'(dmLimitCutText 참고).
+      // 리미트컷 자리: 회오리(BAF8, 진공파 뒤 피격) 시점에 'N번, M시로'. 규칙='반대편+반대방향'(dmLimitCutText).
+      //   알테마는 getCombatants로 분신 2개째(회오리 한참 전)에 항상 확정 → 회오리 땐 늘 확정 상태라 즉시 출력.
+      //   condition `dmUltimaStart!==undefined`가 **알테마 후 회오리만** 통과(알테마 전 회오리는 미확정이라 무시).
+      //   → 회오리 판정·지연/폴백 트리거·dmWhirlwindDone 모두 제거(getCombatants 신뢰, 2026-06-18 정리).
       id: 'DancingMad 리미트컷 자리',
       type: 'Ability',
       netRegex: { id: 'BAF8', capture: false },
-      // 알테마 시작(분신 수집됨) 후의 회오리만 — 알테마 전 회오리(진공파 등)는 무시.
-      condition: (data) =>
-        data.dmUltimaStart !== undefined && (data.dmUltimaCloneIds?.length ?? 0) > 0,
-      preRun: (data) => {
-        data.dmWhirlwindDone = true; // 이후 알테마 회전 안내 생략(겹침 방지)
-      },
-      durationSeconds: 9,
-      suppressSeconds: 30,
-      alertText: (data, _matches, output) => dmLimitCutText(data, output),
-      outputStrings: dmLimitCutOutputs,
-    },
-    {
-      // 리미트컷 자리(지연): 회오리 시점에 알테마 미확정(글리치) → 남은 알테마(632.5·634.5=회오리+3.0s)까지
-      //   본 뒤(+3.5s) 출력. 그래도 미확정이면 'N번' 폴백. → 폴백을 섣불리 내지 않고 완전 판단 후 자리 안내.
-      id: 'DancingMad 리미트컷 자리 (지연)',
-      type: 'Ability',
-      netRegex: { id: 'BAF8', capture: false },
-      // ⚠ 알테마 시작(분신 수집됨) 후의 회오리만 — 알테마 *전* 회오리가 dmWhirlwindDone를 미리 켜
-      //   알테마 회전 안내를 통째로 억제하던 버그 수정(2026-06-18 23:10 풀: 알테마 13초 전 회오리).
-      condition: (data) =>
-        data.dmUltimaStart === undefined && (data.dmUltimaCloneIds?.length ?? 0) > 0,
-      preRun: (data) => {
-        data.dmWhirlwindDone = true; // 회전 안내 생략(판정은 계속 저장됨)
-      },
-      delaySeconds: 3.5, // 마지막 알테마(회오리+3.0s) 처리 후 재평가
+      condition: (data) => data.dmUltimaStart !== undefined,
       durationSeconds: 9,
       suppressSeconds: 30,
       alertText: (data, _matches, output) => dmLimitCutText(data, output),
