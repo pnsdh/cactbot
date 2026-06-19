@@ -1408,6 +1408,7 @@ const triggerSet: TriggerSet<Data> = {
       type: 'NetworkTargetMarker',
       // 머리 표식(공격/속박/금지/도형) = type 29 SignMarker. 부여/해제 추적 → data.dmSigns[이름]=영문 id.
       //   consumer는 기믹별로 추가: 예) data.dmSigns?.[data.me] === 'attack1' / ?.startsWith('attack').
+      //   (블랙홀 줄은 내 마커를 dmResolveMyMark로 읽어 안 찍은 경우 표적 디버프 cohort로 보수.)
       //   waymark 번호표 = dmSignNames. 출력 시 KR명은 consumer outputStrings에서(attack1→공격1 등).
       //   ⚠ 전투 시작 전(카운트다운)에 찍은 사인은 라이브선 보이나 에뮬레이터(InCombat 재생)에선 누락될 수 있음.
       netRegex: {},
