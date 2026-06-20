@@ -3681,6 +3681,33 @@ const triggerSet: TriggerSet<Data> = {
         unknown: { en: '?', ko: '?' },
       },
     },
+    // ───────── P5: 케프카 최종 (BB40 연속 알테마~) ─────────
+    {
+      // 혼돈의 종말(엑사플레어): BB3B 시전과 동시에 분신들이 북서→북동 교대로 전조(BB3C)→AOE(BB3D) 6웨이브.
+      //   전조 ~2.5s 간격(실측 +0/2.54/5.04/7.53/10.03/12.53s). ★9/9 항상 북서 시작 → '북서쪽 보기' 고정.
+      //   duration 2.5s = 캐스팅 시작→2번째 전조(북동)까지(실측 +2.54s). 그 뒤엔 북동을 봐야 하므로 알림 종료.
+      //   BB3B 시전(type20)이 263보다 빠르거나 동일 → 가장 이른 안내. (북동 시작 관측되면 263 BB3C x로 분기 복원.)
+      id: 'DancingMad P5 혼돈의 종말',
+      type: 'StartsUsing',
+      netRegex: { id: 'BB3B', source: '케프카', capture: false },
+      durationSeconds: 2.5,
+      alertText: (_data, _matches, output) => output.text!(),
+      outputStrings: {
+        text: { en: 'Exaflare: Look NW', ko: '엑사플레어: 북서쪽 보기' },
+      },
+    },
+    {
+      // 혼돈의 와류: BB3E=케프카 자기시전(~5s) → +0.9s BB3F가 플레이어 8명 각자 원형 피격. 겹치지 않게 산개.
+      //   시전 시작(StartsUsing BB3E)에 알려 ~5s 여유. (BB3F는 실제 피격이라 알림엔 안 씀.)
+      id: 'DancingMad P5 혼돈의 와류',
+      type: 'StartsUsing',
+      netRegex: { id: 'BB3E', source: '케프카', capture: false },
+      durationSeconds: 5,
+      alertText: (_data, _matches, output) => output.spread!(),
+      outputStrings: {
+        spread: { en: 'Spread', ko: '산개' },
+      },
+    },
   ],
 };
 
