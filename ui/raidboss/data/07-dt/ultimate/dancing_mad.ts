@@ -16,11 +16,12 @@ type ForsakenMethod = 'jamjam' | '09stop'; // 행방불명 처리법 옵션
 type ForsakenSpot = { side: 'L' | 'R' | 'N'; clock: string };
 
 // 페이즈 구분(업스트림 방식 채택): 보스 단계. dmStatueCount(P1 세부 단계)와는 별개·보완 관계.
-type Phase = 'p1' | 'p2' | 'p3' | 'p4';
+type Phase = 'p1' | 'p2' | 'p3' | 'p4' | 'p5';
 const phases: { [id: string]: Phase } = {
   'C24C': 'p2', // 종말의 포옹 (God 케프카)
   'C3F7': 'p3', // 갈기갈기 에어로가 (카오스·엑스데스)
   'C2DC': 'p4', // 꼭두각시 영혼 (케프카·카오스·네오 엑스데스) — P4 첫 스킬(고유). C3FD는 P4→P5 전환에도 재사용돼 부적합
+  'BB40': 'p5', // 연속 알테마(Ultima Repeater) — 네오 엑스데스 처치 후 케프카 최종. 공식 cactbot도 동일 기준
 };
 
 export interface Data extends RaidbossData {
@@ -1375,7 +1376,7 @@ const triggerSet: TriggerSet<Data> = {
     {
       id: 'DancingMad Phase Tracker',
       type: 'StartsUsing',
-      // 종말의 포옹(C24C)=P2 / 갈기갈기 에어로가(C3F7)=P3 / 꼭두각시 영혼(C2DC)=P4 진입 시점에 data.phase 갱신.
+      // 종말의 포옹(C24C)=P2 / 갈기갈기 에어로가(C3F7)=P3 / 꼭두각시 영혼(C2DC)=P4 / 연속 알테마(BB40)=P5 진입 시점에 data.phase 갱신.
       netRegex: { id: Object.keys(phases) },
       run: (data, matches) => data.phase = phases[matches.id] ?? 'unknown',
     },
