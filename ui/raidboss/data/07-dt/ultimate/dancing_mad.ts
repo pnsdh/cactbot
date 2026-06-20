@@ -3700,7 +3700,7 @@ const triggerSet: TriggerSet<Data> = {
         data.dmOrchCount = (data.dmOrchCount ?? 0) + 1; // 1오케=1 / 2오케=2 (이후 마격 2회/3회 구분)
       },
       outputStrings: {
-        spread: { en: 'Spread', ko: '산개' },
+        spread: { en: 'Spread to orchestra spots', ko: '오케스트라 산개 자리로' },
       },
     },
     {
@@ -3767,6 +3767,20 @@ const triggerSet: TriggerSet<Data> = {
       alertText: (data, _matches, output) => output.text!({ n: data.dmOrchCount === 1 ? 2 : 3 }),
       outputStrings: {
         text: { en: 'Magic Hammer spread x${n}', ko: '마격 산개, ${n}번' },
+      },
+    },
+    {
+      // 두 가지 선택의 참사(세 개의 별 탑 처리 중 동시): 보스중심/도넛 회피. 탑 안에서 안쪽/바깥쪽 위치만 다름.
+      //   ★전체 로그 매핑 고정(예외 0): C24E→퀘이크(땅,보스중심)=탑 바깥쪽 / C24F→토네이도(바람,도넛)=탑 안쪽.
+      //   시전 시작(StartsUsing)에 안내 → 착탄 ~5s 전.
+      id: 'DancingMad P5 두 가지 선택의 참사',
+      type: 'StartsUsing',
+      netRegex: { id: ['C24E', 'C24F'], source: '케프카' },
+      durationSeconds: 5,
+      alertText: (_data, matches, output) => matches.id === 'C24E' ? output.out!() : output.in!(),
+      outputStrings: {
+        out: { en: 'Outer edge of tower', ko: '탑 바깥쪽에서' },
+        in: { en: 'Inner edge of tower', ko: '탑 안쪽에서' },
       },
     },
     {
