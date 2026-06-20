@@ -47,6 +47,7 @@ export interface Data extends RaidbossData {
   dmOrchHit?: string[]; // P5 광기의 오케스트라 1타 피격자(BB54 홀리/BB52 플레어 대상). 힐딜 피격/비피격 판별용
   dmOrchTank?: 'flare' | 'holy'; // P5 광기 본인 탱 디버프(14E6 겸사겸사 플레어 / 14E7 겸사겸사 홀리)
   dmOrchCount?: number; // P5 광기의 오케스트라 횟수(1·2). 1오케 후 마격 2회 / 2오케 후 마격 3회
+  dmHammerAlteCount?: number; // P5 연속 알테마(BB40) 횟수. 1번째 후 마격 3회 / 2번째 후 마격 2회
   // P5 세 개의 별 — 탑 속성/클러스터/슬롯(getCombatants BNpcID로 1회 구축), 세트별 활성탑(273 019D 점등)
   dmStarOn?: boolean; // 세 개의 별 진행 윈도우(019D 오인 방지)
   dmStarSet?: number; // 처리 세트 0~3
@@ -3807,12 +3808,30 @@ const triggerSet: TriggerSet<Data> = {
     {
       // 3타(BB55 확산플레어/BB56 혼돈홀리 발동, 플레어·홀리 해소): 다음 마격 산개 예고.
       //   1오케 후 마격 2회 / 2오케 후 마격 3회 → dmOrchCount로 횟수 구분.
+      //   마격은 ~3.1s 간격 → 2회=마지막타격 +7.8s / 3회=+10.9s. duration으로 전 타격 커버.
       id: 'DancingMad P5 오케스트라 3타',
       type: 'Ability',
       netRegex: { id: ['BB55', 'BB56'], source: '케프카', capture: false },
-      durationSeconds: 5,
+      durationSeconds: (data) => data.dmOrchCount === 1 ? 8 : 11,
       suppressSeconds: 5,
       alertText: (data, _matches, output) => output.text!({ n: data.dmOrchCount === 1 ? 2 : 3 }),
+      outputStrings: {
+        text: { en: 'Magic Hammer spread x${n}', ko: '마격 산개, ${n}번' },
+      },
+    },
+    {
+      // 연속 알테마(BB40) 후 마격: 1번째 알테마=마격 3회 / 2번째=2회(클리어 풀 패턴 고정).
+      //   앵커=BB40 해소(Ability) + delay 3s → 첫 마격 ~3s 전(알테마 데미지 직후). duration으로 전 타격 커버
+      //   (3회=마지막 +9.3s / 2회=+6.1s). 마격은 캐스팅 없는 즉시 시전이라 직전 기믹(알테마)에 앵커.
+      id: 'DancingMad P5 마격 (연속 알테마)',
+      type: 'Ability',
+      netRegex: { id: 'BB40', capture: false },
+      preRun: (data) => data.dmHammerAlteCount = (data.dmHammerAlteCount ?? 0) + 1,
+      delaySeconds: 3,
+      durationSeconds: (data) => data.dmHammerAlteCount === 1 ? 9.5 : 6.5,
+      suppressSeconds: 5,
+      alertText: (data, _matches, output) =>
+        output.text!({ n: data.dmHammerAlteCount === 1 ? 3 : 2 }),
       outputStrings: {
         text: { en: 'Magic Hammer spread x${n}', ko: '마격 산개, ${n}번' },
       },
