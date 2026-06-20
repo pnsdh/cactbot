@@ -56,6 +56,10 @@ export interface Data extends RaidbossData {
   // P5 플러드 — C183 직선 텔레그래프(263 위치) 4직선 대각선 수집 → 시작 카디널 + 회전 산출
   dmFloodOn?: boolean; // 플러드 진행 윈도우(C183 텔레그래프 수집 게이트)
   dmFloodTele?: { t: string; x: number; y: number }[]; // 텔레그래프 분신(웨이브당 2개, r21~25)
+  // P5 행방불명 — 영구장판(BB37) 2개씩 4세트. 동선=남 모여→왼90→왼90(북)→세트3분기→세트4분기
+  dmFsknP5Set?: number; // 장판 세트 카운트 1~4
+  dmFsknP5Dir?: 'east' | 'west'; // 세트3 이동 방향(세트4 분기용)
+  dmFsknP5Floors?: { t: string; x: number; y: number }[]; // BB37 영구장판 위치(세트3 동쪽 판정용)
   dmKnockbackGroup?: boolean;
   dmHeadInvert?: boolean;
   dmSpreadBase?: boolean; // 007F=true(산개) / 0080=false(쉐어) / undefined=이번 조합엔 없음
@@ -4068,6 +4072,75 @@ const triggerSet: TriggerSet<Data> = {
         e: { en: 'E', ko: '동' },
         s: { en: 'S', ko: '남' },
         w: { en: 'W', ko: '서' },
+      },
+    },
+    {
+      // 행방불명 시작(BB35 시전): 남쪽으로 모여 시작. 이후 영구장판(BB37) 2개씩 4세트 깔리며 회전.
+      //   본대 전원 같이 이동(장판 설치+쉐어 동시). 좌/우는 보스(중앙) 보는 기준. 카운터·방향 리셋.
+      id: 'DancingMad P5 행방불명 시작',
+      type: 'StartsUsing',
+      netRegex: { id: 'BB35', capture: false },
+      condition: (data) => data.phase === 'p5',
+      durationSeconds: 8,
+      alertText: (data, _matches, output) => {
+        data.dmFsknP5Set = 0;
+        data.dmFsknP5Dir = undefined;
+        data.dmFsknP5Floors = [];
+        return output.gather!();
+      },
+      outputStrings: {
+        gather: { en: 'Gather South', ko: '남쪽으로 모여' },
+      },
+    },
+    {
+      // 영구장판(BB37 "행방불명: 지면") 위치 수집(263). 세트3 동쪽 모서리 판정용. 임시장판(BB38)은 무시.
+      id: 'DancingMad P5 행방불명 장판 수집',
+      type: 'StartsUsingExtra',
+      netRegex: { id: 'BB37' },
+      condition: (data) => data.phase === 'p5',
+      run: (data, matches) => {
+        (data.dmFsknP5Floors ??= []).push({
+          t: matches.timestamp,
+          x: parseFloat(matches.x),
+          y: parseFloat(matches.y),
+        });
+      },
+    },
+    {
+      // 행방불명 이동: 장판 세트 전조마다(BB37 263, 세트당 2개라 suppress) 1회. 세트1·2=왼쪽 90°(남→서→북).
+      //   세트3 = 동쪽 모서리(E)에 영구장판 있으면 오른쪽(서)+더, 없으면 왼쪽(동)+더. 세트4 = 세트3 방향 따라.
+      id: 'DancingMad P5 행방불명 이동',
+      type: 'StartsUsingExtra',
+      netRegex: { id: 'BB37' },
+      condition: (data) => data.phase === 'p5',
+      delaySeconds: 0.3, // 세트 2장판 다 수집 후
+      durationSeconds: 7,
+      suppressSeconds: 5, // 세트당 1회 (세트 간 ~8.2s)
+      alertText: (data, matches, output) => {
+        const set = (data.dmFsknP5Set ?? 0) + 1;
+        if (set === 1)
+          return output.left90!();
+        if (set === 2)
+          return output.left90N!();
+        if (set === 3) {
+          // 이번 세트 영구장판 2개 중 동쪽 모서리(dx>6, |dy|<6) 있나? (대각선 제외)
+          const floors = (data.dmFsknP5Floors ?? []).filter((f) => f.t === matches.timestamp);
+          const east = floors.some((f) => (f.x - 100) > 6 && Math.abs(f.y - 100) < 6);
+          data.dmFsknP5Dir = east ? 'west' : 'east';
+          return east ? output.set3West!() : output.set3East!();
+        }
+        if (set === 4)
+          return data.dmFsknP5Dir === 'west' ? output.set4NW!() : output.set4NE!();
+        return;
+      },
+      run: (data) => data.dmFsknP5Set = (data.dmFsknP5Set ?? 0) + 1,
+      outputStrings: {
+        left90: { en: 'Left 90° (→ W)', ko: '왼쪽(서쪽)으로 90도 ' },
+        left90N: { en: 'Left 90° (→ N)', ko: '왼쪽(북쪽)으로 90도 ' },
+        set3East: { en: 'Left/East — go extra', ko: '왼쪽(동쪽)으로, 추가 이동' },
+        set3West: { en: 'Right/West — go extra', ko: '오른쪽(서쪽)으로, 추가 이동' },
+        set4NW: { en: 'Left (NW)', ko: '왼쪽(북서쪽)으로' },
+        set4NE: { en: 'Right (NE)', ko: '오른쪽(북동쪽)으로' },
       },
     },
     {
