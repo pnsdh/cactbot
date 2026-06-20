@@ -3816,7 +3816,7 @@ const triggerSet: TriggerSet<Data> = {
       netRegex: { id: ['BB55', 'BB56'], source: '케프카', capture: false },
       durationSeconds: (data) => data.dmOrchCount === 1 ? 8 : 11,
       suppressSeconds: 5,
-      alertText: (data, _matches, output) => output.text!({ n: data.dmOrchCount === 1 ? 2 : 3 }),
+      infoText: (data, _matches, output) => output.text!({ n: data.dmOrchCount === 1 ? 2 : 3 }),
       outputStrings: {
         text: { en: 'Magic Hammer spread x${n}', ko: '마격 산개, ${n}번' },
       },
@@ -3834,7 +3834,7 @@ const triggerSet: TriggerSet<Data> = {
       delaySeconds: 1,
       durationSeconds: (data) => data.dmHammerAlteCount === 1 ? 11.5 : 8.5,
       suppressSeconds: 5,
-      alertText: (data, _matches, output) =>
+      infoText: (data, _matches, output) =>
         output.text!({ n: data.dmHammerAlteCount === 1 ? 3 : 2 }),
       outputStrings: {
         text: { en: 'Magic Hammer spread x${n}', ko: '마격 산개, ${n}번' },
@@ -3848,7 +3848,7 @@ const triggerSet: TriggerSet<Data> = {
       type: 'StartsUsing',
       netRegex: { id: ['C24E', 'C24F'], source: '케프카' },
       durationSeconds: 4.3, // 실측 캐스팅 ~4.3s → 해소 시점에 종료
-      alertText: (_data, matches, output) => matches.id === 'C24E' ? output.out!() : output.in!(),
+      infoText: (_data, matches, output) => matches.id === 'C24E' ? output.out!() : output.in!(),
       outputStrings: {
         out: { en: 'Out', ko: '밖으로' },
         in: { en: 'In', ko: '안으로' },
@@ -4114,14 +4114,14 @@ const triggerSet: TriggerSet<Data> = {
       netRegex: { id: 'BB35', capture: false },
       condition: (data) => data.phase === 'p5',
       durationSeconds: 8,
-      alertText: (data, _matches, output) => {
+      infoText: (data, _matches, output) => {
         data.dmFsknP5Set = 0;
         data.dmFsknP5Dir = undefined;
         data.dmFsknP5Floors = [];
         return output.gather!();
       },
       outputStrings: {
-        gather: { en: 'Gather South', ko: '남쪽으로 모여' },
+        gather: { en: 'Gather South', ko: '남쪽에서 시작' },
       },
     },
     {
@@ -4167,12 +4167,12 @@ const triggerSet: TriggerSet<Data> = {
       },
       run: (data) => data.dmFsknP5Set = (data.dmFsknP5Set ?? 0) + 1,
       outputStrings: {
-        left90: { en: 'Left 90° (→ W)', ko: '왼쪽(서쪽)으로 90도 ' },
-        left90N: { en: 'Left 90° (→ N)', ko: '왼쪽(북쪽)으로 90도 ' },
-        set3East: { en: 'Left/East — go extra', ko: '왼쪽(동쪽)으로, 추가 이동' },
-        set3West: { en: 'Right/West — go extra', ko: '오른쪽(서쪽)으로, 추가 이동' },
-        set4NW: { en: 'Left (NW)', ko: '왼쪽(북서쪽)으로' },
-        set4NE: { en: 'Right (NE)', ko: '오른쪽(북동쪽)으로' },
+        left90: { en: 'Left 90° (→ W)', ko: '왼쪽으로 2칸' },
+        left90N: { en: 'Left 90° (→ N)', ko: '왼쪽으로 2칸' },
+        set3East: { en: 'Left/East — go extra', ko: '왼쪽으로, 2.5칸' },
+        set3West: { en: 'Right/West — go extra', ko: '오른쪽으로, 2.5칸' },
+        set4NW: { en: 'Left (NW)', ko: '왼쪽으로 1.5칸' },
+        set4NE: { en: 'Right (NE)', ko: '오른쪽으로 1.5칸' },
       },
     },
     {
@@ -4184,7 +4184,7 @@ const triggerSet: TriggerSet<Data> = {
       type: 'StartsUsing',
       netRegex: { id: 'BB3B', source: '케프카', capture: false },
       durationSeconds: 2.5,
-      alertText: (_data, _matches, output) => output.text!(),
+      infoText: (_data, _matches, output) => output.text!(),
       outputStrings: {
         text: { en: 'Exaflare: Look NW', ko: '엑사플레어: 북서쪽 보기' },
       },
@@ -4196,7 +4196,7 @@ const triggerSet: TriggerSet<Data> = {
       type: 'StartsUsing',
       netRegex: { id: 'BB3E', source: '케프카', capture: false },
       durationSeconds: 5,
-      alertText: (_data, _matches, output) => output.spread!(),
+      infoText: (_data, _matches, output) => output.spread!(),
       outputStrings: {
         spread: { en: 'Spread', ko: '산개' },
       },
