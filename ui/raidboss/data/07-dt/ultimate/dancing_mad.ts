@@ -53,6 +53,9 @@ export interface Data extends RaidbossData {
   dmStarMyElem?: DmStarElem; // 내 저항감소[강] 속성(B56불/B57얼음/BB6선더). undefined=무징
   dmStarTowers?: { [id: string]: { elem: DmStarElem; zone: DmStarZone; slot: number } }; // id(대문자hex)→탑정보. slot 0=왼/1=중/2=오(외향 기준)
   dmStarActive?: string[]; // 이번 세트 활성 탑 id들 (273 019D 10|20 수집, 세트마다 리셋)
+  // P5 플러드 — C183 직선 텔레그래프(263 위치) 4직선 대각선 수집 → 시작 카디널 + 회전 산출
+  dmFloodOn?: boolean; // 플러드 진행 윈도우(C183 텔레그래프 수집 게이트)
+  dmFloodTele?: { t: string; x: number; y: number }[]; // 텔레그래프 분신(웨이브당 2개, r21~25)
   dmKnockbackGroup?: boolean;
   dmHeadInvert?: boolean;
   dmSpreadBase?: boolean; // 007F=true(산개) / 0080=false(쉐어) / undefined=이번 조합엔 없음
@@ -3974,6 +3977,97 @@ const triggerSet: TriggerSet<Data> = {
         left: { en: 'left', ko: '왼쪽' },
         mid: { en: 'center', ko: '중앙' },
         right: { en: 'right', ko: '오른쪽' },
+      },
+    },
+    {
+      // 플러드: C13F 시전 시작 → 텔레그래프 수집 윈도우 open. 4직선(대각선)이 C13F 캐스팅 중 ~1s 간격으로
+      //   C183 StartsUsing(263 위치)으로 예고됨(첫 해소 BB4F보다 ~6s 앞). [[dancing-mad-p5-kefka]]
+      id: 'DancingMad P5 플러드 초기화',
+      type: 'StartsUsing',
+      netRegex: { id: 'C13F', capture: false },
+      condition: (data) => data.phase === 'p5',
+      run: (data) => {
+        data.dmFloodOn = true;
+        data.dmFloodTele = [];
+      },
+    },
+    {
+      // C183 텔레그래프 분신 위치 수집(263 StartsUsingExtra). 플러드 띠 분신은 중심 r21~25 → r필터로 격리
+      //   (C183은 범용이라 dmFloodOn 윈도우 + NPC소스 + 반경으로 한정).
+      id: 'DancingMad P5 플러드 텔레그래프 수집',
+      type: 'StartsUsingExtra',
+      netRegex: { id: 'C183', sourceId: '4[0-9A-Fa-f]{7}' },
+      condition: (data) => data.dmFloodOn === true,
+      run: (data, matches) => {
+        const x = parseFloat(matches.x);
+        const y = parseFloat(matches.y);
+        const r = Math.hypot(x - 100, y - 100);
+        if (r >= 18 && r <= 30)
+          (data.dmFloodTele ??= []).push({ t: matches.timestamp, x: x, y: y });
+      },
+    },
+    {
+      // 플러드 안내: 텔레그래프 2개 뜬 직후(C13F+1.5s) 1회. 회전이 일정 90° 스텝이라 첫 2직선으로 확정.
+      //   띠 방향 = 분신 near→far 대각선. 시작 = 1·2번 대각선 사이 카디널, 회전 = 1→2 방향(CCW=오른쪽).
+      //   경로 = 시작에서 회전방향 90°씩 외삽(3카디널, 예 "오른쪽 (북 → 서 → 남)"). 전풀 검증: 시작 4/4 일치.
+      //   duration 7.5s = 출력(+1.5)~마지막 쉐어(BB4F4, +9.0s).
+      id: 'DancingMad P5 플러드',
+      type: 'StartsUsing',
+      netRegex: { id: 'C13F', capture: false },
+      condition: (data) => data.phase === 'p5',
+      delaySeconds: 1.5,
+      durationSeconds: 7.5,
+      alertText: (data, _matches, output) => {
+        const tele = data.dmFloodTele ?? [];
+        // 웨이브(타임스탬프)별 그룹 → 각 웨이브 2분신
+        const byT: { [t: string]: { x: number; y: number }[] } = {};
+        for (const e of tele)
+          (byT[e.t] ??= []).push(e);
+        const d2r = Math.PI / 180;
+        const r2 = (c: { x: number; y: number }) => (c.x - 100) ** 2 + (c.y - 100) ** 2;
+        // 첫 2웨이브 대각선 bearing(near→far 벡터)
+        const diags: number[] = [];
+        for (const t of Object.keys(byT).sort()) {
+          const cl = byT[t]!;
+          if (cl.length < 2)
+            continue;
+          const a = cl[0]!;
+          const b = cl[1]!;
+          const far = r2(a) >= r2(b) ? a : b;
+          const near = r2(a) >= r2(b) ? b : a;
+          let bear = Math.atan2(far.x - near.x, -(far.y - near.y)) / d2r;
+          if (bear < 0)
+            bear += 360;
+          diags.push(bear);
+        }
+        if (diags.length < 2)
+          return;
+        // 인접 두 대각선 사이 카디널 = 단위벡터 합의 방위
+        const between = (p: number, q: number): number =>
+          Math.atan2(
+            Math.sin(p * d2r) + Math.sin(q * d2r),
+            Math.cos(p * d2r) + Math.cos(q * d2r),
+          ) / d2r;
+        const cards = [output.n!(), output.e!(), output.s!(), output.w!()];
+        const card = (b: number) => cards[Math.round((((b % 360) + 360) % 360) / 90) % 4]!;
+        // 시작 = 1·2번 사이 카디널, 회전 = d0→d1(음수=반시계=오른쪽). 경로는 회전방향 90°씩 외삽.
+        const start = between(diags[0]!, diags[1]!);
+        const delta = ((diags[1]! - diags[0]! + 540) % 360) - 180;
+        const step = delta < 0 ? -90 : 90;
+        const path = [card(start), card(start + step), card(start + 2 * step)];
+        const rotation = delta < 0 ? output.right!() : output.left!();
+        const pathStr = path.join(' → ');
+        return output.text!({ rot: rotation, path: pathStr });
+      },
+      run: (data) => data.dmFloodOn = false,
+      outputStrings: {
+        text: { en: '${rot} (${path})', ko: '${rot} (${path})' },
+        left: { en: 'Left', ko: '왼쪽' },
+        right: { en: 'Right', ko: '오른쪽' },
+        n: { en: 'N', ko: '북' },
+        e: { en: 'E', ko: '동' },
+        s: { en: 'S', ko: '남' },
+        w: { en: 'W', ko: '서' },
       },
     },
     {
