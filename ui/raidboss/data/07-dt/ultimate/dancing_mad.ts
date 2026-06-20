@@ -15,6 +15,10 @@ type ForsakenMethod = 'jamjam' | '09stop'; // 행방불명 처리법 옵션
 // 안내 위치 = 탑(side) + 시(clock). side 'N'=8탑(좌우 미정). 처리=안/비처리=밖은 렌더 시 결정.
 type ForsakenSpot = { side: 'L' | 'R' | 'N'; clock: string };
 
+// P5 세 개의 별: 속성·클러스터 방위. 9탑 = 3속성×3, 고정 3클러스터(북서·북동·남)에 속성 랜덤 배치.
+type DmStarElem = 'fire' | 'ice' | 'thunder';
+type DmStarZone = 'NW' | 'NE' | 'S';
+
 // 페이즈 구분(업스트림 방식 채택): 보스 단계. dmStatueCount(P1 세부 단계)와는 별개·보완 관계.
 type Phase = 'p1' | 'p2' | 'p3' | 'p4' | 'p5';
 const phases: { [id: string]: Phase } = {
@@ -43,6 +47,12 @@ export interface Data extends RaidbossData {
   dmOrchHit?: string[]; // P5 광기의 오케스트라 1타 피격자(BB54 홀리/BB52 플레어 대상). 힐딜 피격/비피격 판별용
   dmOrchTank?: 'flare' | 'holy'; // P5 광기 본인 탱 디버프(14E6 겸사겸사 플레어 / 14E7 겸사겸사 홀리)
   dmOrchCount?: number; // P5 광기의 오케스트라 횟수(1·2). 1오케 후 마격 2회 / 2오케 후 마격 3회
+  // P5 세 개의 별 — 탑 속성/클러스터/슬롯(getCombatants BNpcID로 1회 구축), 세트별 활성탑(273 019D 점등)
+  dmStarOn?: boolean; // 세 개의 별 진행 윈도우(019D 오인 방지)
+  dmStarSet?: number; // 처리 세트 0~3
+  dmStarMyElem?: DmStarElem; // 내 저항감소[강] 속성(B56불/B57얼음/BB6선더). undefined=무징
+  dmStarTowers?: { [id: string]: { elem: DmStarElem; zone: DmStarZone; slot: number } }; // id(대문자hex)→탑정보. slot 0=왼/1=중/2=오(외향 기준)
+  dmStarActive?: string[]; // 이번 세트 활성 탑 id들 (273 019D 10|20 수집, 세트마다 리셋)
   dmKnockbackGroup?: boolean;
   dmHeadInvert?: boolean;
   dmSpreadBase?: boolean; // 007F=true(산개) / 0080=false(쉐어) / undefined=이번 조합엔 없음
@@ -212,6 +222,37 @@ const dmExpiryMs = (matches: { timestamp: string; duration: string }): number =>
 // 만료 5초 전까지의 딜레이(초). delaySeconds 콜백용(음수 가드).
 const dmExpiryWarnDelay = (matches: { duration: string }): number =>
   Math.max(parseFloat(matches.duration) - 5, 0);
+
+// ───── P5 세 개의 별 공통 ─────
+// 탑 BNpcID(고정, 2풀 교차검증) → 속성. 1EC03E=불 / 1EC03F=얼음 / 1EC040=선더.
+const dmStarElemOf = (bnpcId: number | undefined): DmStarElem | undefined => {
+  switch (bnpcId) {
+    case 0x1EC03E:
+      return 'fire';
+    case 0x1EC03F:
+      return 'ice';
+    case 0x1EC040:
+      return 'thunder';
+  }
+  return undefined;
+};
+// 저항감소[강] status id → 속성. B56=불 / B57=얼음 / BB6=선더.
+const dmStarStatusElem = (id: string): DmStarElem | undefined =>
+  id === 'B56' ? 'fire' : id === 'B57' ? 'ice' : id === 'BB6' ? 'thunder' : undefined;
+// 위치(중심 100,100; +Y=남) → 고정 클러스터 방위. y>104=남 / 북쪽이면 x<100=북서·x>100=북동.
+const dmStarZoneOf = (x: number, y: number): DmStarZone => y > 104 ? 'S' : (x < 100 ? 'NW' : 'NE');
+// 클러스터 방위 ↔ compass bearing(도). 세 클러스터는 정확히 120° 간격(남180·북서300·북동60).
+const dmStarZoneBearing: Record<DmStarZone, number> = { S: 180, NW: 300, NE: 60 };
+const dmStarBearingZone = (deg: number): DmStarZone => {
+  const d = ((deg % 360) + 360) % 360;
+  return d === 180 ? 'S' : (d === 300 ? 'NW' : 'NE'); // 회전 결과는 항상 60/180/300
+};
+// 외향(중앙→클러스터) 기준 좌측 투영값. 큰 값 = 더 왼쪽. 클러스터내 왼/중/오 정렬용.
+//   facing bearing B의 왼쪽 = B−90°. FFXIV 좌표(동=+x, 남=+y)에서 bearing θ 단위벡터=(sinθ, −cosθ).
+const dmStarLateral = (x: number, y: number, zone: DmStarZone): number => {
+  const lb = (dmStarZoneBearing[zone] - 90) * Math.PI / 180;
+  return (x - 100) * Math.sin(lb) + (y - 100) * -Math.cos(lb);
+};
 
 // ───── 행방불명(P2) 공통 ─────
 // 위험한 주문 헤드마커 → 역할. 02CB=쉐어 / 02CD=부채꼴 / 02CC=산개.
@@ -3776,11 +3817,163 @@ const triggerSet: TriggerSet<Data> = {
       id: 'DancingMad P5 두 가지 선택의 참사',
       type: 'StartsUsing',
       netRegex: { id: ['C24E', 'C24F'], source: '케프카' },
-      durationSeconds: 5,
+      durationSeconds: 4.3, // 실측 캐스팅 ~4.3s → 해소 시점에 종료
       alertText: (_data, matches, output) => matches.id === 'C24E' ? output.out!() : output.in!(),
       outputStrings: {
-        out: { en: 'Outer edge of tower', ko: '탑 바깥쪽에서' },
-        in: { en: 'Inner edge of tower', ko: '탑 안쪽에서' },
+        out: { en: 'Out', ko: '밖으로' },
+        in: { en: 'In', ko: '안으로' },
+      },
+    },
+    {
+      // 세 개의 별 초기화: 9탑(3속성×3, 고정 3클러스터=북서/북동/남에 속성 랜덤)이 BB42 ~5s 후 스폰.
+      id: 'DancingMad P5 세 개의 별 초기화',
+      type: 'StartsUsing',
+      netRegex: { id: 'BB42', source: '케프카', capture: false },
+      run: (data) => {
+        data.dmStarOn = true;
+        data.dmStarSet = 0;
+        data.dmStarActive = [];
+        data.dmStarMyElem = undefined;
+        data.dmStarTowers = undefined;
+      },
+    },
+    {
+      // 탑 맵 구축: getCombatants로 BNpcID(속성: 1EC03E불/3F얼음/40선더)+위치(클러스터/슬롯) 1회 산출.
+      //   슬롯 = 클러스터내 외향 기준 왼(0)/중(1)/오(2). 세트별 활성탑(273)을 여기에 대조해 안내.
+      id: 'DancingMad P5 세 개의 별 탑 수집',
+      type: 'StartsUsing',
+      netRegex: { id: 'BB42', source: '케프카', capture: false },
+      delaySeconds: 6,
+      promise: async (data) => {
+        const all = (await callOverlayHandler({ call: 'getCombatants' })).combatants;
+        const towers = all.flatMap((c) => {
+          const elem = dmStarElemOf(c.BNpcID);
+          if (elem === undefined || c.ID === undefined)
+            return [];
+          return [{
+            id: c.ID.toString(16).toUpperCase(),
+            elem: elem,
+            zone: dmStarZoneOf(c.PosX, c.PosY),
+            x: c.PosX,
+            y: c.PosY,
+          }];
+        });
+        const map: NonNullable<Data['dmStarTowers']> = {};
+        for (const zone of ['NW', 'NE', 'S'] as DmStarZone[]) {
+          // 같은 클러스터 탑을 외향 좌측 투영값 내림차순(왼→오)으로 정렬 → slot 0/1/2.
+          const inZone = towers
+            .filter((t) => t.zone === zone)
+            .sort((a, b) => dmStarLateral(b.x, b.y, zone) - dmStarLateral(a.x, a.y, zone));
+          inZone.forEach((t, i) => map[t.id] = { elem: t.elem, zone: zone, slot: i });
+        }
+        data.dmStarTowers = map;
+      },
+    },
+    {
+      // 내 저항감소[강](B56불/B57얼음/BB6선더, BB42 ~5s 후 부여) 수집 → 회전 기준. 미부여=무징.
+      id: 'DancingMad P5 세 개의 별 디버프',
+      type: 'GainsEffect',
+      netRegex: { effectId: ['B56', 'B57', 'BB6'] },
+      condition: (data, matches) => matches.target === data.me,
+      run: (data, matches) => data.dmStarMyElem = dmStarStatusElem(matches.effectId),
+    },
+    {
+      // 세트별 활성 4탑 수집: 273 ActorControlExtra 019D 점등(param 10|20)이 폭발 ~6s 전 신호. 4탑 동시 도착.
+      id: 'DancingMad P5 세 개의 별 활성 수집',
+      type: 'ActorControlExtra',
+      netRegex: {
+        id: '4[0-9A-Fa-f]{7}',
+        category: '019D',
+        param1: '10',
+        param2: '20',
+        capture: true,
+      },
+      condition: (data) => data.dmStarOn === true,
+      run: (data, matches) => {
+        (data.dmStarActive ??= []).push(matches.id.toUpperCase());
+      },
+    },
+    {
+      // 세 개의 별 안내: 점등 +0.5s(4탑 수집 후) 1회. 회전=자기 금지 클러스터에서 시계 +120°/세트
+      //   (3세트=금지 복귀, 만료라 진입 가능). 무징=더블(2활성) 클러스터. 클러스터내 디버프=왼/무징=오 우선.
+      id: 'DancingMad P5 세 개의 별',
+      type: 'ActorControlExtra',
+      netRegex: {
+        id: '4[0-9A-Fa-f]{7}',
+        category: '019D',
+        param1: '10',
+        param2: '20',
+        capture: false,
+      },
+      condition: (data) => data.dmStarOn === true,
+      // 4탑 점등(273)이 동일 타임스탬프로 개별 도착 → run(수집)이 다음 틱 처리. 0.2s면 4탑 수집 완료 보장.
+      //   0으로는 수집 run 경합으로 일부만 읽혀(무징 더블 클러스터 오판) → 안전 하한. 0.5→0.2로 0.3s 단축.
+      delaySeconds: 0.2,
+      durationSeconds: 5.9, // 활성+0.2s 표시 → 폭발(활성+~6.1s)까지 유지
+      suppressSeconds: 5,
+      alertText: (data, _matches, output) => {
+        const set = (data.dmStarSet ?? 0) + 1; // 이번 세트(읽기만; 커밋은 run)
+        const towers = data.dmStarTowers;
+        if (towers === undefined)
+          return;
+        const activeTowers = (data.dmStarActive ?? [])
+          .map((id) => towers[id])
+          .filter((t): t is NonNullable<typeof t> => t !== undefined);
+        if (activeTowers.length === 0)
+          return;
+        // 클러스터별 활성 수 → 더블(2활성) 클러스터.
+        const zoneCount: Record<DmStarZone, number> = { NW: 0, NE: 0, S: 0 };
+        for (const t of activeTowers)
+          zoneCount[t.zone]++;
+        const doubled = (['NW', 'NE', 'S'] as DmStarZone[]).find((z) => zoneCount[z] >= 2);
+        // 목표 클러스터 + 좌우 우선순위.
+        let targetZone: DmStarZone | undefined;
+        let pickRight: boolean;
+        if (data.dmStarMyElem !== undefined) {
+          const myTower = Object.values(towers).find((t) => t.elem === data.dmStarMyElem);
+          if (myTower === undefined)
+            return;
+          targetZone = dmStarBearingZone(dmStarZoneBearing[myTower.zone] + 120 * set);
+          pickRight = false; // 디버프 = 왼쪽 우선
+        } else {
+          targetZone = doubled; // 무징 = 더블 클러스터
+          pickRight = true; // 무징 = 오른쪽 우선
+        }
+        if (targetZone === undefined)
+          return;
+        const inTarget = activeTowers
+          .filter((t) => t.zone === targetZone)
+          .sort((a, b) => a.slot - b.slot);
+        const chosen = pickRight ? inTarget[inTarget.length - 1] : inTarget[0];
+        if (chosen === undefined)
+          return;
+        const dirOut = { NW: output.nw!(), NE: output.ne!(), S: output.s!() };
+        const slotOut = [output.left!(), output.mid!(), output.right!()];
+        const elemOut = { fire: output.fire!(), ice: output.ice!(), thunder: output.thunder!() };
+        return output.text!({
+          elem: elemOut[chosen.elem],
+          dir: dirOut[targetZone],
+          slot: slotOut[chosen.slot] ?? '',
+        });
+      },
+      run: (data) => {
+        const set = (data.dmStarSet ?? 0) + 1;
+        data.dmStarSet = set;
+        data.dmStarActive = []; // 다음 세트 위해 리셋
+        if (set >= 3)
+          data.dmStarOn = false; // 마지막(3) 세트 후 윈도우 종료
+      },
+      outputStrings: {
+        text: { en: '${elem} tower: ${dir} ${slot}', ko: '${elem} 탑: ${dir} ${slot} 탑' },
+        fire: { en: 'Fire', ko: '불' },
+        ice: { en: 'Ice', ko: '얼음' },
+        thunder: { en: 'Thunder', ko: '번개' },
+        nw: { en: 'NW', ko: '북서쪽 보고' },
+        ne: { en: 'NE', ko: '북동쪽 보고' },
+        s: { en: 'S', ko: '남쪽 보고' },
+        left: { en: 'left', ko: '왼쪽' },
+        mid: { en: 'center', ko: '중앙' },
+        right: { en: 'right', ko: '오른쪽' },
       },
     },
     {
