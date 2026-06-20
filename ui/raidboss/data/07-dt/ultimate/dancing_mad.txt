@@ -304,7 +304,11 @@ hideall "--sync--"
 1261.9 "두근두근 알테마" Ability { id: "C24A", source: "케프카" }
 1262.4 "--untargetable--" # 케프카 (P4→P5 연출)
 1293.3 "--targetable--" # 케프카 (P5 본격 시작)
-1300.0 "연속 알테마" Ability { id: "BB40", source: "케프카" } duration 3.4 # BB41 4연타(~3.4s)
+1300.0 "연속 알테마" Ability { id: "BB40", source: "케프카" } # 시전 해소(BB41 4연타 시작)
+1301.1 "알테마" # BB41 1타
+1301.8 "알테마" # BB41 2타
+1302.5 "알테마" # BB41 3타
+1303.2 "알테마" # BB41 4타
 1305.4 "--sync--" Ability { id: "C652", source: "케프카" }
 1306.3 "마격" Ability { id: ["C653", "C654", "C655"], source: "케프카" }
 1308.6 "--sync--" Ability { id: "C652", source: "케프카" }
@@ -335,7 +339,11 @@ hideall "--sync--"
 1373.4 "두 가지 선택의 참사" Ability { id: ["C24E", "C24F"], source: "케프카" }
 1374.0 "파이가/블리자가/선더가" Ability { id: ["BB43", "BB44", "BB45"], source: "케프카" }
 1374.2 "퀘이크/토네이도" Ability { id: ["BB4A", "BB4B"], source: "케프카" }
-1382.2 "연속 알테마" Ability { id: "BB40", source: "케프카" } duration 3.4 # BB41 4연타(~3.4s)
+1382.2 "연속 알테마" Ability { id: "BB40", source: "케프카" } # 시전 해소(BB41 4연타 시작)
+1383.3 "알테마" # BB41 1타
+1384.0 "알테마" # BB41 2타
+1384.7 "알테마" # BB41 3타
+1385.4 "알테마" # BB41 4타
 1387.6 "--sync--" Ability { id: "C652", source: "케프카" }
 1388.5 "마격" Ability { id: ["C653", "C654", "C655"], source: "케프카" }
 1390.8 "--sync--" Ability { id: "C652", source: "케프카" }

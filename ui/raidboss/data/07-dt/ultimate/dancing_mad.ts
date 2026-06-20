@@ -3735,6 +3735,14 @@ const triggerSet: TriggerSet<Data> = {
     },
     // ───────── P5: 케프카 최종 (BB40 연속 알테마~) ─────────
     {
+      // 연속 알테마(BB40): P5 전체 공격(BB41 4연타). 시전(~3.7s) 시작에 경감 알림, 종료에 끝남.
+      id: 'DancingMad P5 연속 알테마',
+      type: 'StartsUsing',
+      netRegex: { id: 'BB40', source: '케프카', capture: false },
+      durationSeconds: 3.7,
+      response: Responses.aoe(),
+    },
+    {
       // 광기의 오케스트라: 시전(BB50, ~5s)에 전원 8방향 산개. 이후 3타(1타 BB54홀리/BB52플레어 → 2타
       //   BB54/BB53 → 3타 BB56혼돈홀리/BB55확산플레어). 탱2=14E6 플레어/14E7 홀리(1어글/2어글), 힐딜은
       //   1타 피격 3 / 비피격 3. (검증: 6/14 1타 5피격=탱2+힐딜3, 디버프 1+1.)
