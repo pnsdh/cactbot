@@ -3770,13 +3770,13 @@ const triggerSet: TriggerSet<Data> = {
       run: (data, matches) => data.dmOrchTank = matches.effectId === '14E6' ? 'flare' : 'holy',
     },
     {
-      // 1타 안내(BB50 발동 +2s): 탱=쉐어+북/무적 / 힐딜 피격=칼끝딜+남 / 비피격=안으로+남.
+      // 1타 안내(BB50 발동 +1.7s): 탱=쉐어+북/무적 / 힐딜 피격=칼끝딜+남 / 비피격=안으로+남.
       //   ★탱 디버프(14E6/7) 부여=BB50해소 +1.47~1.51s(실측 변동) → +1.5s면 마진 0/음수라 홀리탱 오안내.
-      //   delay 2.0s로 디버프 수집 보장(마진 ~0.5s). 2타(BB51) +3.17s 전. duration 2.0=종료 +4.0s 유지.
+      //   delay 1.7s로 디버프 수집 보장(최대 +1.51 대비 마진 ~0.19s, deferred run은 ms라 충분). 2타(BB51) +3.17s 전.
       id: 'DancingMad P5 오케스트라 1타 안내',
       type: 'Ability',
       netRegex: { id: 'BB50', source: '케프카', capture: false },
-      delaySeconds: 2,
+      delaySeconds: 1.7,
       durationSeconds: 2,
       alertText: (data, _matches, output) => {
         if (data.role === 'tank')
