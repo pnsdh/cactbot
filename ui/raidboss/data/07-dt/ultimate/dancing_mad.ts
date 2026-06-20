@@ -3821,14 +3821,15 @@ const triggerSet: TriggerSet<Data> = {
     },
     {
       // 연속 알테마(BB40) 후 마격: 1번째 알테마=마격 3회 / 2번째=2회(클리어 풀 패턴 고정).
-      //   앵커=BB40 해소(Ability) + delay 3s → 첫 마격 ~3s 전(알테마 데미지 직후). duration으로 전 타격 커버
-      //   (3회=마지막 +9.3s / 2회=+6.1s). 마격은 캐스팅 없는 즉시 시전이라 직전 기믹(알테마)에 앵커.
+      //   첫 실피격=BB40 해소 +~6s. 앵커=BB40 해소(Ability) + delay 1s → 첫 마격 ~5s 전(알테마 데미지와
+      //   겹쳐도 5초 전 우선). duration으로 전 타격 커버(3회=마지막 +11.3s / 2회=+8.1s, 해소 기준).
+      //   마격은 캐스팅 없는 즉시 시전이라 직전 기믹(알테마)에 앵커.
       id: 'DancingMad P5 마격 (연속 알테마)',
       type: 'Ability',
       netRegex: { id: 'BB40', capture: false },
       preRun: (data) => data.dmHammerAlteCount = (data.dmHammerAlteCount ?? 0) + 1,
-      delaySeconds: 3,
-      durationSeconds: (data) => data.dmHammerAlteCount === 1 ? 9.5 : 6.5,
+      delaySeconds: 1,
+      durationSeconds: (data) => data.dmHammerAlteCount === 1 ? 11.5 : 8.5,
       suppressSeconds: 5,
       alertText: (data, _matches, output) =>
         output.text!({ n: data.dmHammerAlteCount === 1 ? 3 : 2 }),
