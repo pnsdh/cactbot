@@ -40,6 +40,9 @@ export interface Data extends RaidbossData {
   combatantData?: PluginCombatantState[];
   dmSigns?: { [name: string]: string }; // 현재 머리 사인 {플레이어 이름 → 영문 id(attack1·bind1·ignore1·square 등)}
   dmTargetCohort?: { [name: string]: 'attack' | 'bind' | 'ignore' }; // P3 블랙홀 표적 디버프(BBC첫=attack×3/BBD둘=bind×3/BBE셋=ignore×2). 안 찍은 마커 보수용(cohort+크기=마커 독립 신호)
+  dmOrchHit?: string[]; // P5 광기의 오케스트라 1타 피격자(BB54 홀리/BB52 플레어 대상). 힐딜 피격/비피격 판별용
+  dmOrchTank?: 'flare' | 'holy'; // P5 광기 본인 탱 디버프(14E6 겸사겸사 플레어 / 14E7 겸사겸사 홀리)
+  dmOrchCount?: number; // P5 광기의 오케스트라 횟수(1·2). 1오케 후 마격 2회 / 2오케 후 마격 3회
   dmKnockbackGroup?: boolean;
   dmHeadInvert?: boolean;
   dmSpreadBase?: boolean; // 007F=true(산개) / 0080=false(쉐어) / undefined=이번 조합엔 없음
@@ -3682,6 +3685,90 @@ const triggerSet: TriggerSet<Data> = {
       },
     },
     // ───────── P5: 케프카 최종 (BB40 연속 알테마~) ─────────
+    {
+      // 광기의 오케스트라: 시전(BB50, ~5s)에 전원 8방향 산개. 이후 3타(1타 BB54홀리/BB52플레어 → 2타
+      //   BB54/BB53 → 3타 BB56혼돈홀리/BB55확산플레어). 탱2=14E6 플레어/14E7 홀리(1어글/2어글), 힐딜은
+      //   1타 피격 3 / 비피격 3. (검증: 6/14 1타 5피격=탱2+힐딜3, 디버프 1+1.)
+      id: 'DancingMad P5 오케스트라 산개',
+      type: 'StartsUsing',
+      netRegex: { id: 'BB50', source: '케프카', capture: false },
+      durationSeconds: 5,
+      alertText: (_data, _matches, output) => output.spread!(),
+      run: (data) => {
+        data.dmOrchHit = [];
+        data.dmOrchTank = undefined;
+        data.dmOrchCount = (data.dmOrchCount ?? 0) + 1; // 1오케=1 / 2오케=2 (이후 마격 2회/3회 구분)
+      },
+      outputStrings: {
+        spread: { en: 'Spread', ko: '산개' },
+      },
+    },
+    {
+      // 1타 피격자 수집(BB54 홀리/BB52 플레어 대상). 1타 안내가 +1.5s에 읽음(2타 전이라 1타분만 누적됨).
+      id: 'DancingMad P5 오케스트라 1타 수집',
+      type: 'Ability',
+      netRegex: { id: ['BB54', 'BB52'], source: '케프카' },
+      run: (data, matches) => {
+        (data.dmOrchHit ??= []).push(matches.target);
+      },
+    },
+    {
+      // 본인 탱 디버프(14E6 겸사겸사 플레어 / 14E7 겸사겸사 홀리) 수집 → 1·2타 탱 안내 분기.
+      id: 'DancingMad P5 오케스트라 탱 디버프',
+      type: 'GainsEffect',
+      netRegex: { effectId: ['14E6', '14E7'] },
+      condition: (data, matches) => matches.target === data.me,
+      run: (data, matches) => data.dmOrchTank = matches.effectId === '14E6' ? 'flare' : 'holy',
+    },
+    {
+      // 1타 안내(BB50 발동 +1.5s, 피격·디버프 수집 후): 탱=쉐어+북/무적 / 힐딜 피격=칼끝딜+남 / 비피격=안으로+남.
+      id: 'DancingMad P5 오케스트라 1타 안내',
+      type: 'Ability',
+      netRegex: { id: 'BB50', source: '케프카', capture: false },
+      delaySeconds: 1.5,
+      durationSeconds: 2.5,
+      alertText: (data, _matches, output) => {
+        if (data.role === 'tank')
+          return data.dmOrchTank === 'holy' ? output.tankHoly!() : output.tankFlare!();
+        return (data.dmOrchHit ?? []).includes(data.me ?? '') ? output.hit!() : output.notHit!();
+      },
+      outputStrings: {
+        tankFlare: { en: 'Tank share (then N)', ko: '탱커 쉐어 (이후 북쪽으로)' },
+        tankHoly: { en: 'Tank share (then invuln)', ko: '탱커 쉐어 (이후 무적기)' },
+        hit: { en: 'Point-blank (then S)', ko: '칼끝딜 (이후 남쪽으로)' },
+        notHit: { en: 'In (then S)', ko: '안으로 (이후 남쪽으로)' },
+      },
+    },
+    {
+      // 2타 안내(BB51 발동): 힐딜=남쪽(플레어 회피) / 홀리탱=무적 / 플레어탱=북쪽.
+      id: 'DancingMad P5 오케스트라 2타 안내',
+      type: 'Ability',
+      netRegex: { id: 'BB51', source: '케프카', capture: false },
+      durationSeconds: 4,
+      alertText: (data, _matches, output) => {
+        if (data.role !== 'tank')
+          return output.healerDps!();
+        return data.dmOrchTank === 'holy' ? output.tankHoly!() : output.tankFlare!();
+      },
+      outputStrings: {
+        healerDps: { en: 'South (dodge Flare)', ko: '남쪽으로 (플레어 회피)' },
+        tankHoly: { en: 'Use invuln (Holy)', ko: '무적기 사용 (홀리)' },
+        tankFlare: { en: 'North (Flare)', ko: '북쪽으로 (플레어)' },
+      },
+    },
+    {
+      // 3타(BB55 확산플레어/BB56 혼돈홀리 발동, 플레어·홀리 해소): 다음 마격 산개 예고.
+      //   1오케 후 마격 2회 / 2오케 후 마격 3회 → dmOrchCount로 횟수 구분.
+      id: 'DancingMad P5 오케스트라 3타',
+      type: 'Ability',
+      netRegex: { id: ['BB55', 'BB56'], source: '케프카', capture: false },
+      durationSeconds: 5,
+      suppressSeconds: 5,
+      alertText: (data, _matches, output) => output.text!({ n: data.dmOrchCount === 1 ? 2 : 3 }),
+      outputStrings: {
+        text: { en: 'Magic Hammer spread x${n}', ko: '마격 산개, ${n}번' },
+      },
+    },
     {
       // 혼돈의 종말(엑사플레어): BB3B 시전과 동시에 분신들이 북서→북동 교대로 전조(BB3C)→AOE(BB3D) 6웨이브.
       //   전조 ~2.5s 간격(실측 +0/2.54/5.04/7.53/10.03/12.53s). ★9/9 항상 북서 시작 → '북서쪽 보기' 고정.
