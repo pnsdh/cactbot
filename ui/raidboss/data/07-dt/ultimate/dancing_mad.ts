@@ -54,6 +54,7 @@ export interface Data extends RaidbossData {
   dmStarSet?: number; // 처리 세트 0~3
   dmStarMyElem?: DmStarElem; // 내 저항감소[강] 속성(B56불/B57얼음/BB6선더). undefined=무징
   dmStarTowers?: { [id: string]: { elem: DmStarElem; zone: DmStarZone; slot: number } }; // id(대문자hex)→탑정보. slot 0=왼/1=중/2=오(외향 기준)
+  dmStarRaw?: { id: string; elem: DmStarElem; x: number; y: number }[]; // 261서 수집한 탑 원본(맵 구축 전)
   dmStarActive?: string[]; // 이번 세트 활성 탑 id들 (273 019D 10|20 수집, 세트마다 리셋)
   // P5 플러드 — C183 직선 텔레그래프(263 위치) 4직선 대각선 수집 → 시작 카디널 + 회전 산출
   dmFloodOn?: boolean; // 플러드 진행 윈도우(C183 텔레그래프 수집 게이트)
@@ -1431,7 +1432,7 @@ const triggerSet: TriggerSet<Data> = {
       comment: {
         en: '09STOP (default): set1/2 left 90°, set3 checks East cardinal floor. ' +
           'RAID GOSU: set1 left 1 / set2 left 2 / set3 checks North cardinal / set4 checks NW(or NE) temporary floor.',
-        ko: 'P5 행방불명 영구장판 회전 동선. 09STOP=세트3 동쪽 모서리 체크 / RAID GOSU=세트3 북쪽 모서리·세트4 임시장판(북서/북동) 체크',
+        ko: 'P5 행방불명 영구장판 회전 동선.',
       },
       type: 'select',
       options: {
@@ -3776,7 +3777,7 @@ const triggerSet: TriggerSet<Data> = {
       type: 'StartsUsing',
       netRegex: { id: 'BB50', source: '케프카', capture: false },
       durationSeconds: 5,
-      alertText: (_data, _matches, output) => output.spread!(),
+      infoText: (_data, _matches, output) => output.spread!(),
       run: (data) => {
         data.dmOrchHit = [];
         data.dmOrchTank = undefined;
@@ -3899,34 +3900,41 @@ const triggerSet: TriggerSet<Data> = {
         data.dmStarActive = [];
         data.dmStarMyElem = undefined;
         data.dmStarTowers = undefined;
+        data.dmStarRaw = [];
       },
     },
     {
-      // 탑 맵 구축: getCombatants로 BNpcID(속성: 1EC03E불/3F얼음/40선더)+위치(클러스터/슬롯) 1회 산출.
-      //   슬롯 = 클러스터내 외향 기준 왼(0)/중(1)/오(2). 세트별 활성탑(273)을 여기에 대조해 안내.
+      // 탑 수집: 9탑은 type-03(AddedCombatant) 없이 261 CombatantMemory 'Add'로만 스폰 → getCombatants는
+      //   에뮬레이터(03 기반 재구성)에서 탑을 못 봄. 261 직접 파싱(pairBNpcID 속성 + pairPosX/Y 위치)이라
+      //   에뮬·라이브 둘 다 동작. (1EC03E불/3F얼음/40선더.)
       id: 'DancingMad P5 세 개의 별 탑 수집',
+      type: 'CombatantMemory',
+      netRegex: { change: 'Add', pair: [{ key: 'BNpcID', value: ['1EC03E', '1EC03F', '1EC040'] }] },
+      condition: (data) => data.dmStarOn === true,
+      run: (data, matches) => {
+        const elem = dmStarElemOf(parseInt(matches.pairBNpcID ?? '0', 16));
+        if (elem === undefined)
+          return;
+        (data.dmStarRaw ??= []).push({
+          id: matches.id.toUpperCase(),
+          elem: elem,
+          x: parseFloat(matches.pairPosX ?? '0'),
+          y: parseFloat(matches.pairPosY ?? '0'),
+        });
+      },
+    },
+    {
+      // 탑 맵 구축(BB42+6s, 9탑 수집 후): 클러스터(zone)별 외향 좌측투영 내림차순 → slot 0왼/1중/2오.
+      id: 'DancingMad P5 세 개의 별 탑 맵',
       type: 'StartsUsing',
       netRegex: { id: 'BB42', source: '케프카', capture: false },
       delaySeconds: 6,
-      promise: async (data) => {
-        const all = (await callOverlayHandler({ call: 'getCombatants' })).combatants;
-        const towers = all.flatMap((c) => {
-          const elem = dmStarElemOf(c.BNpcID);
-          if (elem === undefined || c.ID === undefined)
-            return [];
-          return [{
-            id: c.ID.toString(16).toUpperCase(),
-            elem: elem,
-            zone: dmStarZoneOf(c.PosX, c.PosY),
-            x: c.PosX,
-            y: c.PosY,
-          }];
-        });
+      run: (data) => {
+        const uniq = [...new Map((data.dmStarRaw ?? []).map((t) => [t.id, t])).values()];
         const map: NonNullable<Data['dmStarTowers']> = {};
         for (const zone of ['NW', 'NE', 'S'] as DmStarZone[]) {
-          // 같은 클러스터 탑을 외향 좌측 투영값 내림차순(왼→오)으로 정렬 → slot 0/1/2.
-          const inZone = towers
-            .filter((t) => t.zone === zone)
+          const inZone = uniq
+            .filter((t) => dmStarZoneOf(t.x, t.y) === zone)
             .sort((a, b) => dmStarLateral(b.x, b.y, zone) - dmStarLateral(a.x, a.y, zone));
           inZone.forEach((t, i) => map[t.id] = { elem: t.elem, zone: zone, slot: i });
         }
@@ -4156,7 +4164,7 @@ const triggerSet: TriggerSet<Data> = {
         return output.gather!();
       },
       outputStrings: {
-        gather: { en: 'Gather South', ko: '남쪽에서 시작' },
+        gather: { en: 'Gather South', ko: '남쪽에서 행방불명 시작' },
       },
     },
     {
