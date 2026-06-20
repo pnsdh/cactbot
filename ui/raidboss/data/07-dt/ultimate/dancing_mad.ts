@@ -3827,6 +3827,7 @@ const triggerSet: TriggerSet<Data> = {
       id: 'DancingMad P5 마격 (연속 알테마)',
       type: 'Ability',
       netRegex: { id: 'BB40', capture: false },
+      condition: (data) => data.phase === 'p5', // BB40은 P5 전용이나 방어적 게이트(카운터 오발 방지)
       preRun: (data) => data.dmHammerAlteCount = (data.dmHammerAlteCount ?? 0) + 1,
       delaySeconds: 1,
       durationSeconds: (data) => data.dmHammerAlteCount === 1 ? 11.5 : 8.5,
@@ -4002,6 +4003,15 @@ const triggerSet: TriggerSet<Data> = {
         mid: { en: 'center', ko: '중앙' },
         right: { en: 'right', ko: '오른쪽' },
       },
+    },
+    {
+      // 세 개의 별 윈도우 안전 종료: 정상은 set3에서 닫히나, 세트 누락 시 잔존 방지로 BB42+30s 강제 종료
+      //   (이후 019D 10|20 오발 차단). 3세트 마지막 해소(~+26s) 뒤라 정상 흐름엔 영향 없음.
+      id: 'DancingMad P5 세 개의 별 종료',
+      type: 'StartsUsing',
+      netRegex: { id: 'BB42', source: '케프카', capture: false },
+      delaySeconds: 30,
+      run: (data) => data.dmStarOn = false,
     },
     {
       // 플러드: C13F 시전 시작 → 텔레그래프 수집 윈도우 open. 4직선(대각선)이 C13F 캐스팅 중 ~1s 간격으로
