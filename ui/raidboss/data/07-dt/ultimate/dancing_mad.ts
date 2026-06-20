@@ -39,6 +39,7 @@ export interface Data extends RaidbossData {
     dmTrineMethod: '09stop' | 'yan';
     dmTetherMethod: '09stop' | 'yan';
     dmKefkaDodge: 'finalSpot' | 'position';
+    dmForsakenP5Method: '09stop' | 'raidgosu';
   };
   phase: Phase | 'unknown';
   combatantData?: PluginCombatantState[];
@@ -59,8 +60,9 @@ export interface Data extends RaidbossData {
   dmFloodTele?: { t: string; x: number; y: number }[]; // 텔레그래프 분신(웨이브당 2개, r21~25)
   // P5 행방불명 — 영구장판(BB37) 2개씩 4세트. 동선=남 모여→왼90→왼90(북)→세트3분기→세트4분기
   dmFsknP5Set?: number; // 장판 세트 카운트 1~4
-  dmFsknP5Dir?: 'east' | 'west'; // 세트3 이동 방향(세트4 분기용)
-  dmFsknP5Floors?: { t: string; x: number; y: number }[]; // BB37 영구장판 위치(세트3 동쪽 판정용)
+  dmFsknP5Dir?: 'east' | 'west' | 'north'; // 세트3 이동 방향(세트4 분기용). 09stop=west/east, raidgosu=west/north
+  dmFsknP5Floors?: { t: string; x: number; y: number }[]; // BB37 영구장판 위치(세트3 동/북 모서리 판정)
+  dmFsknP5Temp?: { t: string; x: number; y: number }[]; // BB38 임시장판 위치(RAID GOSU 세트4 NW/NE 판정)
   dmKnockbackGroup?: boolean;
   dmHeadInvert?: boolean;
   dmSpreadBase?: boolean; // 007F=true(산개) / 0080=false(쉐어) / undefined=이번 조합엔 없음
@@ -1419,6 +1421,30 @@ const triggerSet: TriggerSet<Data> = {
         },
       },
       default: 'position',
+    },
+    {
+      id: 'dmForsakenP5Method',
+      name: {
+        en: 'P5 Forsaken movement',
+        ko: 'P5 행방불명 이동 공략',
+      },
+      comment: {
+        en: '09STOP (default): set1/2 left 90°, set3 checks East cardinal floor. ' +
+          'RAID GOSU: set1 left 1 / set2 left 2 / set3 checks North cardinal / set4 checks NW(or NE) temporary floor.',
+        ko: 'P5 행방불명 영구장판 회전 동선. 09STOP=세트3 동쪽 모서리 체크 / RAID GOSU=세트3 북쪽 모서리·세트4 임시장판(북서/북동) 체크',
+      },
+      type: 'select',
+      options: {
+        en: {
+          '09STOP': '09stop',
+          'RAID GOSU': 'raidgosu',
+        },
+        ko: {
+          '09STOP (기본값)': '09stop',
+          'RAID GOSU': 'raidgosu',
+        },
+      },
+      default: '09stop',
     },
   ],
   timelineFile: 'dancing_mad.txt',
@@ -4126,6 +4152,7 @@ const triggerSet: TriggerSet<Data> = {
         data.dmFsknP5Set = 0;
         data.dmFsknP5Dir = undefined;
         data.dmFsknP5Floors = [];
+        data.dmFsknP5Temp = [];
         return output.gather!();
       },
       outputStrings: {
@@ -4133,7 +4160,7 @@ const triggerSet: TriggerSet<Data> = {
       },
     },
     {
-      // 영구장판(BB37 "행방불명: 지면") 위치 수집(263). 세트3 동쪽 모서리 판정용. 임시장판(BB38)은 무시.
+      // 영구장판(BB37 "행방불명: 지면") 위치 수집(263). 세트3 동/북 모서리 판정용.
       id: 'DancingMad P5 행방불명 장판 수집',
       type: 'StartsUsingExtra',
       netRegex: { id: 'BB37' },
@@ -4147,8 +4174,25 @@ const triggerSet: TriggerSet<Data> = {
       },
     },
     {
-      // 행방불명 이동: 장판 세트 전조마다(BB37 263, 세트당 2개라 suppress) 1회. 세트1·2=왼쪽 90°(남→서→북).
-      //   세트3 = 동쪽 모서리(E)에 영구장판 있으면 오른쪽(서)+더, 없으면 왼쪽(동)+더. 세트4 = 세트3 방향 따라.
+      // 임시장판(BB38 "행방불명") 위치 수집(263). RAID GOSU 세트4 북서/북동 임시장판 판정용(중심 r~10 대각선).
+      id: 'DancingMad P5 행방불명 임시장판 수집',
+      type: 'StartsUsingExtra',
+      netRegex: { id: 'BB38' },
+      condition: (data) =>
+        data.phase === 'p5' && data.triggerSetConfig.dmForsakenP5Method === 'raidgosu',
+      run: (data, matches) => {
+        (data.dmFsknP5Temp ??= []).push({
+          t: matches.timestamp,
+          x: parseFloat(matches.x),
+          y: parseFloat(matches.y),
+        });
+      },
+    },
+    {
+      // 행방불명 이동(옵션 dmForsakenP5Method): 장판 세트 전조마다(BB37 263, 세트당 2개라 suppress) 1회.
+      //   09STOP(기본): 세트1·2=왼90 / 세트3=동쪽 모서리 영구장판 분기 / 세트4=세트3 방향 따라.
+      //   RAID GOSU: 세트1=왼1칸 / 세트2=왼2칸 / 세트3=북쪽 모서리 영구장판(있음→오른1/dir=west, 없음→왼1/dir=north)
+      //     / 세트4=임시장판(BB38) 북서(dir=west)·북동(dir=north)에 있으면 오른1, 없으면 왼1.
       id: 'DancingMad P5 행방불명 이동',
       type: 'StartsUsingExtra',
       netRegex: { id: 'BB37' },
@@ -4158,6 +4202,29 @@ const triggerSet: TriggerSet<Data> = {
       suppressSeconds: 5, // 세트당 1회 (세트 간 ~8.2s)
       alertText: (data, matches, output) => {
         const set = (data.dmFsknP5Set ?? 0) + 1;
+        if (data.triggerSetConfig.dmForsakenP5Method === 'raidgosu') {
+          if (set === 1)
+            return output.gosuLeft1!();
+          if (set === 2)
+            return output.gosuLeft2!();
+          if (set === 3) {
+            // 이번 세트 영구장판 2개 중 북쪽 모서리(|dx|<6, dy<-6) 있나? 있음→오른쪽(서로 감)/없음→왼쪽(북으로 감)
+            const floors = (data.dmFsknP5Floors ?? []).filter((f) => f.t === matches.timestamp);
+            const north = floors.some((f) => Math.abs(f.x - 100) < 6 && (f.y - 100) < -6);
+            data.dmFsknP5Dir = north ? 'west' : 'north';
+            return north ? output.gosuRight1!() : output.gosuLeft1!();
+          }
+          if (set === 4) {
+            // 임시장판(BB38) 북반구 대각선: dir=west면 북서(dx<-3) / dir=north면 북동(dx>3) 체크
+            const temps = (data.dmFsknP5Temp ?? []).filter((f) => f.t === matches.timestamp);
+            const checkNW = data.dmFsknP5Dir === 'west';
+            const hit = temps.some((f) =>
+              (f.y - 100) < -3 && (checkNW ? (f.x - 100) < -3 : (f.x - 100) > 3)
+            );
+            return hit ? output.gosuRight1!() : output.gosuLeft1!();
+          }
+          return;
+        }
         if (set === 1)
           return output.left90!();
         if (set === 2)
@@ -4181,6 +4248,9 @@ const triggerSet: TriggerSet<Data> = {
         set3West: { en: 'Right/West — go extra', ko: '오른쪽으로, 2.5칸' },
         set4NW: { en: 'Left (NW)', ko: '왼쪽으로 1.5칸' },
         set4NE: { en: 'Right (NE)', ko: '오른쪽으로 1.5칸' },
+        gosuLeft1: { en: 'Left 1', ko: '왼쪽으로 1칸' },
+        gosuLeft2: { en: 'Left 2', ko: '왼쪽으로 2칸' },
+        gosuRight1: { en: 'Right 1', ko: '오른쪽으로 1칸' },
       },
     },
     {
