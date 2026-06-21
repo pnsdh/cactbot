@@ -3493,6 +3493,27 @@ const triggerSet: TriggerSet<Data> = {
       },
     },
     {
+      // 산개 대상자 선행 안내(요구): GC1/GC2 부여 즉시 '빠른/늦은 산개'를 미리. 쉐어 대상자는 침묵.
+      //   빠른(E1)/늦은(E2) = 실제 발동 2시점. 부여 시점 지속시간으로 분류(외부 4풀 검증: 36·51=빠른 / 61·76=늦은).
+      //   ★GC 번호로는 판정 불가(풀마다 dur76 GC1=늦/dur36 GC2=빠 또는 dur51 GC1=빠/dur61 GC2=늦로 뒤집힘) → dur로.
+      //   각자 한 세트만 positioning이라 1회. 만료 5초 전 통합 안내(갈래 물압축 안내)는 그대로 별도 유지.
+      id: 'DancingMad 갈래 물압축 선행 산개',
+      type: 'GainsEffect',
+      netRegex: { effectId: ['15A8', '15A9'] },
+      condition: (data, matches) => {
+        if (matches.target !== data.me)
+          return false;
+        const truth = data.dmFloodTruth ?? true; // 부여 시점 네오 808
+        return (matches.effectId === '15A8') === truth; // 갈래 진실=산개 / 물압축 진실=쉐어 → 산개만
+      },
+      infoText: (_data, matches, output) =>
+        parseFloat(matches.duration) < 56 ? output.early!() : output.late!(),
+      outputStrings: {
+        early: { en: 'Early spread (you)', ko: '빠른 산개' },
+        late: { en: 'Late spread (you)', ko: '늦은 산개' },
+      },
+    },
+    {
       id: 'DancingMad 가속도 폭탄 수집',
       type: 'GainsEffect',
       netRegex: { effectId: '15AA' }, // 가속도 폭탄
