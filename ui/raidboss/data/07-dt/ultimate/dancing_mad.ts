@@ -291,19 +291,21 @@ const dmP4PosText = (data: Data, early: boolean, output: Output): string => {
 
 // P4 콜러 접미(옵션 ON): 산개/쉐어 안내 뒤에 ' (산개자: 직업… / 가속)' 덧붙임. 가속=차수 전체 정지/이동 일치.
 const dmP4CallerOutputs = {
-  caller: { en: ' (Spread: ${jobs} / ${accel})', ko: ' (산개자: ${jobs} / ${accel})' },
+  caller: { en: ' (${jobs} / ${accel})', ko: ' (${jobs} / ${accel})' },
   accStop: { en: 'Stop', ko: '멈춰' },
   accMove: { en: 'Move', ko: '움직여' },
-  accMixed: { en: 'Mixed', ko: '섞임' },
+  accMixed: { en: 'Each', ko: '각자 봐' },
 };
 const dmP4CallerSuffix = (data: Data, early: boolean, output: Output): string => {
   if (data.triggerSetConfig.dmP4Caller !== true)
     return '';
   // 산개자(이 차수 만료 + 산개) 직업 약어. party.member().job = 현지화 약칭(ko='건브'/'암기'/'백마' …).
+  //   ★수집은 부여(GainsEffect) 시점이라 '실제 디버프 받은 사람'만 들어옴 → 앞에서 죽어 디버프 못 받은
+  //   사람은 애초에 미수집(예상보다 적어도 그대로 정확). 미수집/전무는 '?'로 폴백(빈칸 방지).
   const jobs = (data.dmP4ForkAll ?? [])
     .filter((f) => f.early === early && f.spread)
     .map((f) => data.party.member(f.target).job ?? f.target)
-    .join(', ');
+    .join(', ') || '?';
   // 가속: 이 차수 만료 가속도 전체 정지/이동 일치 → 멈춰/움직여, 섞이면 섞임.
   const accels = (data.dmP4AccelAll ?? []).filter((a) => a.early === early);
   const accel = accels.length === 0
