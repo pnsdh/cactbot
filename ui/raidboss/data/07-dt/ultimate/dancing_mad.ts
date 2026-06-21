@@ -253,6 +253,17 @@ const dmP4IsWave1 = (matches: { timestamp: string }, t1?: number, t2?: number): 
   return Math.abs(t - (t1 ?? t)) <= Math.abs(t - (t2 ?? t));
 };
 
+// P4 캐스케이드 발동 게이트: loss 시각이 예상 발동(만료) 시각 중 하나에 근접(tolMs)한가.
+//   자연 만료=±0.03s 통과 / 전멸·조기사망(조기 제거)=수 초 이상 어긋남 → 차단. 미수집(undefined)은 무시.
+const dmP4AtResolution = (
+  matches: { timestamp: string },
+  tolMs: number,
+  ...times: (number | undefined)[]
+): boolean => {
+  const t = Date.parse(matches.timestamp);
+  return times.some((x) => x !== undefined && Math.abs(t - x) < tolMs);
+};
+
 // P4 산개/쉐어(+가속도) 공용 출력(1·2차 동일). 키는 혼돈불 처리(#4) 병합에서 재사용하므로 충돌 회피용 고유명
 //   (posCombo/accelMove). 가속도는 자기 차수(E1/E2)에 맞을 때만 합침.
 const dmP4PosOutputs = {
@@ -3627,6 +3638,8 @@ const triggerSet: TriggerSet<Data> = {
       id: 'DancingMad P4 마안 (캐스케이드)',
       type: 'LosesEffect',
       netRegex: { effectId: ['15A8', '15A9'] },
+      // 자연 만료(=E1/E2)에만 발동. 전멸·조기사망 시 일괄 조기제거는 시각이 어긋나 차단.
+      condition: (data, matches) => dmP4AtResolution(matches, 3000, data.dmP4PosE1, data.dmP4PosE2),
       durationSeconds: (data, matches) =>
         dmP4Dur(
           matches,
@@ -3676,6 +3689,8 @@ const triggerSet: TriggerSet<Data> = {
       id: 'DancingMad P4 혼돈 불물 중앙 (캐스케이드)',
       type: 'LosesEffect',
       netRegex: { effectId: '15A7' },
+      condition: (data, matches) =>
+        dmP4AtResolution(matches, 3000, data.dmP4Curse1, data.dmP4Curse2),
       durationSeconds: (data, matches) =>
         dmP4Dur(
           matches,
@@ -3698,7 +3713,8 @@ const triggerSet: TriggerSet<Data> = {
       //   장판 발동(만료+~5.08s)까지 표시. '이후' = 내 2차(E2) 안내 전체(산개/쉐어 + 가속도) = #5와 동일.
       id: 'DancingMad P4 혼돈불 처리 (캐스케이드)',
       type: 'LosesEffect',
-      netRegex: { effectId: '15AB', capture: false },
+      netRegex: { effectId: '15AB' },
+      condition: (data, matches) => dmP4AtResolution(matches, 3000, data.dmP4Fire),
       durationSeconds: 5.1, // 만료~장판 발동(+5.08s)
       suppressSeconds: 5,
       infoText: (data, _matches, output) => {
@@ -3719,6 +3735,7 @@ const triggerSet: TriggerSet<Data> = {
       id: 'DancingMad P4 산개쉐어 2차',
       type: 'LosesEffect',
       netRegex: { effectId: '15AB' },
+      condition: (data, matches) => dmP4AtResolution(matches, 3000, data.dmP4Fire),
       delaySeconds: 5.1, // 혼돈불 장판 처리 후
       durationSeconds: (data, matches) => dmP4Dur(matches, data.dmP4PosE2, 5.1),
       suppressSeconds: 5,
@@ -3729,7 +3746,8 @@ const triggerSet: TriggerSet<Data> = {
       // [캐스케이드 #8] 혼돈물 만료(15AC Loses) → '이동/대기'(마지막). 장판 발동(+5.08s)까지 표시.
       id: 'DancingMad P4 혼돈물 처리 (캐스케이드)',
       type: 'LosesEffect',
-      netRegex: { effectId: '15AC', capture: false },
+      netRegex: { effectId: '15AC' },
+      condition: (data, matches) => dmP4AtResolution(matches, 3000, data.dmP4Water),
       durationSeconds: 5.1,
       suppressSeconds: 5,
       infoText: (data, _matches, output) =>
