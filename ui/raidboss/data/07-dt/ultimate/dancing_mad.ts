@@ -39,7 +39,7 @@ export interface Data extends RaidbossData {
     dmTrineMethod: '09stop' | 'yan';
     dmTetherMethod: '09stop' | 'yan';
     dmKefkaDodge: 'finalSpot' | 'position';
-    dmForsakenP5Method: '09stop' | 'raidgosu';
+    dmForsakenP5Method: '09stop0621' | '09stop' | 'raidgosu';
   };
   phase: Phase | 'unknown';
   combatantData?: PluginCombatantState[];
@@ -1431,22 +1431,25 @@ const triggerSet: TriggerSet<Data> = {
         ko: 'P5 행방불명 이동 공략',
       },
       comment: {
-        en: '09STOP (default): set1/2 left 90°, set3 checks East cardinal floor. ' +
+        en: '09STOP (0621) (default): start SW, then "left 2" every set (4×, no branching). ' +
+          '09STOP (Old): set1/2 left 90°, set3 checks East cardinal floor. ' +
           'RAID GOSU: set1 left 1 / set2 left 2 / set3 checks North cardinal / set4 checks NW(or NE) temporary floor.',
         ko: 'P5 행방불명 영구장판 회전 동선.',
       },
       type: 'select',
       options: {
         en: {
-          '09STOP': '09stop',
+          '09STOP (0621)': '09stop0621',
+          '09STOP (Old)': '09stop',
           'RAID GOSU': 'raidgosu',
         },
         ko: {
-          '09STOP (기본값)': '09stop',
+          '09STOP (0621) (기본값)': '09stop0621',
+          '09STOP (Old)': '09stop',
           'RAID GOSU': 'raidgosu',
         },
       },
-      default: '09stop',
+      default: '09stop0621',
     },
   ],
   timelineFile: 'dancing_mad.txt',
@@ -4167,10 +4170,13 @@ const triggerSet: TriggerSet<Data> = {
         data.dmFsknP5Dir = undefined;
         data.dmFsknP5Floors = [];
         data.dmFsknP5Temp = [];
+        if (data.triggerSetConfig.dmForsakenP5Method === '09stop0621')
+          return output.gatherSW!();
         return output.gather!();
       },
       outputStrings: {
         gather: { en: 'Gather South', ko: '남쪽에서 행방불명 시작' },
+        gatherSW: { en: 'Gather SW', ko: '남서쪽에서 행방불명 시작' },
       },
     },
     {
@@ -4204,7 +4210,8 @@ const triggerSet: TriggerSet<Data> = {
     },
     {
       // 행방불명 이동(옵션 dmForsakenP5Method): 장판 세트 전조마다(BB37 263, 세트당 2개라 suppress) 1회.
-      //   09STOP(기본): 세트1·2=왼90 / 세트3=동쪽 모서리 영구장판 분기 / 세트4=세트3 방향 따라.
+      //   09STOP(0621)(기본): 남서 시작 후 매 세트 '왼쪽으로 2칸'(4회, 분기 없음).
+      //   09STOP(Old): 세트1·2=왼90 / 세트3=동쪽 모서리 영구장판 분기 / 세트4=세트3 방향 따라.
       //   RAID GOSU: 세트1=왼1칸 / 세트2=왼2칸 / 세트3=북쪽 모서리 영구장판(있음→오른1/dir=west, 없음→왼1/dir=north)
       //     / 세트4=임시장판(BB38) 북서(dir=west)·북동(dir=north)에 있으면 오른1, 없으면 왼1.
       id: 'DancingMad P5 행방불명 이동',
@@ -4216,6 +4223,10 @@ const triggerSet: TriggerSet<Data> = {
       suppressSeconds: 5, // 세트당 1회 (세트 간 ~8.2s)
       alertText: (data, matches, output) => {
         const set = (data.dmFsknP5Set ?? 0) + 1;
+        if (data.triggerSetConfig.dmForsakenP5Method === '09stop0621') {
+          // 분기 없음: 남서 시작 후 매 세트(1~4) '왼쪽으로 2칸' 반복.
+          return output.left2!();
+        }
         if (data.triggerSetConfig.dmForsakenP5Method === 'raidgosu') {
           if (set === 1)
             return output.gosuLeft1!();
@@ -4256,6 +4267,7 @@ const triggerSet: TriggerSet<Data> = {
       },
       run: (data) => data.dmFsknP5Set = (data.dmFsknP5Set ?? 0) + 1,
       outputStrings: {
+        left2: { en: 'Left 2', ko: '왼쪽으로 2칸' },
         left90: { en: 'Left 90° (→ W)', ko: '왼쪽으로 2칸' },
         left90N: { en: 'Left 90° (→ N)', ko: '왼쪽으로 2칸' },
         set3East: { en: 'Left/East — go extra', ko: '왼쪽으로, 2.5칸' },
