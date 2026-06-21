@@ -3686,20 +3686,32 @@ const triggerSet: TriggerSet<Data> = {
       },
     },
     {
-      // [캐스케이드 #3] 마안 만료(15A7 Loses) → 혼돈 불/물 '중앙으로 (이후 이동/대기)' 선행. 1차→불 / 2차→물.
+      // [캐스케이드 #3] 마안 시점에 혼돈 불/물 '중앙으로 (이후 이동/대기)' 선행. 1차→불 / 2차→물.
+      //   ★앵커=positioning loss(8명, 견고)+마안 시각까지 delay. 마안(15A7)은 4명만 보유라 그 loss를 앵커로
+      //   쓰면 마안 그룹 2명 전멸 시 누락 → positioning loss로 앵커하고 마안 시각(부여 때 수집)만큼 지연.
       id: 'DancingMad P4 혼돈 불물 중앙 (캐스케이드)',
       type: 'LosesEffect',
-      netRegex: { effectId: '15A7' },
-      condition: (data, matches) =>
-        dmP4AtResolution(matches, 3000, data.dmP4Curse1, data.dmP4Curse2),
-      durationSeconds: (data, matches) =>
-        dmP4Dur(
-          matches,
-          dmP4IsWave1(matches, data.dmP4Curse1, data.dmP4Curse2) ? data.dmP4Fire : data.dmP4Water,
-        ),
+      netRegex: { effectId: ['15A8', '15A9'] },
+      condition: (data, matches) => dmP4AtResolution(matches, 3000, data.dmP4PosE1, data.dmP4PosE2),
+      delaySeconds: (data, matches) => {
+        // E1/E2(positioning 만료) → 마안1/2 시각까지(=마안 만료에 표시). 미수집 시 0(즉시).
+        const w1 = dmP4IsWave1(matches, data.dmP4PosE1, data.dmP4PosE2);
+        const curse = w1 ? data.dmP4Curse1 : data.dmP4Curse2;
+        const pos = w1 ? data.dmP4PosE1 : data.dmP4PosE2;
+        return Math.max(((curse ?? 0) - (pos ?? 0)) / 1000, 0);
+      },
+      durationSeconds: (data, matches) => {
+        const w1 = dmP4IsWave1(matches, data.dmP4PosE1, data.dmP4PosE2);
+        const pos = w1 ? data.dmP4PosE1 : data.dmP4PosE2;
+        const delay = Math.max(
+          (((w1 ? data.dmP4Curse1 : data.dmP4Curse2) ?? 0) - (pos ?? 0)) / 1000,
+          0,
+        );
+        return dmP4Dur(matches, w1 ? data.dmP4Fire : data.dmP4Water, delay); // 마안~불/물
+      },
       suppressSeconds: 10,
       infoText: (data, matches, output) => {
-        const id = dmP4IsWave1(matches, data.dmP4Curse1, data.dmP4Curse2) ? '15AB' : '15AC'; // 불 먼저/물 나중
+        const id = dmP4IsWave1(matches, data.dmP4PosE1, data.dmP4PosE2) ? '15AB' : '15AC'; // 불 먼저/물 나중
         const next = (data.dmChaosMove?.[id] ?? false) ? output.move!() : output.wait!();
         return output.center!({ next: next });
       },
