@@ -37,7 +37,7 @@ export interface Data extends RaidbossData {
     dmBlizzardKnockback: 'kbSouth' | 'roleSide';
     dmBlizzardThunder: 'stepDodge' | 'dir';
     dmTrineMethod: '09stop' | 'yan';
-    dmTetherMethod: '09stop' | 'yan';
+    dmTetherMethod: '09stop0620' | '09stop' | 'yan';
     dmKefkaDodge: 'finalSpot' | 'position';
     dmForsakenP5Method: '09stop0621' | '09stop' | 'raidgosu';
   };
@@ -1106,14 +1106,17 @@ const dmBhSortKey = (dir: number, kefkaDir: number | undefined): number =>
   (dir * 2 - (kefkaDir ?? 0) + 8) % 8;
 
 // 줄별 '이 플레이어가 처리하는 방향'(메서드별). 반환: 방향 배열(1개 or 2개=양쪽) / 비처리=undefined.
-//   09stop(기본): 줄1=공격2(1) · 줄2=공격1(양쪽) · 줄9=금지2(양쪽) · 줄10=금지1(1). 그 외는 yan과 동일.
+//   09stop(공통=09stop·09stop0620): 줄1=공격2(1) · 줄2=공격1(양쪽). 그 외는 yan과 동일.
+//   ★줄9만 09STOP 두 종이 다름: 09stop(Old)=케프카 시계 우선순위(금지1=s[0]·금지2=s[1]) /
+//     09stop0620=V-중간 45° 좌우(왼=금지1·오른=금지2, 활성 2블홀이 항상 90° 인접인 점 이용).
 //   yan: 줄1=공격1 · 줄2=공격1(줄1반대)/공격2(남은) · 줄9=금지1/금지2 · 줄10=금지2.
 //   줄3·6(풀)·4·5·7·8(스왑)은 메서드 무관 active[idx]→케프카정렬 dmSetDirs[idx].
 //   본 안내(alertText)·선행 안내(infoText)·이동 덧붙임이 모두 이 헬퍼로 일관 계산(now/next).
 const dmHandlesRound = (data: Data, round: number, myMark: string): number[] | undefined => {
   const k = data.dmKefkaDir;
   const sortK = (arr: number[]) => [...arr].sort((a, b) => dmBhSortKey(a, k) - dmBhSortKey(b, k));
-  const s09 = data.triggerSetConfig.dmTetherMethod === '09stop';
+  // 09stop·09stop0620 공통 경로(줄1·2 등). 두 09STOP은 줄9만 다름.
+  const s09 = data.triggerSetConfig.dmTetherMethod !== 'yan';
   if (round === 1) {
     const d = (data.dmRoundDirs ?? [])[0];
     if (d === undefined)
@@ -1137,10 +1140,23 @@ const dmHandlesRound = (data: Data, round: number, myMark: string): number[] | u
     return undefined;
   }
   if (round === 9) {
-    // 줄9·10은 옵션 무관 Yan식 통일(09stop도 공략을 yan식으로 되돌림): 금지1=s[0]·금지2=s[1] / 줄10=금지2.
-    const s = sortK(data.dmRoundDirs ?? []);
     const idx = ['ignore1', 'ignore2'].indexOf(myMark);
-    return idx >= 0 && s[idx] !== undefined ? [s[idx]!] : undefined;
+    if (idx < 0)
+      return undefined;
+    const dirs = data.dmRoundDirs ?? [];
+    if (data.triggerSetConfig.dmTetherMethod === '09stop0620' && dirs.length === 2) {
+      // 09STOP (0620) 줄9: 활성 블랙홀 2개는 항상 90° 인접(맞은편 없음). 중심에서 둘 사이 45°
+      //   (V 벌어진 중간)를 보고 왼쪽 줄=금지1·오른쪽 줄=금지2. 시계로 앞선(왼쪽=CCW) 방위가 금지1.
+      const [a, b] = dirs as [number, number];
+      if ((a + 1) % 4 === b || (b + 1) % 4 === a) { // 인접(90°) 쌍에서만; 아니면 케프카 정렬 폴백
+        const left = (a + 1) % 4 === b ? a : b; // (left+1)%4===right
+        const right = left === a ? b : a;
+        return [idx === 0 ? left : right];
+      }
+    }
+    // 09STOP (Old)·Yan: 케프카 시계방향 우선순위(금지1=s[0]·금지2=s[1]).
+    const s = sortK(dirs);
+    return s[idx] !== undefined ? [s[idx]!] : undefined;
   }
   if (round === 10) {
     const used = data.dmFirstRoundDirs ?? [];
@@ -1382,22 +1398,26 @@ const triggerSet: TriggerSet<Data> = {
         ko: 'P3 블랙홀 줄 처리법',
       },
       comment: {
-        en: '09STOP (default): line 1 = attack2, line 2 = attack1 takes both. ' +
-          'Yan: line 1 = attack1, line 2 = attack1(opposite)/attack2. Lines 3-10 identical (Yan-style).',
-        ko: '공략에 따른 블랙홀 줄 처리 방식 (1·2줄만 다름, 3~10줄은 공통)',
+        en: '09STOP (0620) (default): same as Old but line 9 assigns ignore1/2 by ' +
+          'left/right of the V between the two 90°-apart black holes. ' +
+          '09STOP (Old): line 1 = attack2, line 2 = attack1 takes both. ' +
+          'Yan: line 1 = attack1, line 2 = attack1(opposite)/attack2. Lines 3-10 otherwise identical (Yan-style).',
+        ko: '공략에 따른 블랙홀 줄 처리 방식 (09STOP은 1·2·9줄, 그 외는 공통)',
       },
       type: 'select',
       options: {
         en: {
-          '09STOP (default)': '09stop',
+          '09STOP (0620)': '09stop0620',
+          '09STOP (Old)': '09stop',
           'Yan': 'yan',
         },
         ko: {
-          '09STOP (기본값)': '09stop',
+          '09STOP (0620) (기본값)': '09stop0620',
+          '09STOP (Old)': '09stop',
           '얀': 'yan',
         },
       },
-      default: '09stop',
+      default: '09stop0620',
     },
     {
       id: 'dmKefkaDodge',
