@@ -3818,15 +3818,25 @@ const triggerSet: TriggerSet<Data> = {
       delaySeconds: 1.7,
       durationSeconds: 2,
       alertText: (data, _matches, output) => {
-        if (data.role === 'tank')
-          return data.dmOrchTank === 'holy' ? output.tankHoly!() : output.tankFlare!();
-        return (data.dmOrchHit ?? []).includes(data.me ?? '') ? output.hit!() : output.notHit!();
+        // {action} (이후 {next}) 조합으로 토큰화(유저 커스터마이즈 용이). 표시 결과는 동일.
+        if (data.role === 'tank') {
+          const next = data.dmOrchTank === 'holy' ? output.nInvuln!() : output.nNorth!();
+          return output.combo!({ action: output.aShare!(), next: next });
+        }
+        const hit = (data.dmOrchHit ?? []).includes(data.me ?? '');
+        return output.combo!({
+          action: hit ? output.aHit!() : output.aIn!(),
+          next: output.nSouth!(),
+        });
       },
       outputStrings: {
-        tankFlare: { en: 'Tank share (then N)', ko: '탱커 쉐어 (이후 북쪽으로)' },
-        tankHoly: { en: 'Tank share (then invuln)', ko: '탱커 쉐어 (이후 무적기)' },
-        hit: { en: 'Point-blank (then S)', ko: '칼끝딜 (이후 남쪽으로)' },
-        notHit: { en: 'In (then S)', ko: '안으로 (이후 남쪽으로)' },
+        combo: { en: '${action} (then ${next})', ko: '${action} (이후 ${next})' },
+        aShare: { en: 'Tank share', ko: '탱커 쉐어' },
+        aHit: { en: 'Point-blank', ko: '칼끝딜' },
+        aIn: { en: 'In', ko: '안으로' },
+        nNorth: { en: 'N', ko: '북쪽으로' },
+        nSouth: { en: 'S', ko: '남쪽으로' },
+        nInvuln: { en: 'invuln', ko: '무적기' },
       },
     },
     {
@@ -3836,14 +3846,21 @@ const triggerSet: TriggerSet<Data> = {
       netRegex: { id: 'BB51', source: '케프카', capture: false },
       durationSeconds: 4,
       alertText: (data, _matches, output) => {
+        // {main} ({note}) 조합으로 토큰화(유저 커스터마이즈 용이). 표시 결과는 동일.
         if (data.role !== 'tank')
-          return output.healerDps!();
-        return data.dmOrchTank === 'holy' ? output.tankHoly!() : output.tankFlare!();
+          return output.combo!({ main: output.south!(), note: output.dodgeFlare!() });
+        return data.dmOrchTank === 'holy'
+          ? output.combo!({ main: output.invuln!(), note: output.holy!() })
+          : output.combo!({ main: output.north!(), note: output.flare!() });
       },
       outputStrings: {
-        healerDps: { en: 'South (dodge Flare)', ko: '남쪽으로 (플레어 회피)' },
-        tankHoly: { en: 'Use invuln (Holy)', ko: '무적기 사용 (홀리)' },
-        tankFlare: { en: 'North (Flare)', ko: '북쪽으로 (플레어)' },
+        combo: { en: '${main} (${note})', ko: '${main} (${note})' },
+        south: { en: 'South', ko: '남쪽으로' },
+        north: { en: 'North', ko: '북쪽으로' },
+        invuln: { en: 'Use invuln', ko: '무적기 사용' },
+        dodgeFlare: { en: 'dodge Flare', ko: '플레어 회피' },
+        flare: { en: 'Flare', ko: '플레어' },
+        holy: { en: 'Holy', ko: '홀리' },
       },
     },
     {
