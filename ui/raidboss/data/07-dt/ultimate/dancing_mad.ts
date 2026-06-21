@@ -1669,7 +1669,9 @@ const triggerSet: TriggerSet<Data> = {
           : (matches.effectId === 'BBD' ? 'bind' : 'ignore');
       },
     },
-    // ───────── 전체공격 ─────────
+    // ───────── P1 평타: 전체공격(심판의 빛·하이퍼드라이브) + 탱버(파삭파삭 루인가) ─────────
+    // 심판의 빛(C622)=전체공격, 그 첫 2회 뒤 하이퍼드라이브(광역 탱버 3연타) 동반. 파삭파삭 루인가(C403)=탱버.
+    //   BABB(강화 심판의 빛)=P1 전멸기 → 섹션 끝에 배치.
     {
       id: 'DancingMad 심판의 빛',
       type: 'StartsUsing',
@@ -1699,22 +1701,6 @@ const triggerSet: TriggerSet<Data> = {
       },
     },
     {
-      id: 'DancingMad 심판의 빛 전멸기',
-      type: 'StartsUsing',
-      // BABB = 강화판 심판의 빛 = P1 전멸기 (DPS 부족 시 전멸)
-      netRegex: { id: 'BABB', source: '케프카', capture: false },
-      durationSeconds: 4.7,
-      infoText: (_data, _matches, output) => output.enrage!(),
-      outputStrings: {
-        enrage: {
-          en: 'Enrage!',
-          ko: '전멸기',
-        },
-      },
-    },
-
-    // ───────── 탱버 ─────────
-    {
       id: 'DancingMad 파삭파삭 루인가',
       type: 'StartsUsing',
       // C403 = 1타(1어글자 대상, 시전 4.7s). C4E1 = 2타(2어글자 대상).
@@ -1743,6 +1729,20 @@ const triggerSet: TriggerSet<Data> = {
         secondTank: {
           en: '2nd Aggro Tankbuster',
           ko: '2어글자 탱버',
+        },
+      },
+    },
+    {
+      id: 'DancingMad 심판의 빛 전멸기',
+      type: 'StartsUsing',
+      // BABB = 강화판 심판의 빛 = P1 전멸기 (DPS 부족 시 전멸)
+      netRegex: { id: 'BABB', source: '케프카', capture: false },
+      durationSeconds: 4.7,
+      infoText: (_data, _matches, output) => output.enrage!(),
+      outputStrings: {
+        enrage: {
+          en: 'Enrage!',
+          ko: '전멸기',
         },
       },
     },
