@@ -3944,11 +3944,14 @@ const triggerSet: TriggerSet<Data> = {
       },
     },
     {
-      // 내 저항감소[강](B56불/B57얼음/BB6선더, BB42 ~5s 후 부여) 수집 → 회전 기준. 미부여=무징.
+      // 내 저항감소[강](B56불/B57얼음/BB6선더) 수집 → 회전 시작 기준. 미부여=무징.
+      //   ★디버프는 매 세트 재부여돼 3종이 순차로 붙음(회전하며 다음 클러스터 회피용) → 회전 시작은 첫(set1)
+      //   디버프뿐. set1 디버프는 첫 활성(dmStarSet 0→1) 전 ~5s에 오므로 dmStarSet===0일 때만 잡아 덮어쓰기 방지.
+      //   (무징=set1엔 디버프 없음 → 이후 재부여돼도 게이팅돼 undefined 유지.)
       id: 'DancingMad P5 세 개의 별 디버프',
       type: 'GainsEffect',
       netRegex: { effectId: ['B56', 'B57', 'BB6'] },
-      condition: (data, matches) => matches.target === data.me,
+      condition: (data, matches) => matches.target === data.me && (data.dmStarSet ?? 0) === 0,
       run: (data, matches) => data.dmStarMyElem = dmStarStatusElem(matches.effectId),
     },
     {
