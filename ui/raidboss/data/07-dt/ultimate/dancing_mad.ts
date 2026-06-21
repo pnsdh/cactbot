@@ -4357,13 +4357,14 @@ const triggerSet: TriggerSet<Data> = {
         const path = [card(start), card(start + step), card(start + 2 * step)];
         const rotation = delta < 0 ? output.right!() : output.left!();
         const pathStr = path.join(' → ');
-        return output.text!({ rot: rotation, path: pathStr });
+        // '(시작지점)에서 왼쪽으로 (순서)' — '왼쪽'만으론 기준이 모호해 시작 카디널을 앞에 붙임.
+        return output.text!({ start: path[0]!, rot: rotation, path: pathStr });
       },
       run: (data) => data.dmFloodOn = false,
       outputStrings: {
-        text: { en: '${rot} (${path})', ko: '${rot} (${path})' },
-        left: { en: 'Left', ko: '왼쪽' },
-        right: { en: 'Right', ko: '오른쪽' },
+        text: { en: 'From ${start}, ${rot} (${path})', ko: '${start}에서 ${rot} (${path})' },
+        left: { en: 'Left', ko: '왼쪽으로' },
+        right: { en: 'Right', ko: '오른쪽으로' },
         n: { en: 'N', ko: '북' },
         e: { en: 'E', ko: '동' },
         s: { en: 'S', ko: '남' },
