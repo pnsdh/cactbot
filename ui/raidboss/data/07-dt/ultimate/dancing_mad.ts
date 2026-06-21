@@ -56,6 +56,7 @@ export interface Data extends RaidbossData {
   dmStarTowers?: { [id: string]: { elem: DmStarElem; zone: DmStarZone; slot: number } }; // id(대문자hex)→탑정보. slot 0=왼/1=중/2=오(외향 기준)
   dmStarRaw?: { id: string; elem: DmStarElem; x: number; y: number }[]; // 261서 수집한 탑 원본(맵 구축 전)
   dmStarActive?: string[]; // 이번 세트 활성 탑 id들 (273 019D 10|20 수집, 세트마다 리셋)
+  dmStarSetTime?: string; // 직전 세트 활성 타임스탬프(세트 경계 감지용 — 카운터를 항상발화 수집기에서 증가)
   // P5 플러드 — C183 직선 텔레그래프(263 위치) 4직선 대각선 수집 → 시작 카디널 + 회전 산출
   dmFloodOn?: boolean; // 플러드 진행 윈도우(C183 텔레그래프 수집 게이트)
   dmFloodTele?: { t: string; x: number; y: number }[]; // 텔레그래프 분신(웨이브당 2개, r21~25)
@@ -3897,6 +3898,7 @@ const triggerSet: TriggerSet<Data> = {
       run: (data) => {
         data.dmStarOn = true;
         data.dmStarSet = 0;
+        data.dmStarSetTime = undefined;
         data.dmStarActive = [];
         data.dmStarMyElem = undefined;
         data.dmStarTowers = undefined;
@@ -3962,6 +3964,13 @@ const triggerSet: TriggerSet<Data> = {
       },
       condition: (data) => data.dmStarOn === true,
       run: (data, matches) => {
+        // 새 세트(활성 타임스탬프 변화) → 세트 카운터 증가 + 활성 리셋. 수집기는 매 활성 발화(suppress 없음)라
+        //   안내가 어느 세트에서 누락돼도 카운터가 어긋나지 않음.
+        if (matches.timestamp !== data.dmStarSetTime) {
+          data.dmStarSetTime = matches.timestamp;
+          data.dmStarSet = (data.dmStarSet ?? 0) + 1;
+          data.dmStarActive = [];
+        }
         (data.dmStarActive ??= []).push(matches.id.toUpperCase());
       },
     },
@@ -3984,7 +3993,7 @@ const triggerSet: TriggerSet<Data> = {
       durationSeconds: 5.9, // 활성+0.2s 표시 → 폭발(활성+~6.1s)까지 유지
       suppressSeconds: 5,
       alertText: (data, _matches, output) => {
-        const set = (data.dmStarSet ?? 0) + 1; // 이번 세트(읽기만; 커밋은 run)
+        const set = data.dmStarSet ?? 1; // 수집기가 세트 경계에서 증가 → 현재 세트값
         const towers = data.dmStarTowers;
         if (towers === undefined)
           return;
@@ -4028,13 +4037,7 @@ const triggerSet: TriggerSet<Data> = {
           slot: slotOut[chosen.slot] ?? '',
         });
       },
-      run: (data) => {
-        const set = (data.dmStarSet ?? 0) + 1;
-        data.dmStarSet = set;
-        data.dmStarActive = []; // 다음 세트 위해 리셋
-        if (set >= 3)
-          data.dmStarOn = false; // 마지막(3) 세트 후 윈도우 종료
-      },
+      // 카운터·활성리셋은 수집기에서, 윈도우 종료는 BB42+30s '종료' 트리거에서 처리(여기선 출력만).
       outputStrings: {
         text: { en: '${elem} tower: ${dir} ${slot}', ko: '${elem} 탑: ${dir} ${slot} 탑' },
         fire: { en: 'Fire', ko: '불' },
