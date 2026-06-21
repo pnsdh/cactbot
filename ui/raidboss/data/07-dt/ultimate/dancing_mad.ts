@@ -114,12 +114,19 @@ export interface Data extends RaidbossData {
   dmFloodLiving?: { x: number; y: number }; // 산 자의 암흑광(C394, 보라 빔) 시전 좌표
   dmFloodDead?: { x: number; y: number }; // 죽은 자의 암흑광(C395, 파랑 빔) 시전 좌표
   dmFloodTruth?: boolean; // 네오 808 param 462=진실=true / 461=거짓=false. 무의범람·GC 공용(부여 시점에 읽기)
-  dmForkMine?: { expiry: number; spread: boolean }; // P4 내 갈래번개/물압축: 만료(ms)·산개여부. 세트 매칭+행동
-  dmAccelMine?: { expiry: number; stop: boolean }; // P4 내 가속도 폭탄: 만료(ms)·정지여부. 만료=세트와 같으면 합침
+  dmForkMine?: { expiry: number; spread: boolean; early: boolean }; // P4 내 갈래번개/물압축: 만료(ms)·산개여부·E1(빠른)여부
+  dmAccelMine?: { expiry: number; stop: boolean; early: boolean }; // P4 내 가속도 폭탄: 만료(ms)·정지여부·E1(빠른)여부
   dmCurseTruth?: { [key: number]: boolean }; // P4 마안(저주의 외침) 그룹 진실(보지않기): key=만료(초). 비대상자도 방향 필요
   dmCurseMine?: number; // P4 내가 마안 대상이면 내 저주 만료시각(ms). 그룹 매칭용
   dmChaosTruth?: boolean; // P4 카오스 808 460=진실/45F=거짓(검증). 해일/화염→혼돈 불물 진실거짓
   dmChaosMove?: { [id: string]: boolean }; // P4 혼돈 불(15AB)/물(15AC): true=이동(근접)/false=대기(도넛)
+  // P4 디버프 캐스케이드 — 전역 발동(만료) 시각(ms). 각 안내가 직전 해소 앵커 + 자기 만료까지 표시.
+  dmP4PosE1?: number; // 산개/쉐어 1차(빠른) 만료 = E1
+  dmP4PosE2?: number; // 산개/쉐어 2차(늦은) 만료 = E2
+  dmP4Curse1?: number; // 마안 1차(이른 그룹) 만료
+  dmP4Curse2?: number; // 마안 2차(늦은 그룹) 만료
+  dmP4Fire?: number; // 혼돈의 불 만료
+  dmP4Water?: number; // 혼돈의 물 만료
   // P4 바닥(알쏭달쏭/찌릿찌릿/널리널리/마력방출) — 블리자가 고리 02A4=진실 / 선더가 고리 02A6=진실
   dmP4Blizzard?: boolean; // 최신 블리자가 고리(02A4=진실)
   dmP4BlizzardDir?: boolean; // 최신 블리자가 구슬 안전 대각선(true=북서/남동) — dir 옵션용
@@ -234,6 +241,37 @@ const dmExpiryMs = (matches: { timestamp: string; duration: string }): number =>
 // 만료 5초 전까지의 딜레이(초). delaySeconds 콜백용(음수 가드).
 const dmExpiryWarnDelay = (matches: { duration: string }): number =>
   Math.max(parseFloat(matches.duration) - 5, 0);
+
+// P4 캐스케이드 표시 길이(초): 앵커 이벤트(matches.timestamp)+delay 부터 목표 만료(ms)까지. 음수 가드 1s.
+//   각 안내는 '직전 기믹 해소'에 앵커되고 자기 만료까지 떠 있음 → duration을 동적으로 계산.
+const dmP4Dur = (matches: { timestamp: string }, targetMs: number | undefined, delay = 0): number =>
+  Math.max(((targetMs ?? 0) - Date.parse(matches.timestamp)) / 1000 - delay, 1);
+
+// P4 캐스케이드 차수 판정: 앵커(loss) 타임스탬프가 1차(t1) vs 2차(t2) 발동 중 어디에 가까운가(카운터 불필요).
+const dmP4IsWave1 = (matches: { timestamp: string }, t1?: number, t2?: number): boolean => {
+  const t = Date.parse(matches.timestamp);
+  return Math.abs(t - (t1 ?? t)) <= Math.abs(t - (t2 ?? t));
+};
+
+// P4 산개/쉐어(+가속도) 공용 출력(1·2차 동일). 가속도는 자기 차수(E1/E2)에 맞을 때만 합침.
+const dmP4PosOutputs = {
+  combo: { en: '${pos} + ${accel}', ko: '${pos} + ${accel}' },
+  spread: { en: 'Spread', ko: '산개' },
+  stack: { en: 'Stack', ko: '쉐어' },
+  stop: { en: 'Stop', ko: '정지' },
+  move: { en: 'Move', ko: '움직이기' },
+};
+// 내 positioning/가속도가 해당 차수(early=E1/!early=E2)면 행동, 아니면 쉐어/생략.
+const dmP4PosText = (data: Data, early: boolean, output: Output): string => {
+  const fork = data.dmForkMine;
+  const pos = (fork !== undefined && fork.early === early && fork.spread)
+    ? output.spread!()
+    : output.stack!();
+  const accel = data.dmAccelMine;
+  if (accel === undefined || accel.early !== early)
+    return pos;
+  return output.combo!({ pos: pos, accel: accel.stop ? output.stop!() : output.move!() });
+};
 
 // ───── P5 세 개의 별 공통 ─────
 // 탑 BNpcID(고정, 2풀 교차검증) → 속성. 1EC03E=불 / 1EC03F=얼음 / 1EC040=선더.
@@ -3473,11 +3511,13 @@ const triggerSet: TriggerSet<Data> = {
       netRegex: { effectId: '808', target: '네오 엑스데스' },
       run: (data, matches) => data.dmFloodTruth = matches.count === '462',
     },
-    // ───────── P4 갈래 번개 / 물속성 압축 / 가속도 폭탄 (만료 5초 전 통합 안내) ─────────
-    // GC1/GC2가 각각 갈래번개(15A8)2·물압축(15A9)2·가속도(15AA) 부여. 8명=positioning은 서로 다른 세트.
-    //   갈래: GC진실→산개/거짓→쉐어 · 물압축: GC진실→쉐어/거짓→산개 → 세트마다 6쉐어·2산개.
-    //   가속도: GC진실→정지/거짓→움직이기. 만료시각이 세트와 같아(raw dur는 GC교차로 다름) 한 줄로 합쳐 안내.
-    //   ※ 만료 절대시각(timestamp+dur)으로 세트 매칭 → infoText 한 줄(alertText는 2차 바닥 기믹용으로 비움).
+    // ───────── P4 디버프 캐스케이드 (산개·쉐어/가속도/마안/혼돈불물) ─────────
+    // GC1/GC2가 각각 갈래번개(15A8)2·물압축(15A9)2·가속도(15AA)·저주(15A7) 부여. positioning 8명=서로 다른 세트.
+    //   갈래: GC진실→산개/거짓→쉐어 · 물압축: GC진실→쉐어/거짓→산개 → 세트마다 6쉐어·2산개. 가속도: GC진실→정지.
+    //   ★실제 발동=만료 2시점(E1 빠름/E2 늦음). positioning과 가속도 차수는 독립(엇갈림 검증). 마안 60=1차/69=2차.
+    //   ★안내 = 직전 기믹 해소(LosesEffect/ability)에 앵커 + 자기 만료까지 표시(촉박한 만료−5 대체, 유저 요구).
+    //     체인: 무의범람→산개1 / 산개1만료→마안1 / 마안1만료→불중앙 / 불만료→이동대기(이후 산개2) /
+    //           불장판→산개2 / 산개2만료→마안2 / 마안2만료→물중앙 / 물만료→이동대기.
     {
       id: 'DancingMad 갈래 물압축 수집',
       type: 'GainsEffect',
@@ -3489,6 +3529,7 @@ const triggerSet: TriggerSet<Data> = {
         data.dmForkMine = {
           expiry: dmExpiryMs(matches),
           spread: spread,
+          early: parseFloat(matches.duration) < 56, // 36·51=E1(빠른) / 61·76=E2(늦은)
         };
       },
     },
@@ -3522,37 +3563,55 @@ const triggerSet: TriggerSet<Data> = {
         data.dmAccelMine = {
           expiry: dmExpiryMs(matches),
           stop: data.dmFloodTruth ?? true, // GC 진실=정지
+          early: parseFloat(matches.duration) < 56, // positioning과 독립(엇갈림 가능)
         },
     },
     {
-      id: 'DancingMad 갈래 물압축 안내',
+      // [캐스케이드 공용] 전역 발동(만료) 시각 + 마안 그룹 진실 수집(all-target). 각 안내가 직전 해소에 앵커되고
+      //   자기 만료까지 표시되도록 만료 절대시각을 미리 확보. positioning 36·51=E1/61·76=E2, 마안 60=1차/69=2차.
+      id: 'DancingMad P4 디버프 만료/그룹 수집',
       type: 'GainsEffect',
-      // positioning 디버프 기준 세트당 1회(suppress, 세트 간 ~15s), 만료 5초 전(delay=dur-5).
-      netRegex: { effectId: ['15A8', '15A9'] },
-      delaySeconds: (_data, matches) => dmExpiryWarnDelay(matches),
-      suppressSeconds: 10,
-      infoText: (data, matches, output) => {
-        const setExpiry = dmExpiryMs(matches);
-        // 산개/쉐어: 내 positioning이 이 세트(만료시각 일치)면 내 행동, 아니면 쉐어
-        const fork = data.dmForkMine;
-        const isMyFork = fork !== undefined && Math.abs(fork.expiry - setExpiry) < 2000;
-        const pos = isMyFork ? (fork.spread ? output.spread!() : output.stack!()) : output.stack!();
-        // 가속도: 내 가속도 만료가 이 세트와 같으면 합쳐서 안내
-        const accel = data.dmAccelMine;
-        if (accel === undefined || Math.abs(accel.expiry - setExpiry) >= 2000)
-          return pos;
-        return output.combo!({ pos: pos, accel: accel.stop ? output.stop!() : output.move!() });
-      },
-      outputStrings: {
-        combo: { en: '${pos} + ${accel}', ko: '${pos} + ${accel}' },
-        spread: { en: 'Spread', ko: '산개' },
-        stack: { en: 'Stack', ko: '쉐어' },
-        stop: { en: 'Stop', ko: '정지' },
-        move: { en: 'Move', ko: '움직이기' },
+      netRegex: { effectId: ['15A7', '15A8', '15A9', '15AB', '15AC'] },
+      run: (data, matches) => {
+        const ex = dmExpiryMs(matches);
+        const dur = parseFloat(matches.duration);
+        switch (matches.effectId) {
+          case '15A8':
+          case '15A9':
+            if (dur < 56)
+              data.dmP4PosE1 = ex;
+            else
+              data.dmP4PosE2 = ex;
+            break;
+          case '15A7':
+            if (dur < 64)
+              data.dmP4Curse1 = ex;
+            else
+              data.dmP4Curse2 = ex;
+            (data.dmCurseTruth ??= {})[Math.round(ex / 1000)] = data.dmFloodTruth ?? true; // 진실=보지않기
+            break;
+          case '15AB':
+            data.dmP4Fire = ex;
+            break;
+          case '15AC':
+            data.dmP4Water = ex;
+            break;
+        }
       },
     },
-    // ───────── P4 저주의 외침(마안, 15A7) — 만료 5초 전 보기/보지않기 ─────────
-    // 그룹당 2명, GC1(이른 만료)·GC2(늦은 만료) 2그룹(만료 안 뒤섞임, 고정). 진실→보지않기 / 거짓→보기.
+    {
+      // [캐스케이드 #1] 무의 범람 해소(시전+5s) → 1차 산개/쉐어/가속도(E1) 선행. E1 만료까지 표시(만료−5 대체).
+      id: 'DancingMad P4 산개쉐어 1차',
+      type: 'StartsUsing',
+      netRegex: { id: ['C392', 'C393', 'C3A1', 'C3A2'], source: '네오 엑스데스' },
+      delaySeconds: 5, // 무의범람 시전~해소
+      durationSeconds: (data, matches) => dmP4Dur(matches, data.dmP4PosE1, 5),
+      suppressSeconds: 5,
+      infoText: (data, _matches, output) => dmP4PosText(data, true, output),
+      outputStrings: dmP4PosOutputs,
+    },
+    // ───────── P4 저주의 외침(마안, 15A7) — 캐스케이드(산개 만료 앵커) 보기/보지않기 ─────────
+    // 그룹당 2명, GC1(이른 만료 60)·GC2(늦은 만료 69) 2그룹(만료 안 뒤섞임, 고정). 진실→보지않기 / 거짓→보기.
     //   모두 2명을 함께 보거나 피함. 내가 대상이면 나머지 1명만 처리 → 앞에 '내가 '. (다른 대상 식별 불필요)
     {
       id: 'DancingMad 저주의 외침 대상 수집',
@@ -3562,21 +3621,25 @@ const triggerSet: TriggerSet<Data> = {
       run: (data, matches) => data.dmCurseMine = dmExpiryMs(matches),
     },
     {
-      id: 'DancingMad 저주의 외침 안내',
-      type: 'GainsEffect',
-      netRegex: { effectId: '15A7' },
-      // preRun: 그룹 진실(네오 808)을 만료시각 키로 저장(비대상자도 방향 필요·만료 땐 808이 바뀜). 그룹당 1회(suppress).
-      preRun: (data, matches) => {
-        const key = Math.round(dmExpiryMs(matches) / 1000);
-        (data.dmCurseTruth ??= {})[key] = data.dmFloodTruth ?? true; // 진실=보지않기
-      },
-      delaySeconds: (_data, matches) => dmExpiryWarnDelay(matches),
-      suppressSeconds: 10,
+      // [캐스케이드 #2] 산개/쉐어 만료(positioning LosesEffect) → 마안 안내. 1차 만료=마안1차 / 2차=마안2차.
+      //   loss 타임스탬프를 E1/E2에 비교해 차수 판정(카운터 불필요·누락에 견고). 대상/비대상 모두 같은 타이밍.
+      id: 'DancingMad P4 마안 (캐스케이드)',
+      type: 'LosesEffect',
+      netRegex: { effectId: ['15A8', '15A9'] },
+      durationSeconds: (data, matches) =>
+        dmP4Dur(
+          matches,
+          dmP4IsWave1(matches, data.dmP4PosE1, data.dmP4PosE2) ? data.dmP4Curse1 : data.dmP4Curse2,
+        ),
+      suppressSeconds: 10, // 차수당 1회(E1/E2 ~25s 간격)
       infoText: (data, matches, output) => {
-        const expiry = dmExpiryMs(matches);
-        const away = data.dmCurseTruth?.[Math.round(expiry / 1000)] ?? true;
+        const curseMs = dmP4IsWave1(matches, data.dmP4PosE1, data.dmP4PosE2)
+          ? data.dmP4Curse1
+          : data.dmP4Curse2;
+        const away = data.dmCurseTruth?.[Math.round((curseMs ?? 0) / 1000)] ?? true;
         const dir = away ? output.away!() : output.look!();
-        const mine = data.dmCurseMine !== undefined && Math.abs(data.dmCurseMine - expiry) < 2000;
+        const mine = data.dmCurseMine !== undefined && curseMs !== undefined &&
+          Math.abs(data.dmCurseMine - curseMs) < 2000;
         return mine ? output.mine!({ dir: dir }) : output.notMine!({ dir: dir });
       },
       outputStrings: {
@@ -3586,10 +3649,9 @@ const triggerSet: TriggerSet<Data> = {
         look: { en: 'Evil Eye: Look', ko: '마안: 보기' },
       },
     },
-    // ───────── P4 혼돈의 불(15AB)/물(15AC) — 만료시 근접/도넛 장판 ─────────
+    // ───────── P4 혼돈의 불(15AB)/물(15AC) — 캐스케이드(마안 만료→중앙 / 만료→이동대기 장판) ─────────
     // 각자 불+물 둘 다(불이 먼저 만료, 해일/화염 순서 무관). 진실/거짓=카오스 808(해일/화염 시전).
-    //   불 진실=근접(이동)/거짓=도넛(대기) · 물은 반대 → move(이동) = (불 === 진실).
-    //   만료 5초 전 '중앙으로 (이후 이동/대기)' → 만료시 '이동/대기'(장판 발동 ~만료+5s까지).
+    //   불 진실=근접(이동)/거짓=도넛(대기) · 물은 반대 → move(이동) = (불 === 진실). 장판 발동=만료+5.08s.
     {
       id: 'DancingMad 카오스 진실거짓 수집',
       type: 'GainsEffect',
@@ -3598,21 +3660,32 @@ const triggerSet: TriggerSet<Data> = {
       run: (data, matches) => data.dmChaosTruth = matches.count === '460',
     },
     {
-      id: 'DancingMad 혼돈 불물 중앙',
+      // 혼돈 불(15AB)/물(15AC) move 수집: 부여 시점 카오스 진실 → 이동(근접)/대기(도넛). effectId별(불·물 각각).
+      id: 'DancingMad P4 혼돈 불물 수집',
       type: 'GainsEffect',
-      netRegex: { effectId: ['15AB', '15AC'] }, // 15AB 혼돈의 불 / 15AC 혼돈의 물
+      netRegex: { effectId: ['15AB', '15AC'] },
       condition: (data, matches) => matches.target === data.me,
-      // preRun: 부여 시점 카오스 진실로 move(이동/근접) 계산해 effectId별 저장(불·물 만료시각 달라 각각)
-      preRun: (data, matches) => {
+      run: (data, matches) => {
         (data.dmChaosMove ??= {})[matches.effectId] =
           (matches.effectId === '15AB') === (data.dmChaosTruth ?? true);
       },
-      delaySeconds: (_data, matches) => dmExpiryWarnDelay(matches),
-      durationSeconds: 5,
-      infoText: (data, matches, output) =>
-        output.center!({
-          next: (data.dmChaosMove?.[matches.effectId] ?? false) ? output.move!() : output.wait!(),
-        }),
+    },
+    {
+      // [캐스케이드 #3] 마안 만료(15A7 Loses) → 혼돈 불/물 '중앙으로 (이후 이동/대기)' 선행. 1차→불 / 2차→물.
+      id: 'DancingMad P4 혼돈 불물 중앙 (캐스케이드)',
+      type: 'LosesEffect',
+      netRegex: { effectId: '15A7' },
+      durationSeconds: (data, matches) =>
+        dmP4Dur(
+          matches,
+          dmP4IsWave1(matches, data.dmP4Curse1, data.dmP4Curse2) ? data.dmP4Fire : data.dmP4Water,
+        ),
+      suppressSeconds: 10,
+      infoText: (data, matches, output) => {
+        const id = dmP4IsWave1(matches, data.dmP4Curse1, data.dmP4Curse2) ? '15AB' : '15AC'; // 불 먼저/물 나중
+        const next = (data.dmChaosMove?.[id] ?? false) ? output.move!() : output.wait!();
+        return output.center!({ next: next });
+      },
       outputStrings: {
         center: { en: 'To center (then ${next})', ko: '중앙으로 (이후 ${next})' },
         move: { en: 'Move', ko: '이동' },
@@ -3620,15 +3693,49 @@ const triggerSet: TriggerSet<Data> = {
       },
     },
     {
-      id: 'DancingMad 혼돈 불물 처리',
-      type: 'GainsEffect',
-      // 만료시(장판 발동 ~+5s까지): 이동(근접 피하기)/대기(도넛 안). '중앙' 트리거 preRun이 저장한 move 사용.
-      netRegex: { effectId: ['15AB', '15AC'] },
-      condition: (data, matches) => matches.target === data.me,
-      delaySeconds: (_data, matches) => parseFloat(matches.duration),
-      durationSeconds: 5,
-      infoText: (data, matches, output) =>
-        (data.dmChaosMove?.[matches.effectId] ?? false) ? output.move!() : output.wait!(),
+      // [캐스케이드 #4] 혼돈불 만료(15AB Loses) → '이동/대기 (이후 산개/쉐어)'. 불 처리 + 2차 산개 선행 병합.
+      //   장판 발동(만료+~5.08s)까지 표시. '이후 산개/쉐어' = 내 2차(E2) positioning 예고.
+      id: 'DancingMad P4 혼돈불 처리 (캐스케이드)',
+      type: 'LosesEffect',
+      netRegex: { effectId: '15AB', capture: false },
+      durationSeconds: 5.1, // 만료~장판 발동(+5.08s)
+      suppressSeconds: 5,
+      infoText: (data, _matches, output) => {
+        const move = (data.dmChaosMove?.['15AB'] ?? false) ? output.move!() : output.wait!();
+        const fork = data.dmForkMine;
+        const next = (fork !== undefined && !fork.early && fork.spread)
+          ? output.spread!()
+          : output.stack!();
+        return output.combo!({ move: move, next: next });
+      },
+      outputStrings: {
+        combo: { en: '${move} (then ${next})', ko: '${move} (이후 ${next})' },
+        move: { en: 'Move', ko: '이동' },
+        wait: { en: 'Wait', ko: '대기' },
+        spread: { en: 'Spread', ko: '산개' },
+        stack: { en: 'Stack', ko: '쉐어' },
+      },
+    },
+    {
+      // [캐스케이드 #5] 혼돈불 장판 처리(만료+5.1s) 후 → 2차 산개/쉐어/가속도(E2) 원래 안내. E2 만료까지 표시.
+      id: 'DancingMad P4 산개쉐어 2차',
+      type: 'LosesEffect',
+      netRegex: { effectId: '15AB' },
+      delaySeconds: 5.1, // 혼돈불 장판 처리 후
+      durationSeconds: (data, matches) => dmP4Dur(matches, data.dmP4PosE2, 5.1),
+      suppressSeconds: 5,
+      infoText: (data, _matches, output) => dmP4PosText(data, false, output),
+      outputStrings: dmP4PosOutputs,
+    },
+    {
+      // [캐스케이드 #8] 혼돈물 만료(15AC Loses) → '이동/대기'(마지막). 장판 발동(+5.08s)까지 표시.
+      id: 'DancingMad P4 혼돈물 처리 (캐스케이드)',
+      type: 'LosesEffect',
+      netRegex: { effectId: '15AC', capture: false },
+      durationSeconds: 5.1,
+      suppressSeconds: 5,
+      infoText: (data, _matches, output) =>
+        (data.dmChaosMove?.['15AC'] ?? false) ? output.move!() : output.wait!(),
       outputStrings: {
         move: { en: 'Move', ko: '이동' },
         wait: { en: 'Wait', ko: '대기' },
@@ -3645,6 +3752,18 @@ const triggerSet: TriggerSet<Data> = {
         data.dmP4StdBlizzard = undefined;
         data.dmP4StdThunder = undefined;
         data.dmP4BlizzardDir = undefined;
+        // 디버프 캐스케이드 상태(직전 풀 잔여 방지)
+        data.dmForkMine = undefined;
+        data.dmAccelMine = undefined;
+        data.dmCurseMine = undefined;
+        data.dmCurseTruth = undefined;
+        data.dmChaosMove = undefined;
+        data.dmP4PosE1 = undefined;
+        data.dmP4PosE2 = undefined;
+        data.dmP4Curse1 = undefined;
+        data.dmP4Curse2 = undefined;
+        data.dmP4Fire = undefined;
+        data.dmP4Water = undefined;
       },
     },
     {
