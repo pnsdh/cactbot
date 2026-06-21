@@ -3812,10 +3812,13 @@ const triggerSet: TriggerSet<Data> = {
         const move = (data.dmChaosMove?.['15AB'] ?? false)
           ? output.fireMove!()
           : output.fireWait!();
-        return output.combo!({ move: move, next: dmP4PosText(data, false, output) });
+        // 콜러 ON이면 미리보기에도 그룹 콜 덧붙임(유저 요청, 감안하고 켜는 옵션).
+        const next = dmP4PosText(data, false, output) + dmP4CallerSuffix(data, false, output);
+        return output.combo!({ move: move, next: next });
       },
       outputStrings: {
         ...dmP4PosOutputs, // 이후 안내(산개/쉐어+가속도) 재사용
+        ...dmP4CallerOutputs, // 콜러 ON 시 미리보기에도 그룹 콜
         combo: { en: '${move} (then ${next})', ko: '${move} (이후 ${next})' },
         fireMove: { en: 'Move', ko: '이동' },
         fireWait: { en: 'Wait', ko: '대기' },
