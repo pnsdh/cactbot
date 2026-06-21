@@ -1402,7 +1402,7 @@ const triggerSet: TriggerSet<Data> = {
           'left/right of the V between the two 90°-apart black holes. ' +
           '09STOP (Old): line 1 = attack2, line 2 = attack1 takes both. ' +
           'Yan: line 1 = attack1, line 2 = attack1(opposite)/attack2. Lines 3-10 otherwise identical (Yan-style).',
-        ko: '공략에 따른 블랙홀 줄 처리 방식 (09STOP은 1·2·9줄, 그 외는 공통)',
+        ko: '공략에 따른 블랙홀 줄 처리 방식',
       },
       type: 'select',
       options: {
@@ -1454,7 +1454,7 @@ const triggerSet: TriggerSet<Data> = {
         en: '09STOP (0621) (default): start SW, then "left 2" every set (4×, no branching). ' +
           '09STOP (Old): set1/2 left 90°, set3 checks East cardinal floor. ' +
           'RAID GOSU: set1 left 1 / set2 left 2 / set3 checks North cardinal / set4 checks NW(or NE) temporary floor.',
-        ko: 'P5 행방불명 영구장판 회전 동선.',
+        ko: 'P5 행방불명 회전 동선.',
       },
       type: 'select',
       options: {
@@ -3739,23 +3739,24 @@ const triggerSet: TriggerSet<Data> = {
       delaySeconds: 0.5,
       durationSeconds: 4.5, // 시전~피격까지(지연 0.5 보정)
       alertText: (data, matches, output) => {
+        // 네오 방향(8방위, 플레이어가 바라볼 쪽) = 네오 좌표를 중앙 기준 방위로. 항상 산출 가능 → 폴백용 선계산.
+        const neoX = parseFloat(matches.x);
+        const neoY = parseFloat(matches.y);
+        const facing = output[
+          Directions.output8Dir[Directions.xyTo8DirNum(neoX, neoY, 100, 100)] ??
+            'unknown'
+        ]!();
         const wound = data.dmFloodWound;
         const mod = data.dmFloodMod;
+        // 상처/모드 미수집(이례적): 무음 대신 최소한 네오 방위라도 안내 — 색·좌우는 직접 확인.
         if (wound === undefined || mod === undefined)
-          return;
+          return output.faceOnly!({ facing: facing });
         // 실제 타겟 빔: 죽음초월(defy)→상처와 같은 / 알라그(allagan)→반대 (산자=C394/보라, 죽은자=C395/파랑)
         const targetLiving = mod === 'defy' ? wound === 'living' : wound !== 'living';
         const target = targetLiving ? data.dmFloodLiving : data.dmFloodDead;
         // 보이는 색 = 실제색(산자=보라)을 무의범람 거짓(808 param=461)이면 반전 (사람이 보는 색에 맞춤)
         const visiblePurple = data.dmFloodTruth === false ? !targetLiving : targetLiving;
         const color = visiblePurple ? output.purple!() : output.blue!();
-        const neoX = parseFloat(matches.x);
-        const neoY = parseFloat(matches.y);
-        // 네오 방향(8방위, 플레이어가 바라볼 쪽) = 네오 좌표를 중앙 기준 방위로
-        const facing = output[
-          Directions.output8Dir[Directions.xyTo8DirNum(neoX, neoY, 100, 100)] ??
-            'unknown'
-        ]!();
         if (target === undefined)
           return output.colorOnly!({ facing: facing, color: color }); // 빔 좌표 미수집 → 방향+색만
         // 좌우: F=(네오−중앙) 향함, T=(타겟빔−중앙). 외적>0=오른쪽 (실측 보정: 산자 북=서향 시 우).
@@ -3769,6 +3770,7 @@ const triggerSet: TriggerSet<Data> = {
           ko: '${facing}을 보고 ${side} ${color} 빔 맞기',
         },
         colorOnly: { en: 'Face ${facing}, ${color} beam', ko: '${facing}을 보고 ${color} 빔 맞기' },
+        faceOnly: { en: 'Face ${facing} (check beam)', ko: '${facing}을 보고 빔 직접 확인' },
         purple: { en: 'Purple', ko: '보라' },
         blue: { en: 'Blue', ko: '파랑' },
         left: { en: 'left', ko: '왼쪽' },
