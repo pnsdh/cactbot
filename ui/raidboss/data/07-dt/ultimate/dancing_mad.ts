@@ -4526,7 +4526,7 @@ const triggerSet: TriggerSet<Data> = {
       durationSeconds: 5,
       infoText: (_data, _matches, output) => output.spread!(),
       outputStrings: {
-        spread: { en: 'Spread', ko: '산개' },
+        spread: { en: 'Whirlwind: Spread', ko: '와류 전체 산개' },
       },
     },
   ],
