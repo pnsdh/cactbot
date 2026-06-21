@@ -4000,20 +4000,16 @@ const triggerSet: TriggerSet<Data> = {
       run: (data, matches) => data.dmOrchTank = matches.effectId === '14E6' ? 'flare' : 'holy',
     },
     {
-      // 1타 안내(BB50 발동 +1.7s): 탱=쉐어+북/무적 / 힐딜 피격=칼끝딜+남 / 비피격=안으로+남.
-      //   ★탱 디버프(14E6/7) 부여=BB50해소 +1.47~1.51s(실측 변동) → +1.5s면 마진 0/음수라 홀리탱 오안내.
-      //   delay 1.7s로 디버프 수집 보장(최대 +1.51 대비 마진 ~0.19s, deferred run은 ms라 충분). 2타(BB51) +3.17s 전.
-      id: 'DancingMad P5 오케스트라 1타 안내',
+      // 1타 안내 (딜힐): 피격 여부(칼끝딜/안으로)는 1타 피격(BB52플레어/BB54홀리→dmOrchHit)만 필요.
+      //   ★피격=BB50발동 +0.89s(실측 15컷 0.888~0.896, 매우 일정) → delay 1.1(마진 ~0.2s)로 반응성↑.
+      //   탱은 플레어/홀리 디버프(+1.47s)가 필요해 별도(아래). 2타(BB51) +3.17s 전.
+      id: 'DancingMad P5 오케스트라 1타 안내 (딜힐)',
       type: 'Ability',
       netRegex: { id: 'BB50', source: '케프카', capture: false },
-      delaySeconds: 1.7,
+      condition: (data) => data.role !== 'tank',
+      delaySeconds: 1.1,
       durationSeconds: 2,
       alertText: (data, _matches, output) => {
-        // {action} (이후 {next}) 조합으로 토큰화(유저 커스터마이즈 용이). 표시 결과는 동일.
-        if (data.role === 'tank') {
-          const next = data.dmOrchTank === 'holy' ? output.nInvuln!() : output.nNorth!();
-          return output.combo!({ action: output.aShare!(), next: next });
-        }
         const hit = (data.dmOrchHit ?? []).includes(data.me ?? '');
         return output.combo!({
           action: hit ? output.aHit!() : output.aIn!(),
@@ -4022,11 +4018,29 @@ const triggerSet: TriggerSet<Data> = {
       },
       outputStrings: {
         combo: { en: '${action} (then ${next})', ko: '${action} (이후 ${next})' },
-        aShare: { en: 'Tank share', ko: '탱커 쉐어' },
         aHit: { en: 'Point-blank', ko: '칼끝딜' },
         aIn: { en: 'In', ko: '안으로' },
-        nNorth: { en: 'N', ko: '북쪽으로' },
         nSouth: { en: 'S', ko: '남쪽으로' },
+      },
+    },
+    {
+      // 1타 안내 (탱): 플레어→북/홀리→무적은 디버프(14E6플레어/14E7홀리)를 봐야 함.
+      //   ★디버프 부여=BB50발동 +1.47~1.51s(실측 변동) → +1.5s면 마진 0/음수라 홀리탱 오안내(예전 버그).
+      //   delay 1.7s로 수집 보장(최대 +1.51 대비 마진 ~0.19s). 피격 시점(+0.9s)엔 플레어/홀리 미확정이라 못 당김.
+      id: 'DancingMad P5 오케스트라 1타 안내 (탱)',
+      type: 'Ability',
+      netRegex: { id: 'BB50', source: '케프카', capture: false },
+      condition: (data) => data.role === 'tank',
+      delaySeconds: 1.7,
+      durationSeconds: 2,
+      alertText: (data, _matches, output) => {
+        const next = data.dmOrchTank === 'holy' ? output.nInvuln!() : output.nNorth!();
+        return output.combo!({ action: output.aShare!(), next: next });
+      },
+      outputStrings: {
+        combo: { en: '${action} (then ${next})', ko: '${action} (이후 ${next})' },
+        aShare: { en: 'Tank share', ko: '탱커 쉐어' },
+        nNorth: { en: 'N', ko: '북쪽으로' },
         nInvuln: { en: 'invuln', ko: '무적기' },
       },
     },
