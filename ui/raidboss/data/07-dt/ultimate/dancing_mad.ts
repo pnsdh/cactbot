@@ -253,13 +253,14 @@ const dmP4IsWave1 = (matches: { timestamp: string }, t1?: number, t2?: number): 
   return Math.abs(t - (t1 ?? t)) <= Math.abs(t - (t2 ?? t));
 };
 
-// P4 산개/쉐어(+가속도) 공용 출력(1·2차 동일). 가속도는 자기 차수(E1/E2)에 맞을 때만 합침.
+// P4 산개/쉐어(+가속도) 공용 출력(1·2차 동일). 키는 혼돈불 처리(#4) 병합에서 재사용하므로 충돌 회피용 고유명
+//   (posCombo/accelMove). 가속도는 자기 차수(E1/E2)에 맞을 때만 합침.
 const dmP4PosOutputs = {
-  combo: { en: '${pos} + ${accel}', ko: '${pos} + ${accel}' },
+  posCombo: { en: '${pos} + ${accel}', ko: '${pos} + ${accel}' },
   spread: { en: 'Spread', ko: '산개' },
   stack: { en: 'Stack', ko: '쉐어' },
   stop: { en: 'Stop', ko: '정지' },
-  move: { en: 'Move', ko: '움직이기' },
+  accelMove: { en: 'Move', ko: '움직이기' },
 };
 // 내 positioning/가속도가 해당 차수(early=E1/!early=E2)면 행동, 아니면 쉐어/생략.
 const dmP4PosText = (data: Data, early: boolean, output: Output): string => {
@@ -270,7 +271,7 @@ const dmP4PosText = (data: Data, early: boolean, output: Output): string => {
   const accel = data.dmAccelMine;
   if (accel === undefined || accel.early !== early)
     return pos;
-  return output.combo!({ pos: pos, accel: accel.stop ? output.stop!() : output.move!() });
+  return output.posCombo!({ pos: pos, accel: accel.stop ? output.stop!() : output.accelMove!() });
 };
 
 // ───── P5 세 개의 별 공통 ─────
@@ -3693,27 +3694,24 @@ const triggerSet: TriggerSet<Data> = {
       },
     },
     {
-      // [캐스케이드 #4] 혼돈불 만료(15AB Loses) → '이동/대기 (이후 산개/쉐어)'. 불 처리 + 2차 산개 선행 병합.
-      //   장판 발동(만료+~5.08s)까지 표시. '이후 산개/쉐어' = 내 2차(E2) positioning 예고.
+      // [캐스케이드 #4] 혼돈불 만료(15AB Loses) → '이동/대기 (이후 <2차 안내 전체>)'. 불 처리 + 2차 산개 선행 병합.
+      //   장판 발동(만료+~5.08s)까지 표시. '이후' = 내 2차(E2) 안내 전체(산개/쉐어 + 가속도) = #5와 동일.
       id: 'DancingMad P4 혼돈불 처리 (캐스케이드)',
       type: 'LosesEffect',
       netRegex: { effectId: '15AB', capture: false },
       durationSeconds: 5.1, // 만료~장판 발동(+5.08s)
       suppressSeconds: 5,
       infoText: (data, _matches, output) => {
-        const move = (data.dmChaosMove?.['15AB'] ?? false) ? output.move!() : output.wait!();
-        const fork = data.dmForkMine;
-        const next = (fork !== undefined && !fork.early && fork.spread)
-          ? output.spread!()
-          : output.stack!();
-        return output.combo!({ move: move, next: next });
+        const move = (data.dmChaosMove?.['15AB'] ?? false)
+          ? output.fireMove!()
+          : output.fireWait!();
+        return output.combo!({ move: move, next: dmP4PosText(data, false, output) });
       },
       outputStrings: {
+        ...dmP4PosOutputs, // 이후 안내(산개/쉐어+가속도) 재사용
         combo: { en: '${move} (then ${next})', ko: '${move} (이후 ${next})' },
-        move: { en: 'Move', ko: '이동' },
-        wait: { en: 'Wait', ko: '대기' },
-        spread: { en: 'Spread', ko: '산개' },
-        stack: { en: 'Stack', ko: '쉐어' },
+        fireMove: { en: 'Move', ko: '이동' },
+        fireWait: { en: 'Wait', ko: '대기' },
       },
     },
     {
@@ -3836,7 +3834,7 @@ const triggerSet: TriggerSet<Data> = {
         data.dmP4StdBlizzard = matches.id === 'BA98';
         data.dmP4ThunderDone = false; // 마력방출 후 전조 블리자가에 재발동 방지
       },
-      durationSeconds: 5, // 시전 시작~착탄
+      durationSeconds: 4, // 산개/쉐어 2차(E2 만료, 시전+~4s)에 종료 맞춤. 착탄은 +5s지만 그 전 위치 잡음.
       suppressSeconds: 3,
       alertText: (_data, matches, output) =>
         matches.id === 'BA98' ? output.avoid!() : output.step!(),
