@@ -4008,7 +4008,7 @@ const triggerSet: TriggerSet<Data> = {
       netRegex: { id: 'BB50', source: '케프카', capture: false },
       condition: (data) => data.role !== 'tank',
       delaySeconds: 1.1,
-      durationSeconds: 2,
+      durationSeconds: 2.2, // 2타(BB51 +3.17s)까지 끊김 없이(show +1.1 → +3.3, 2타가 덮어씀)
       alertText: (data, _matches, output) => {
         const hit = (data.dmOrchHit ?? []).includes(data.me ?? '');
         return output.combo!({
