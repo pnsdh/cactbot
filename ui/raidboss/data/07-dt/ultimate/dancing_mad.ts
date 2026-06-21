@@ -4223,60 +4223,65 @@ const triggerSet: TriggerSet<Data> = {
       suppressSeconds: 5, // 세트당 1회 (세트 간 ~8.2s)
       alertText: (data, matches, output) => {
         const set = (data.dmFsknP5Set ?? 0) + 1;
+        // 모든 공략 동선을 {dir}쪽으로 {n}칸 조합으로 통일(유저 커스터마이즈 용이). dir/n만 분기서 산출.
+        let dir: 'left' | 'right' = 'left';
+        let n = 2;
         if (data.triggerSetConfig.dmForsakenP5Method === '09stop0621') {
-          // 분기 없음: 남서 시작 후 매 세트(1~4) '왼쪽으로 2칸' 반복.
-          return output.left2!();
-        }
-        if (data.triggerSetConfig.dmForsakenP5Method === 'raidgosu') {
-          if (set === 1)
-            return output.gosuLeft1!();
-          if (set === 2)
-            return output.gosuLeft2!();
-          if (set === 3) {
+          // 분기 없음: 남서 시작 후 매 세트(1~4) 왼쪽으로 2칸 반복.
+          dir = 'left';
+          n = 2;
+        } else if (data.triggerSetConfig.dmForsakenP5Method === 'raidgosu') {
+          if (set === 1) {
+            dir = 'left';
+            n = 1;
+          } else if (set === 2) {
+            dir = 'left';
+            n = 2;
+          } else if (set === 3) {
             // 이번 세트 영구장판 2개 중 북쪽 모서리(|dx|<6, dy<-6) 있나? 있음→오른쪽(서로 감)/없음→왼쪽(북으로 감)
             const floors = (data.dmFsknP5Floors ?? []).filter((f) => f.t === matches.timestamp);
             const north = floors.some((f) => Math.abs(f.x - 100) < 6 && (f.y - 100) < -6);
             data.dmFsknP5Dir = north ? 'west' : 'north';
-            return north ? output.gosuRight1!() : output.gosuLeft1!();
-          }
-          if (set === 4) {
+            dir = north ? 'right' : 'left';
+            n = 1;
+          } else if (set === 4) {
             // 임시장판(BB38) 북반구 대각선: dir=west면 북서(dx<-3) / dir=north면 북동(dx>3) 체크
             const temps = (data.dmFsknP5Temp ?? []).filter((f) => f.t === matches.timestamp);
             const checkNW = data.dmFsknP5Dir === 'west';
             const hit = temps.some((f) =>
               (f.y - 100) < -3 && (checkNW ? (f.x - 100) < -3 : (f.x - 100) > 3)
             );
-            return hit ? output.gosuRight1!() : output.gosuLeft1!();
+            dir = hit ? 'right' : 'left';
+            n = 1;
+          } else {
+            return;
           }
-          return;
+        } else {
+          // 09stop (Old): 세트1·2=왼2 / 세트3=동쪽 모서리 분기(왼/오른 2.5) / 세트4=세트3 따라(1.5)
+          if (set === 1 || set === 2) {
+            dir = 'left';
+            n = 2;
+          } else if (set === 3) {
+            // 이번 세트 영구장판 2개 중 동쪽 모서리(dx>6, |dy|<6) 있나? (대각선 제외)
+            const floors = (data.dmFsknP5Floors ?? []).filter((f) => f.t === matches.timestamp);
+            const east = floors.some((f) => (f.x - 100) > 6 && Math.abs(f.y - 100) < 6);
+            data.dmFsknP5Dir = east ? 'west' : 'east';
+            dir = east ? 'right' : 'left';
+            n = 2.5;
+          } else if (set === 4) {
+            dir = data.dmFsknP5Dir === 'west' ? 'left' : 'right';
+            n = 1.5;
+          } else {
+            return;
+          }
         }
-        if (set === 1)
-          return output.left90!();
-        if (set === 2)
-          return output.left90N!();
-        if (set === 3) {
-          // 이번 세트 영구장판 2개 중 동쪽 모서리(dx>6, |dy|<6) 있나? (대각선 제외)
-          const floors = (data.dmFsknP5Floors ?? []).filter((f) => f.t === matches.timestamp);
-          const east = floors.some((f) => (f.x - 100) > 6 && Math.abs(f.y - 100) < 6);
-          data.dmFsknP5Dir = east ? 'west' : 'east';
-          return east ? output.set3West!() : output.set3East!();
-        }
-        if (set === 4)
-          return data.dmFsknP5Dir === 'west' ? output.set4NW!() : output.set4NE!();
-        return;
+        return output.combo!({ dir: output[dir]!(), n: n });
       },
       run: (data) => data.dmFsknP5Set = (data.dmFsknP5Set ?? 0) + 1,
       outputStrings: {
-        left2: { en: 'Left 2', ko: '왼쪽으로 2칸' },
-        left90: { en: 'Left 90° (→ W)', ko: '왼쪽으로 2칸' },
-        left90N: { en: 'Left 90° (→ N)', ko: '왼쪽으로 2칸' },
-        set3East: { en: 'Left/East — go extra', ko: '왼쪽으로, 2.5칸' },
-        set3West: { en: 'Right/West — go extra', ko: '오른쪽으로, 2.5칸' },
-        set4NW: { en: 'Left (NW)', ko: '왼쪽으로 1.5칸' },
-        set4NE: { en: 'Right (NE)', ko: '오른쪽으로 1.5칸' },
-        gosuLeft1: { en: 'Left 1', ko: '왼쪽으로 1칸' },
-        gosuLeft2: { en: 'Left 2', ko: '왼쪽으로 2칸' },
-        gosuRight1: { en: 'Right 1', ko: '오른쪽으로 1칸' },
+        combo: { en: '${dir} ${n}', ko: '${dir}쪽으로 ${n}칸' },
+        left: { en: 'Left', ko: '왼' },
+        right: { en: 'Right', ko: '오른' },
       },
     },
     {
