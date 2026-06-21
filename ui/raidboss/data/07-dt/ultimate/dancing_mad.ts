@@ -128,9 +128,10 @@ export interface Data extends RaidbossData {
   dmP4Curse2?: number; // 마안 2차(늦은 그룹) 만료
   dmP4Fire?: number; // 혼돈의 불 만료
   dmP4Water?: number; // 혼돈의 물 만료
-  // P4 콜러(dmP4Caller) — 전원 산개/가속 수집(그룹 콜용, 옵션 ON일 때만)
+  // P4 콜러(dmP4Caller) — 전원 산개/가속/마안 수집(그룹 콜용, 옵션 ON일 때만)
   dmP4ForkAll?: { target: string; spread: boolean; early: boolean }[]; // 전원 positioning
   dmP4AccelAll?: { target: string; stop: boolean; early: boolean }[]; // 전원 가속도
+  dmP4CurseAll?: { target: string; early: boolean }[]; // 마안 대상(early=1차 그룹 dur60)
   // P4 바닥(알쏭달쏭/찌릿찌릿/널리널리/마력방출) — 블리자가 고리 02A4=진실 / 선더가 고리 02A6=진실
   dmP4Blizzard?: boolean; // 최신 블리자가 고리(02A4=진실)
   dmP4BlizzardDir?: boolean; // 최신 블리자가 구슬 안전 대각선(true=북서/남동) — dir 옵션용
@@ -316,6 +317,20 @@ const dmP4CallerSuffix = (data: Data, early: boolean, output: Output): string =>
     ? output.accMove!()
     : output.accMixed!();
   return output.caller!({ jobs: jobs, accel: accel });
+};
+
+// 마안 콜러 접미(옵션 ON): 해당 회차 마안 대상자 직업만 덧붙임(보기/보지않기는 공통이라 앞에 이미 안내).
+const dmP4CurseOutputs = {
+  targets: { en: ' (${jobs})', ko: ' (${jobs})' },
+};
+const dmP4CurseSuffix = (data: Data, wave1: boolean, output: Output): string => {
+  if (data.triggerSetConfig.dmP4Caller !== true)
+    return '';
+  const jobs = (data.dmP4CurseAll ?? [])
+    .filter((c) => c.early === wave1) // wave1=1차 그룹(dur60) / wave2=2차(dur69)
+    .map((c) => data.party.member(c.target).job ?? c.target)
+    .join(', ') || '?';
+  return output.targets!({ jobs: jobs });
 };
 
 // ───── P5 세 개의 별 공통 ─────
@@ -3656,6 +3671,19 @@ const triggerSet: TriggerSet<Data> = {
       },
     },
     {
+      // 콜러 전원 마안 대상 수집(옵션 ON일 때만). early=1차 그룹(dur60<64) / 2차(dur69).
+      id: 'DancingMad P4 콜러 마안 수집',
+      type: 'GainsEffect',
+      netRegex: { effectId: '15A7' },
+      condition: (data) => data.triggerSetConfig.dmP4Caller === true,
+      run: (data, matches) => {
+        (data.dmP4CurseAll ??= []).push({
+          target: matches.target,
+          early: parseFloat(matches.duration) < 64,
+        });
+      },
+    },
+    {
       // [캐스케이드 공용] 전역 발동(만료) 시각 + 마안 그룹 진실 수집(all-target). 각 안내가 직전 해소에 앵커되고
       //   자기 만료까지 표시되도록 만료 절대시각을 미리 확보. positioning 36·51=E1/61·76=E2, 마안 60=1차/69=2차.
       id: 'DancingMad P4 디버프 만료/그룹 수집',
@@ -3726,20 +3754,22 @@ const triggerSet: TriggerSet<Data> = {
         ),
       suppressSeconds: 10, // 차수당 1회(E1/E2 ~25s 간격)
       infoText: (data, matches, output) => {
-        const curseMs = dmP4IsWave1(matches, data.dmP4PosE1, data.dmP4PosE2)
-          ? data.dmP4Curse1
-          : data.dmP4Curse2;
+        const wave1 = dmP4IsWave1(matches, data.dmP4PosE1, data.dmP4PosE2);
+        const curseMs = wave1 ? data.dmP4Curse1 : data.dmP4Curse2;
         const away = data.dmCurseTruth?.[Math.round((curseMs ?? 0) / 1000)] ?? true;
         const dir = away ? output.away!() : output.look!();
         const mine = data.dmCurseMine !== undefined && curseMs !== undefined &&
           Math.abs(data.dmCurseMine - curseMs) < 2000;
-        return mine ? output.mine!({ dir: dir }) : output.notMine!({ dir: dir });
+        // 콜러 ON이면 해당 회차 마안 대상자 직업 덧붙임(보기/보지않기는 공통이라 앞에 이미).
+        const base = mine ? output.mine!({ dir: dir }) : output.notMine!({ dir: dir });
+        return base + dmP4CurseSuffix(data, wave1, output);
       },
       outputStrings: {
         mine: { en: 'My ${dir}', ko: '내가 ${dir}' },
         notMine: { en: '${dir}', ko: '${dir}' },
         away: { en: 'Evil Eye: Look Away', ko: '마안: 보지 않기' },
         look: { en: 'Evil Eye: Look', ko: '마안: 보기' },
+        ...dmP4CurseOutputs,
       },
     },
     // ───────── P4 혼돈의 불(15AB)/물(15AC) — 캐스케이드(마안 만료→중앙 / 만료→이동대기 장판) ─────────
@@ -3877,6 +3907,7 @@ const triggerSet: TriggerSet<Data> = {
         data.dmP4Water = undefined;
         data.dmP4ForkAll = undefined;
         data.dmP4AccelAll = undefined;
+        data.dmP4CurseAll = undefined;
       },
     },
     {
