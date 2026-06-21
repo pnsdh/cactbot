@@ -299,10 +299,10 @@ const dmP4CallerOutputs = {
 const dmP4CallerSuffix = (data: Data, early: boolean, output: Output): string => {
   if (data.triggerSetConfig.dmP4Caller !== true)
     return '';
-  // 산개자(이 차수 만료 + 산개) 직업명. party.member().jobFull = 유저 언어 현지화(ko='닌자').
+  // 산개자(이 차수 만료 + 산개) 직업 약어. party.member().job = 현지화 약칭(ko='건브'/'암기'/'백마' …).
   const jobs = (data.dmP4ForkAll ?? [])
     .filter((f) => f.early === early && f.spread)
-    .map((f) => data.party.member(f.target).jobFull ?? f.target)
+    .map((f) => data.party.member(f.target).job ?? f.target)
     .join(', ');
   // 가속: 이 차수 만료 가속도 전체 정지/이동 일치 → 멈춰/움직여, 섞이면 섞임.
   const accels = (data.dmP4AccelAll ?? []).filter((a) => a.early === early);
