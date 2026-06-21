@@ -4223,27 +4223,28 @@ const triggerSet: TriggerSet<Data> = {
       suppressSeconds: 5, // 세트당 1회 (세트 간 ~8.2s)
       alertText: (data, matches, output) => {
         const set = (data.dmFsknP5Set ?? 0) + 1;
-        // 모든 공략 동선을 {dir}쪽으로 {n}칸 조합으로 통일(유저 커스터마이즈 용이). dir/n만 분기서 산출.
+        // 모든 공략 동선을 {dir} {dist} 조합으로 통일(유저 커스터마이즈 용이). 각 토큰은 통째 교체 가능
+        //   (예 dist2 '2칸'→'90도', left '왼쪽으로'→'시계방향으로'). dir/dist 키만 분기서 산출.
         let dir: 'left' | 'right' = 'left';
-        let n = 2;
+        let dist: 'dist1' | 'dist15' | 'dist2' | 'dist25' = 'dist2';
         if (data.triggerSetConfig.dmForsakenP5Method === '09stop0621') {
           // 분기 없음: 남서 시작 후 매 세트(1~4) 왼쪽으로 2칸 반복.
           dir = 'left';
-          n = 2;
+          dist = 'dist2';
         } else if (data.triggerSetConfig.dmForsakenP5Method === 'raidgosu') {
           if (set === 1) {
             dir = 'left';
-            n = 1;
+            dist = 'dist1';
           } else if (set === 2) {
             dir = 'left';
-            n = 2;
+            dist = 'dist2';
           } else if (set === 3) {
             // 이번 세트 영구장판 2개 중 북쪽 모서리(|dx|<6, dy<-6) 있나? 있음→오른쪽(서로 감)/없음→왼쪽(북으로 감)
             const floors = (data.dmFsknP5Floors ?? []).filter((f) => f.t === matches.timestamp);
             const north = floors.some((f) => Math.abs(f.x - 100) < 6 && (f.y - 100) < -6);
             data.dmFsknP5Dir = north ? 'west' : 'north';
             dir = north ? 'right' : 'left';
-            n = 1;
+            dist = 'dist1';
           } else if (set === 4) {
             // 임시장판(BB38) 북반구 대각선: dir=west면 북서(dx<-3) / dir=north면 북동(dx>3) 체크
             const temps = (data.dmFsknP5Temp ?? []).filter((f) => f.t === matches.timestamp);
@@ -4252,7 +4253,7 @@ const triggerSet: TriggerSet<Data> = {
               (f.y - 100) < -3 && (checkNW ? (f.x - 100) < -3 : (f.x - 100) > 3)
             );
             dir = hit ? 'right' : 'left';
-            n = 1;
+            dist = 'dist1';
           } else {
             return;
           }
@@ -4260,28 +4261,32 @@ const triggerSet: TriggerSet<Data> = {
           // 09stop (Old): 세트1·2=왼2 / 세트3=동쪽 모서리 분기(왼/오른 2.5) / 세트4=세트3 따라(1.5)
           if (set === 1 || set === 2) {
             dir = 'left';
-            n = 2;
+            dist = 'dist2';
           } else if (set === 3) {
             // 이번 세트 영구장판 2개 중 동쪽 모서리(dx>6, |dy|<6) 있나? (대각선 제외)
             const floors = (data.dmFsknP5Floors ?? []).filter((f) => f.t === matches.timestamp);
             const east = floors.some((f) => (f.x - 100) > 6 && Math.abs(f.y - 100) < 6);
             data.dmFsknP5Dir = east ? 'west' : 'east';
             dir = east ? 'right' : 'left';
-            n = 2.5;
+            dist = 'dist25';
           } else if (set === 4) {
             dir = data.dmFsknP5Dir === 'west' ? 'left' : 'right';
-            n = 1.5;
+            dist = 'dist15';
           } else {
             return;
           }
         }
-        return output.combo!({ dir: output[dir]!(), n: n });
+        return output.combo!({ dir: output[dir]!(), dist: output[dist]!() });
       },
       run: (data) => data.dmFsknP5Set = (data.dmFsknP5Set ?? 0) + 1,
       outputStrings: {
-        combo: { en: '${dir} ${n}', ko: '${dir}쪽으로 ${n}칸' },
-        left: { en: 'Left', ko: '왼' },
-        right: { en: 'Right', ko: '오른' },
+        combo: { en: '${dir} ${dist}', ko: '${dir} ${dist}' },
+        left: { en: 'Left', ko: '왼쪽으로' },
+        right: { en: 'Right', ko: '오른쪽으로' },
+        dist1: { en: '1', ko: '1칸' },
+        dist15: { en: '1.5', ko: '1.5칸' },
+        dist2: { en: '2', ko: '2칸' },
+        dist25: { en: '2.5', ko: '2.5칸' },
       },
     },
     {
