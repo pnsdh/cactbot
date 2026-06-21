@@ -4032,7 +4032,7 @@ const triggerSet: TriggerSet<Data> = {
       netRegex: { id: 'BB50', source: '케프카', capture: false },
       condition: (data) => data.role === 'tank',
       delaySeconds: 1.7,
-      durationSeconds: 2,
+      durationSeconds: 1.5, // 2타(BB51 +3.17s) 시작에 종료 맞춤(show +1.7 → +3.2), 뒷 안내와 겹침 최소
       alertText: (data, _matches, output) => {
         const next = data.dmOrchTank === 'holy' ? output.nInvuln!() : output.nNorth!();
         return output.combo!({ action: output.aShare!(), next: next });
