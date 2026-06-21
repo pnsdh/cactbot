@@ -3612,12 +3612,13 @@ const triggerSet: TriggerSet<Data> = {
       },
     },
     {
-      // [캐스케이드 #1] 무의 범람 해소(시전+5s) → 1차 산개/쉐어/가속도(E1) 선행. E1 만료까지 표시(만료−5 대체).
+      // [캐스케이드 #1] 무의 범람 해소(시전+5.5s) → 1차 산개/쉐어/가속도(E1) 선행. E1 만료까지 표시(만료−5 대체).
+      //   delay 5.5: 플러드 해소(시전~5s) 확실히 뒤에 표시(겹침 방지). E1까지 ~9s 남아 여유 충분.
       id: 'DancingMad P4 산개쉐어 1차',
       type: 'StartsUsing',
       netRegex: { id: ['C392', 'C393', 'C3A1', 'C3A2'], source: '네오 엑스데스' },
-      delaySeconds: 5, // 무의범람 시전~해소
-      durationSeconds: (data, matches) => dmP4Dur(matches, data.dmP4PosE1, 5),
+      delaySeconds: 5.5, // 무의범람 시전~해소 직후(플러드 끝난 뒤)
+      durationSeconds: (data, matches) => dmP4Dur(matches, data.dmP4PosE1, 5.5),
       suppressSeconds: 5,
       infoText: (data, _matches, output) => dmP4PosText(data, true, output),
       outputStrings: dmP4PosOutputs,
