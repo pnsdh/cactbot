@@ -4024,48 +4024,39 @@ const triggerSet: TriggerSet<Data> = {
       },
     },
     {
-      // 1타 안내 (탱): 플레어→북/홀리→무적은 디버프(14E6플레어/14E7홀리)를 봐야 함.
-      //   ★디버프 부여=BB50발동 +1.47~1.51s(실측 변동) → +1.5s면 마진 0/음수라 홀리탱 오안내(예전 버그).
-      //   delay 1.7s로 수집 보장(최대 +1.51 대비 마진 ~0.19s). 피격 시점(+0.9s)엔 플레어/홀리 미확정이라 못 당김.
+      // 1타 안내 (탱, 통합): 1타 쉐어 + 이후 홀리/플레어 처리를 한 콜로(2타엔 탱 무표시). 디버프(14E6플레어/
+      //   14E7홀리, BB50발동 +1.47s 부여·dur6)가 해소될 때까지(~3타 +7.5s) 유지.
+      //   ★delay 1.7s=디버프 수집 보장(부여 +1.47~1.51s 변동, 마진 ~0.19s). 피격(+0.9s)엔 플레어/홀리 미확정.
       id: 'DancingMad P5 오케스트라 1타 안내 (탱)',
       type: 'Ability',
       netRegex: { id: 'BB50', source: '케프카', capture: false },
       condition: (data) => data.role === 'tank',
       delaySeconds: 1.7,
-      durationSeconds: 1.5, // 2타(BB51 +3.17s) 시작에 종료 맞춤(show +1.7 → +3.2), 뒷 안내와 겹침 최소
+      durationSeconds: 5.8, // 디버프 해소(~+7.5s)까지 유지 → 2타 통합
       alertText: (data, _matches, output) => {
-        const next = data.dmOrchTank === 'holy' ? output.nInvuln!() : output.nNorth!();
+        const next = data.dmOrchTank === 'holy' ? output.nHoly!() : output.nFlare!();
         return output.combo!({ action: output.aShare!(), next: next });
       },
       outputStrings: {
-        combo: { en: '${action} (then ${next})', ko: '${action} (이후 ${next})' },
+        combo: { en: '${action}, then ${next}', ko: '${action}, 이후 ${next}' },
         aShare: { en: 'Tank share', ko: '탱커 쉐어' },
-        nNorth: { en: 'N', ko: '북쪽으로' },
-        nInvuln: { en: 'invuln', ko: '무적기' },
+        nHoly: { en: 'Holy (invuln)', ko: '홀리(무적기 처리)' },
+        nFlare: { en: 'Flare (go N)', ko: '북쪽에서 플레어 처리' },
       },
     },
     {
-      // 2타 안내(BB51 발동): 힐딜=남쪽(플레어 회피) / 홀리탱=무적 / 플레어탱=북쪽.
+      // 2타 안내(BB51 발동): 힐딜=남쪽(플레어 회피). ★탱은 1타 통합 콜로 처리 → 무표시(role 게이트).
       id: 'DancingMad P5 오케스트라 2타 안내',
       type: 'Ability',
       netRegex: { id: 'BB51', source: '케프카', capture: false },
+      condition: (data) => data.role !== 'tank',
       durationSeconds: 4,
-      alertText: (data, _matches, output) => {
-        // {main} ({note}) 조합으로 토큰화(유저 커스터마이즈 용이). 표시 결과는 동일.
-        if (data.role !== 'tank')
-          return output.combo!({ main: output.south!(), note: output.dodgeFlare!() });
-        return data.dmOrchTank === 'holy'
-          ? output.combo!({ main: output.invuln!(), note: output.holy!() })
-          : output.combo!({ main: output.north!(), note: output.flare!() });
-      },
+      alertText: (_data, _matches, output) =>
+        output.combo!({ main: output.south!(), note: output.dodgeFlare!() }),
       outputStrings: {
         combo: { en: '${main} (${note})', ko: '${main} (${note})' },
         south: { en: 'South', ko: '남쪽으로' },
-        north: { en: 'North', ko: '북쪽으로' },
-        invuln: { en: 'Use invuln', ko: '무적기 사용' },
         dodgeFlare: { en: 'dodge Flare', ko: '플레어 회피' },
-        flare: { en: 'Flare', ko: '플레어' },
-        holy: { en: 'Holy', ko: '홀리' },
       },
     },
     {
