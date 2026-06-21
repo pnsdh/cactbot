@@ -1543,6 +1543,20 @@ const triggerSet: TriggerSet<Data> = {
       default: 'position',
     },
     {
+      id: 'dmP4Caller',
+      name: {
+        en: 'P4 caller (spread/accel group call)',
+        ko: 'P4 콜러 (산개/가속 그룹 콜)',
+      },
+      comment: {
+        en: 'Appends "(Spread: jobs / accel)" after the spread/stack call. ' +
+          'Accel = Stop (all true) / Move (all false) / Mixed.',
+        ko: '산개, 마안 안내 시 대상자들을 직업별로 나열하고, 가속 그룹을 괄호 안에 표시',
+      },
+      type: 'checkbox',
+      default: false,
+    },
+    {
       id: 'dmForsakenP5Method',
       name: {
         en: 'P5 Forsaken movement',
@@ -1568,21 +1582,6 @@ const triggerSet: TriggerSet<Data> = {
         },
       },
       default: '09stop0621',
-    },
-    {
-      id: 'dmP4Caller',
-      name: {
-        en: 'P4 caller (spread/accel group call)',
-        ko: 'P4 콜러 (산개/가속 그룹 콜)',
-      },
-      comment: {
-        en: 'Appends "(Spread: jobs / accel)" after the spread/stack call. ' +
-          'Accel = Stop (all true) / Move (all false) / Mixed.',
-        ko: '산개/쉐어 안내 뒤에 "(산개자: 직업1, 직업2 / 가속)"을 덧붙임. ' +
-          '가속 = 멈춰(전원 진실)/움직여(전원 거짓)/섞임.',
-      },
-      type: 'checkbox',
-      default: false,
     },
   ],
   timelineFile: 'dancing_mad.txt',
@@ -3536,9 +3535,36 @@ const triggerSet: TriggerSet<Data> = {
         text: { en: 'Keep moving + avoid center', ko: '계속 움직이기 + 중앙 피하기' },
       },
     },
-    // ───────── P4 진실/거짓 디버프: 무의 범람 ─────────
+    // ───────── P4 진입(C2DC) + 진실/거짓 디버프: 무의 범람 ─────────
     // 데이터 기반 — 실제 빔(C394 산자/보라, C395 죽은자/파랑) 위치를 읽으면 진실/거짓이 자동 상쇄.
     //   타겟색 = 죽음초월(566)→상처와 같은색 / 알라그필드(1C6)→다른색. (GC3·무의범람 진실거짓 불필요)
+    {
+      // P4 진입(꼭두각시 영혼 C2DC): 직전 풀 잔여 상태 리셋(바닥 + 디버프 캐스케이드 + 콜러).
+      id: 'DancingMad P4 진입 초기화',
+      type: 'StartsUsing',
+      netRegex: { id: 'C2DC', source: '케프카', capture: false },
+      run: (data) => {
+        data.dmP4ThunderDone = false; // 직전 풀 잔여 방지
+        data.dmP4StdBlizzard = undefined;
+        data.dmP4StdThunder = undefined;
+        data.dmP4BlizzardDir = undefined;
+        // 디버프 캐스케이드 상태(직전 풀 잔여 방지)
+        data.dmForkMine = undefined;
+        data.dmAccelMine = undefined;
+        data.dmCurseMine = undefined;
+        data.dmCurseTruth = undefined;
+        data.dmChaosMove = undefined;
+        data.dmP4PosE1 = undefined;
+        data.dmP4PosE2 = undefined;
+        data.dmP4Curse1 = undefined;
+        data.dmP4Curse2 = undefined;
+        data.dmP4Fire = undefined;
+        data.dmP4Water = undefined;
+        data.dmP4ForkAll = undefined;
+        data.dmP4AccelAll = undefined;
+        data.dmP4CurseAll = undefined;
+      },
+    },
     {
       id: 'DancingMad 무의 범람 상처 수집',
       type: 'GainsEffect',
@@ -3585,6 +3611,63 @@ const triggerSet: TriggerSet<Data> = {
       //   무의범람(보이는 색)·갈래번개/물압축(GC 진실거짓) 공용. 부여 시점에 읽어 저장할 것.
       netRegex: { effectId: '808', target: '네오 엑스데스' },
       run: (data, matches) => data.dmFloodTruth = matches.count === '462',
+    },
+    {
+      id: 'DancingMad 무의 범람',
+      type: 'StartsUsing',
+      // 무의 범람 4변종(풀마다 랜덤). 빔 수집(C394/C395)은 같은 시각·로그상 먼저 → 본 트리거서 조합.
+      //   네오는 8고정 위치 중 랜덤(항상 중앙 향함) → 플레이어가 네오 보는 방향 + 타겟 빔 좌우(외적) 안내.
+      netRegex: { id: ['C392', 'C393', 'C3A1', 'C3A2'], source: '네오 엑스데스' },
+      // 빔 수집(C394/C395)이 메인보다 늦게 올 수 있어(로그 순서 풀마다 가변) 약간 지연 후 출력.
+      delaySeconds: 0.5,
+      durationSeconds: 4.5, // 시전~피격까지(지연 0.5 보정)
+      alertText: (data, matches, output) => {
+        // 네오 방향(8방위, 플레이어가 바라볼 쪽) = 네오 좌표를 중앙 기준 방위로. 항상 산출 가능 → 폴백용 선계산.
+        const neoX = parseFloat(matches.x);
+        const neoY = parseFloat(matches.y);
+        const facing = output[
+          Directions.output8Dir[Directions.xyTo8DirNum(neoX, neoY, 100, 100)] ??
+            'unknown'
+        ]!();
+        const wound = data.dmFloodWound;
+        const mod = data.dmFloodMod;
+        // 상처/모드 미수집(이례적): 무음 대신 최소한 네오 방위라도 안내 — 색·좌우는 직접 확인.
+        if (wound === undefined || mod === undefined)
+          return output.faceOnly!({ facing: facing });
+        // 실제 타겟 빔: 죽음초월(defy)→상처와 같은 / 알라그(allagan)→반대 (산자=C394/보라, 죽은자=C395/파랑)
+        const targetLiving = mod === 'defy' ? wound === 'living' : wound !== 'living';
+        const target = targetLiving ? data.dmFloodLiving : data.dmFloodDead;
+        // 보이는 색 = 실제색(산자=보라)을 무의범람 거짓(808 param=461)이면 반전 (사람이 보는 색에 맞춤)
+        const visiblePurple = data.dmFloodTruth === false ? !targetLiving : targetLiving;
+        const color = visiblePurple ? output.purple!() : output.blue!();
+        if (target === undefined)
+          return output.colorOnly!({ facing: facing, color: color }); // 빔 좌표 미수집 → 방향+색만
+        // 좌우: F=(네오−중앙) 향함, T=(타겟빔−중앙). 외적>0=오른쪽 (실측 보정: 산자 북=서향 시 우).
+        const cross = (neoX - 100) * (target.y - 100) - (neoY - 100) * (target.x - 100);
+        const side = cross > 0 ? output.right!() : output.left!();
+        return output.go!({ facing: facing, side: side, color: color });
+      },
+      outputStrings: {
+        go: {
+          en: 'Face ${facing}, ${side} ${color} beam',
+          ko: '${facing}을 보고 ${side} ${color} 빔 맞기',
+        },
+        colorOnly: { en: 'Face ${facing}, ${color} beam', ko: '${facing}을 보고 ${color} 빔 맞기' },
+        faceOnly: { en: 'Face ${facing} (check beam)', ko: '${facing}을 보고 빔 직접 확인' },
+        purple: { en: 'Purple', ko: '보라' },
+        blue: { en: 'Blue', ko: '파랑' },
+        left: { en: 'left', ko: '왼쪽' },
+        right: { en: 'right', ko: '오른쪽' },
+        dirN: { en: 'N', ko: '북쪽' },
+        dirNE: { en: 'NE', ko: '북동쪽' },
+        dirE: { en: 'E', ko: '동쪽' },
+        dirSE: { en: 'SE', ko: '남동쪽' },
+        dirS: { en: 'S', ko: '남쪽' },
+        dirSW: { en: 'SW', ko: '남서쪽' },
+        dirW: { en: 'W', ko: '서쪽' },
+        dirNW: { en: 'NW', ko: '북서쪽' },
+        unknown: { en: '?', ko: '?' },
+      },
     },
     // ───────── P4 디버프 캐스케이드 (산개·쉐어/가속도/마안/혼돈불물) ─────────
     // GC1/GC2가 각각 갈래번개(15A8)2·물압축(15A9)2·가속도(15AA)·저주(15A7) 부여. positioning 8명=서로 다른 세트.
@@ -3884,32 +3967,7 @@ const triggerSet: TriggerSet<Data> = {
     },
     // ───────── P4 바닥: 알쏭달쏭 ×3 / 찌릿찌릿 선더가 / 널리널리 블리자가 / 마력 방출 ─────────
     // 블리자가 고리 02A4=진실 / 선더가 고리 02A6=진실. 출력은 dmBlizzardThunder 옵션(P1과 동일).
-    {
-      id: 'DancingMad P4 진입 초기화',
-      type: 'StartsUsing',
-      netRegex: { id: 'C2DC', source: '케프카', capture: false },
-      run: (data) => {
-        data.dmP4ThunderDone = false; // 직전 풀 잔여 방지
-        data.dmP4StdBlizzard = undefined;
-        data.dmP4StdThunder = undefined;
-        data.dmP4BlizzardDir = undefined;
-        // 디버프 캐스케이드 상태(직전 풀 잔여 방지)
-        data.dmForkMine = undefined;
-        data.dmAccelMine = undefined;
-        data.dmCurseMine = undefined;
-        data.dmCurseTruth = undefined;
-        data.dmChaosMove = undefined;
-        data.dmP4PosE1 = undefined;
-        data.dmP4PosE2 = undefined;
-        data.dmP4Curse1 = undefined;
-        data.dmP4Curse2 = undefined;
-        data.dmP4Fire = undefined;
-        data.dmP4Water = undefined;
-        data.dmP4ForkAll = undefined;
-        data.dmP4AccelAll = undefined;
-        data.dmP4CurseAll = undefined;
-      },
-    },
+    //   ※ P4 진입 초기화(C2DC)는 위 'P4 진입' 섹션으로 이동.
     {
       id: 'DancingMad P4 블리자가 고리 수집',
       type: 'HeadMarker',
@@ -4012,63 +4070,6 @@ const triggerSet: TriggerSet<Data> = {
         return dmBlizThunText(data, blizzard, thunder, safeNwSe, output);
       },
       outputStrings: dmBlizThunStrings,
-    },
-    {
-      id: 'DancingMad 무의 범람',
-      type: 'StartsUsing',
-      // 무의 범람 4변종(풀마다 랜덤). 빔 수집(C394/C395)은 같은 시각·로그상 먼저 → 본 트리거서 조합.
-      //   네오는 8고정 위치 중 랜덤(항상 중앙 향함) → 플레이어가 네오 보는 방향 + 타겟 빔 좌우(외적) 안내.
-      netRegex: { id: ['C392', 'C393', 'C3A1', 'C3A2'], source: '네오 엑스데스' },
-      // 빔 수집(C394/C395)이 메인보다 늦게 올 수 있어(로그 순서 풀마다 가변) 약간 지연 후 출력.
-      delaySeconds: 0.5,
-      durationSeconds: 4.5, // 시전~피격까지(지연 0.5 보정)
-      alertText: (data, matches, output) => {
-        // 네오 방향(8방위, 플레이어가 바라볼 쪽) = 네오 좌표를 중앙 기준 방위로. 항상 산출 가능 → 폴백용 선계산.
-        const neoX = parseFloat(matches.x);
-        const neoY = parseFloat(matches.y);
-        const facing = output[
-          Directions.output8Dir[Directions.xyTo8DirNum(neoX, neoY, 100, 100)] ??
-            'unknown'
-        ]!();
-        const wound = data.dmFloodWound;
-        const mod = data.dmFloodMod;
-        // 상처/모드 미수집(이례적): 무음 대신 최소한 네오 방위라도 안내 — 색·좌우는 직접 확인.
-        if (wound === undefined || mod === undefined)
-          return output.faceOnly!({ facing: facing });
-        // 실제 타겟 빔: 죽음초월(defy)→상처와 같은 / 알라그(allagan)→반대 (산자=C394/보라, 죽은자=C395/파랑)
-        const targetLiving = mod === 'defy' ? wound === 'living' : wound !== 'living';
-        const target = targetLiving ? data.dmFloodLiving : data.dmFloodDead;
-        // 보이는 색 = 실제색(산자=보라)을 무의범람 거짓(808 param=461)이면 반전 (사람이 보는 색에 맞춤)
-        const visiblePurple = data.dmFloodTruth === false ? !targetLiving : targetLiving;
-        const color = visiblePurple ? output.purple!() : output.blue!();
-        if (target === undefined)
-          return output.colorOnly!({ facing: facing, color: color }); // 빔 좌표 미수집 → 방향+색만
-        // 좌우: F=(네오−중앙) 향함, T=(타겟빔−중앙). 외적>0=오른쪽 (실측 보정: 산자 북=서향 시 우).
-        const cross = (neoX - 100) * (target.y - 100) - (neoY - 100) * (target.x - 100);
-        const side = cross > 0 ? output.right!() : output.left!();
-        return output.go!({ facing: facing, side: side, color: color });
-      },
-      outputStrings: {
-        go: {
-          en: 'Face ${facing}, ${side} ${color} beam',
-          ko: '${facing}을 보고 ${side} ${color} 빔 맞기',
-        },
-        colorOnly: { en: 'Face ${facing}, ${color} beam', ko: '${facing}을 보고 ${color} 빔 맞기' },
-        faceOnly: { en: 'Face ${facing} (check beam)', ko: '${facing}을 보고 빔 직접 확인' },
-        purple: { en: 'Purple', ko: '보라' },
-        blue: { en: 'Blue', ko: '파랑' },
-        left: { en: 'left', ko: '왼쪽' },
-        right: { en: 'right', ko: '오른쪽' },
-        dirN: { en: 'N', ko: '북쪽' },
-        dirNE: { en: 'NE', ko: '북동쪽' },
-        dirE: { en: 'E', ko: '동쪽' },
-        dirSE: { en: 'SE', ko: '남동쪽' },
-        dirS: { en: 'S', ko: '남쪽' },
-        dirSW: { en: 'SW', ko: '남서쪽' },
-        dirW: { en: 'W', ko: '서쪽' },
-        dirNW: { en: 'NW', ko: '북서쪽' },
-        unknown: { en: '?', ko: '?' },
-      },
     },
     // ───────── P5: 케프카 최종 (BB40 연속 알테마~) ─────────
     {
