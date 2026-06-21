@@ -40,6 +40,7 @@ export interface Data extends RaidbossData {
     dmTetherMethod: '09stop0620' | '09stop' | 'yan';
     dmKefkaDodge: 'finalSpot' | 'position';
     dmForsakenP5Method: '09stop0621' | '09stop' | 'raidgosu';
+    dmP4Caller: boolean;
   };
   phase: Phase | 'unknown';
   combatantData?: PluginCombatantState[];
@@ -127,6 +128,9 @@ export interface Data extends RaidbossData {
   dmP4Curse2?: number; // 마안 2차(늦은 그룹) 만료
   dmP4Fire?: number; // 혼돈의 불 만료
   dmP4Water?: number; // 혼돈의 물 만료
+  // P4 콜러(dmP4Caller) — 전원 산개/가속 수집(그룹 콜용, 옵션 ON일 때만)
+  dmP4ForkAll?: { target: string; spread: boolean; early: boolean }[]; // 전원 positioning
+  dmP4AccelAll?: { target: string; stop: boolean; early: boolean }[]; // 전원 가속도
   // P4 바닥(알쏭달쏭/찌릿찌릿/널리널리/마력방출) — 블리자가 고리 02A4=진실 / 선더가 고리 02A6=진실
   dmP4Blizzard?: boolean; // 최신 블리자가 고리(02A4=진실)
   dmP4BlizzardDir?: boolean; // 최신 블리자가 구슬 안전 대각선(true=북서/남동) — dir 옵션용
@@ -283,6 +287,33 @@ const dmP4PosText = (data: Data, early: boolean, output: Output): string => {
   if (accel === undefined || accel.early !== early)
     return pos;
   return output.posCombo!({ pos: pos, accel: accel.stop ? output.stop!() : output.accelMove!() });
+};
+
+// P4 콜러 접미(옵션 ON): 산개/쉐어 안내 뒤에 ' (산개자: 직업… / 가속)' 덧붙임. 가속=차수 전체 정지/이동 일치.
+const dmP4CallerOutputs = {
+  caller: { en: ' (Spread: ${jobs} / ${accel})', ko: ' (산개자: ${jobs} / ${accel})' },
+  accStop: { en: 'Stop', ko: '멈춰' },
+  accMove: { en: 'Move', ko: '움직여' },
+  accMixed: { en: 'Mixed', ko: '섞임' },
+};
+const dmP4CallerSuffix = (data: Data, early: boolean, output: Output): string => {
+  if (data.triggerSetConfig.dmP4Caller !== true)
+    return '';
+  // 산개자(이 차수 만료 + 산개) 직업명. party.member().jobFull = 유저 언어 현지화(ko='닌자').
+  const jobs = (data.dmP4ForkAll ?? [])
+    .filter((f) => f.early === early && f.spread)
+    .map((f) => data.party.member(f.target).jobFull ?? f.target)
+    .join(', ');
+  // 가속: 이 차수 만료 가속도 전체 정지/이동 일치 → 멈춰/움직여, 섞이면 섞임.
+  const accels = (data.dmP4AccelAll ?? []).filter((a) => a.early === early);
+  const accel = accels.length === 0
+    ? output.accMixed!()
+    : accels.every((a) => a.stop)
+    ? output.accStop!()
+    : accels.every((a) => !a.stop)
+    ? output.accMove!()
+    : output.accMixed!();
+  return output.caller!({ jobs: jobs, accel: accel });
 };
 
 // ───── P5 세 개의 별 공통 ─────
@@ -1520,6 +1551,21 @@ const triggerSet: TriggerSet<Data> = {
         },
       },
       default: '09stop0621',
+    },
+    {
+      id: 'dmP4Caller',
+      name: {
+        en: 'P4 caller (spread/accel group call)',
+        ko: 'P4 콜러 (산개/가속 그룹 콜)',
+      },
+      comment: {
+        en: 'Appends "(Spread: jobs / accel)" after the spread/stack call. ' +
+          'Accel = Stop (all true) / Move (all false) / Mixed.',
+        ko: '산개/쉐어 안내 뒤에 "(산개자: 직업1, 직업2 / 가속)"을 덧붙임. ' +
+          '가속 = 멈춰(전원 진실)/움직여(전원 거짓)/섞임.',
+      },
+      type: 'checkbox',
+      default: false,
     },
   ],
   timelineFile: 'dancing_mad.txt',
@@ -3579,6 +3625,35 @@ const triggerSet: TriggerSet<Data> = {
         },
     },
     {
+      // 콜러 전원 positioning 수집(옵션 ON일 때만). 산개여부=부여 시점 자기 GC 808로 per-player.
+      id: 'DancingMad P4 콜러 positioning 수집',
+      type: 'GainsEffect',
+      netRegex: { effectId: ['15A8', '15A9'] },
+      condition: (data) => data.triggerSetConfig.dmP4Caller === true,
+      run: (data, matches) => {
+        const truth = data.dmFloodTruth ?? true;
+        (data.dmP4ForkAll ??= []).push({
+          target: matches.target,
+          spread: (matches.effectId === '15A8') === truth,
+          early: parseFloat(matches.duration) < 56,
+        });
+      },
+    },
+    {
+      // 콜러 전원 가속도 수집(옵션 ON일 때만). 정지여부=부여 시점 자기 GC 808.
+      id: 'DancingMad P4 콜러 가속도 수집',
+      type: 'GainsEffect',
+      netRegex: { effectId: '15AA' },
+      condition: (data) => data.triggerSetConfig.dmP4Caller === true,
+      run: (data, matches) => {
+        (data.dmP4AccelAll ??= []).push({
+          target: matches.target,
+          stop: data.dmFloodTruth ?? true,
+          early: parseFloat(matches.duration) < 56,
+        });
+      },
+    },
+    {
       // [캐스케이드 공용] 전역 발동(만료) 시각 + 마안 그룹 진실 수집(all-target). 각 안내가 직전 해소에 앵커되고
       //   자기 만료까지 표시되도록 만료 절대시각을 미리 확보. positioning 36·51=E1/61·76=E2, 마안 60=1차/69=2차.
       id: 'DancingMad P4 디버프 만료/그룹 수집',
@@ -3620,8 +3695,9 @@ const triggerSet: TriggerSet<Data> = {
       delaySeconds: 5.5, // 무의범람 시전~해소 직후(플러드 끝난 뒤)
       durationSeconds: (data, matches) => dmP4Dur(matches, data.dmP4PosE1, 5.5),
       suppressSeconds: 5,
-      infoText: (data, _matches, output) => dmP4PosText(data, true, output),
-      outputStrings: dmP4PosOutputs,
+      infoText: (data, _matches, output) =>
+        dmP4PosText(data, true, output) + dmP4CallerSuffix(data, true, output),
+      outputStrings: { ...dmP4PosOutputs, ...dmP4CallerOutputs },
     },
     // ───────── P4 저주의 외침(마안, 15A7) — 캐스케이드(산개 만료 앵커) 보기/보지않기 ─────────
     // 그룹당 2명, GC1(이른 만료 60)·GC2(늦은 만료 69) 2그룹(만료 안 뒤섞임, 고정). 진실→보지않기 / 거짓→보기.
@@ -3752,8 +3828,9 @@ const triggerSet: TriggerSet<Data> = {
       delaySeconds: 5.1, // 혼돈불 장판 처리 후
       durationSeconds: (data, matches) => dmP4Dur(matches, data.dmP4PosE2, 5.1),
       suppressSeconds: 5,
-      infoText: (data, _matches, output) => dmP4PosText(data, false, output),
-      outputStrings: dmP4PosOutputs,
+      infoText: (data, _matches, output) =>
+        dmP4PosText(data, false, output) + dmP4CallerSuffix(data, false, output),
+      outputStrings: { ...dmP4PosOutputs, ...dmP4CallerOutputs },
     },
     {
       // [캐스케이드 #8] 혼돈물 만료(15AC Loses) → '이동/대기'(마지막). 장판 발동(+5.08s)까지 표시.
@@ -3793,6 +3870,8 @@ const triggerSet: TriggerSet<Data> = {
         data.dmP4Curse2 = undefined;
         data.dmP4Fire = undefined;
         data.dmP4Water = undefined;
+        data.dmP4ForkAll = undefined;
+        data.dmP4AccelAll = undefined;
       },
     },
     {
