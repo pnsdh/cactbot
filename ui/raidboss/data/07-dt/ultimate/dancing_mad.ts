@@ -293,8 +293,8 @@ const dmP4PosText = (data: Data, early: boolean, output: Output): string => {
 // P4 콜러 접미(옵션 ON): 산개/쉐어 안내 뒤에 ' (산개자: 직업… / 가속)' 덧붙임. 가속=차수 전체 정지/이동 일치.
 const dmP4CallerOutputs = {
   caller: { en: ' (${jobs} / ${accel})', ko: ' (${jobs} / ${accel})' },
-  accStop: { en: 'Stop', ko: '멈춰' },
-  accMove: { en: 'Move', ko: '움직여' },
+  accStop: { en: 'All stop', ko: '전부 멈춰' },
+  accMove: { en: 'All move', ko: '전부 움직여' },
   accMaranStop: { en: 'Eyes stop', ko: '마안만 멈춰' },
   accMaranMove: { en: 'Eyes move', ko: '마안만 움직여' },
   accMixed: { en: 'Each', ko: '각자 봐' },
