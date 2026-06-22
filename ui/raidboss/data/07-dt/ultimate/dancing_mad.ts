@@ -3864,8 +3864,8 @@ const triggerSet: TriggerSet<Data> = {
       outputStrings: {
         mine: { en: 'My ${dir}', ko: '내가 ${dir}' },
         notMine: { en: '${dir}', ko: '${dir}' },
-        away: { en: 'Evil Eye: Look Away', ko: '마안: 보지 않기' },
-        look: { en: 'Evil Eye: Look', ko: '마안: 보기' },
+        away: { en: 'Evil Eye: Look Away', ko: '마안 보지 않기' },
+        look: { en: 'Evil Eye: Look', ko: '마안 보기' },
         ...dmP4CurseOutputs,
       },
     },
@@ -3946,7 +3946,7 @@ const triggerSet: TriggerSet<Data> = {
       outputStrings: {
         ...dmP4PosOutputs, // 이후 안내(산개/쉐어+가속도) 재사용
         ...dmP4CallerOutputs, // 콜러 ON 시 미리보기에도 그룹 콜
-        combo: { en: '${move} (then ${next})', ko: '${move} (이후 ${next})' },
+        combo: { en: '${move} → ${next}', ko: '${move} → ${next}' },
         fireMove: { en: 'Move', ko: '이동' },
         fireWait: { en: 'Wait', ko: '대기' },
       },
