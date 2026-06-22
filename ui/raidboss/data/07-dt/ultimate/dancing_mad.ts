@@ -295,6 +295,8 @@ const dmP4CallerOutputs = {
   caller: { en: ' (${jobs} / ${accel})', ko: ' (${jobs} / ${accel})' },
   accStop: { en: 'Stop', ko: '멈춰' },
   accMove: { en: 'Move', ko: '움직여' },
+  accMaranStop: { en: 'Eyes stop', ko: '마안만 멈춰' },
+  accMaranMove: { en: 'Eyes move', ko: '마안만 움직여' },
   accMixed: { en: 'Each', ko: '각자 봐' },
 };
 const dmP4CallerSuffix = (data: Data, early: boolean, output: Output): string => {
@@ -307,15 +309,27 @@ const dmP4CallerSuffix = (data: Data, early: boolean, output: Output): string =>
     .filter((f) => f.early === early && f.spread)
     .map((f) => data.party.member(f.target).job ?? f.target)
     .join(', ') || '?';
-  // 가속: 이 차수 만료 가속도 전체 정지/이동 일치 → 멈춰/움직여, 섞이면 섞임.
+  // 가속: 이 차수 만료 가속도 전체 정지/이동 일치 → 멈춰/움직여.
+  //   ★섞이면(GC1·GC2 truth 다름) → 마안 그룹 기준 콜. 마안 그룹 2명은 같은 GC라 항상 균일(검증 42/42),
+  //   비마안은 반대 → '마안만 멈춰/움직여'로 완전 지정. 마안 가속 불명 시만 '각자 봐' 폴백.
   const accels = (data.dmP4AccelAll ?? []).filter((a) => a.early === early);
-  const accel = accels.length === 0
-    ? output.accMixed!()
-    : accels.every((a) => a.stop)
-    ? output.accStop!()
-    : accels.every((a) => !a.stop)
-    ? output.accMove!()
-    : output.accMixed!();
+  let accel: string;
+  if (accels.length === 0) {
+    accel = output.accMixed!();
+  } else if (accels.every((a) => a.stop)) {
+    accel = output.accStop!();
+  } else if (accels.every((a) => !a.stop)) {
+    accel = output.accMove!();
+  } else {
+    // 섞임 → 이 차수 마안(curse.early===early ↔ accel E1/E2 1:1) 보유자의 가속으로.
+    const maran = (data.dmP4CurseAll ?? []).filter((c) => c.early === early).map((c) => c.target);
+    const ma = accels.find((a) => maran.includes(a.target));
+    accel = ma === undefined
+      ? output.accMixed!()
+      : ma.stop
+      ? output.accMaranStop!()
+      : output.accMaranMove!();
+  }
   return output.caller!({ jobs: jobs, accel: accel });
 };
 
