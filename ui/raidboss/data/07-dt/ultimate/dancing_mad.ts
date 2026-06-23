@@ -1789,7 +1789,7 @@ const triggerSet: TriggerSet<Data> = {
     {
       id: 'DancingMad 블리자가 유무 수집',
       type: 'StartsUsing',
-      netRegex: { id: ['BA98', 'BA9B'], source: '케프카', capture: false },
+      netRegex: { id: ['BA98', 'BA9B'], capture: false }, // ★시전자 랜덤(케프카/카오스/엑스데스…) → 소스 미지정(phase로 P1 한정)
       condition: (data) => data.phase === 'p1', // P4 BA9B(널리널리 블리자가) 재등장 → P1 한정
       run: (data) => data.dmBlizzardCombo = true,
     },
@@ -1799,7 +1799,7 @@ const triggerSet: TriggerSet<Data> = {
       id: 'DancingMad 알쏭달쏭1',
       type: 'StartsUsing',
       // BA98=정상(안전=구슬축 수직), BA9B=?(안전=구슬축=텔레그래프). BA9E 제외(BA9B가 텔레그래프 축).
-      netRegex: { id: ['BA98', 'BA9B'], source: ['케프카', '카오스'] }, // ★단독 널리널리 시전자 풀마다 랜덤(외부5로그 케프카23/카오스2). 둘 다 허용
+      netRegex: { id: ['BA98', 'BA9B'] }, // ★시전자(케프카/카오스/엑스데스…)가 풀마다·한 캐스트 내에서도 랜덤 → 소스 미지정(id+phase+게이트로 한정)
       condition: (data) => data.phase === 'p1', // P4에도 유사 알쏭달쏭 → P1 한정
       // 로그 측정: 구슬 위치는 시전 직전(~0.09s 전) 확정·이후 고정, 마커도 선도착 → 큰 대기 불필요.
       delaySeconds: 0.3, // promise/수집 안전 버퍼만
@@ -1850,7 +1850,7 @@ const triggerSet: TriggerSet<Data> = {
     {
       id: 'DancingMad 알쏭달쏭2',
       type: 'StartsUsing',
-      netRegex: { id: ['BA98', 'BA9B'], source: ['케프카', '카오스'] }, // ★단독 널리널리 시전자 풀마다 랜덤(외부5로그 케프카23/카오스2). 둘 다 허용
+      netRegex: { id: ['BA98', 'BA9B'] }, // ★시전자(케프카/카오스/엑스데스…)가 풀마다·한 캐스트 내에서도 랜덤 → 소스 미지정(id+phase+게이트로 한정)
       condition: (data) => data.phase === 'p1', // P4에도 유사 알쏭달쏭 → P1 한정
       delaySeconds: 0.3, // 구슬·마커 선확정 → 버퍼만 (알쏭달쏭1과 동일 근거)
       durationSeconds: 4.7, // 끝 시점 동일 유지
@@ -1887,7 +1887,7 @@ const triggerSet: TriggerSet<Data> = {
       // 2번째 신들의 상(중력탄/암석탄) 사이클의 블리자가. 방향 대신 ?-state로 바닥+쉐어 안내.
       // BA98=진실(바닥 피하고) / BA9B=거짓?(바닥 밟고). 둘 다 쉐어 처리(중력/암석 그룹 공통).
       // 그룹별 이동(중앙/시계방향)은 '중력탄 암석탄 이동' 콜이 별도로 처리.
-      netRegex: { id: ['BA98', 'BA9B'], source: ['케프카', '카오스'] }, // ★단독 널리널리 시전자 풀마다 랜덤(외부5로그 케프카23/카오스2). 둘 다 허용
+      netRegex: { id: ['BA98', 'BA9B'] }, // ★시전자(케프카/카오스/엑스데스…)가 풀마다·한 캐스트 내에서도 랜덤 → 소스 미지정(id+phase+게이트로 한정)
       condition: (data) => data.phase === 'p1', // P4 BA9B(널리널리 블리자가) 재등장 → P1 한정
       delaySeconds: 0.3, // 구슬·마커 선확정 → 버퍼만
       durationSeconds: 4.7, // 끝 시점 동일 유지
@@ -3979,7 +3979,7 @@ const triggerSet: TriggerSet<Data> = {
       //   알쏭달쏭/널리널리 구슬마다 갱신. 마력방출엔 새 구슬이 없어 직전 널리널리 값이 그대로 쓰임.
       id: 'DancingMad P4 블리자가 방향 수집',
       type: 'StartsUsing',
-      netRegex: { id: ['BA98', 'BA9B'], source: ['케프카', '카오스'] }, // ★단독 널리널리 시전자 풀마다 랜덤(외부5로그 케프카23/카오스2). 둘 다 허용
+      netRegex: { id: ['BA98', 'BA9B'] }, // ★시전자(케프카/카오스/엑스데스…)가 풀마다·한 캐스트 내에서도 랜덤 → 소스 미지정(id+phase+게이트로 한정)
       condition: (data) => data.phase === 'p4',
       run: (data, matches) =>
         data.dmP4BlizzardDir = getBlizzardSafeNwSe(parseFloat(matches.heading), matches.id),
@@ -4031,7 +4031,7 @@ const triggerSet: TriggerSet<Data> = {
       // 널리널리 블리자가(단독): 찌릿찌릿 다음 블리자가. 시전 id로 진실. 진실값 저장(마력방출 XNOR용)
       id: 'DancingMad P4 널리널리 블리자가',
       type: 'StartsUsing',
-      netRegex: { id: ['BA98', 'BA9B'], source: ['케프카', '카오스'] }, // ★단독 널리널리 시전자 풀마다 랜덤(외부5로그 케프카23/카오스2). 둘 다 허용
+      netRegex: { id: ['BA98', 'BA9B'] }, // ★시전자(케프카/카오스/엑스데스…)가 풀마다·한 캐스트 내에서도 랜덤 → 소스 미지정(id+phase+게이트로 한정)
       condition: (data) => data.phase === 'p4' && data.dmP4ThunderDone === true,
       preRun: (data, matches) => {
         data.dmP4StdBlizzard = matches.id === 'BA98';
