@@ -863,14 +863,25 @@ const forsaken09Compute = (
   return next;
 };
 
-// 8탑(09STOP) 좌/우 탑 = 내 머리 사인 번호로(유저 룰, 사인 종류 무관): 1번=왼쪽 탑 / 2번 이상=오른쪽 탑.
+// 8탑(09STOP) 좌/우 탑 = 머리 사인 번호로(유저 룰, 사인 종류 무관): 1번=왼쪽 탑 / 2번 이상=오른쪽 탑.
 //   공격(1~8)·속박(1~3)·금지(1~2) 전부 동일. 마커→사인 매핑 없이 자기 사인 직접 읽음(공격도 인식).
-//   내 사인 없거나 번호 없는 사인(도형 등)이면 undefined → 폴백 N(머리징쪽).
-const forsaken8SignSide = (data: Data): 'L' | 'R' | undefined => {
-  const m = ((data.dmSigns ?? {})[data.me ?? ''] ?? '').match(/^(?:attack|bind|ignore)(\d+)$/);
-  if (m === null)
-    return undefined;
-  return m[1] === '1' ? 'L' : 'R'; // 1=왼쪽 / 2이상=오른쪽
+//   ★내 사인 없으면: 같은 마커 짝(8탑 같이 처리)의 사인으로 보수 — 짝 1번=짝 왼이므로 나=오 / 짝 2이상=짝 오므로 나=왼.
+//   짝도 사인 없거나(번호 없는 도형 등) 짝 미상이면 undefined → 폴백 N(머리징쪽).
+const forsaken8SignSide = (data: Data, myMark: ForsakenRole): 'L' | 'R' | undefined => {
+  const signNum = (name: string): number | undefined => {
+    const m = ((data.dmSigns ?? {})[name] ?? '').match(/^(?:attack|bind|ignore)(\d+)$/);
+    return m === null ? undefined : parseInt(m[1]!, 10);
+  };
+  const mine = signNum(data.me ?? '');
+  if (mine !== undefined)
+    return mine === 1 ? 'L' : 'R'; // 내 사인: 1=왼 / 2이상=오
+  // 내 사인 없음 → 같은 마커 짝의 사인 반대편(짝 1=왼→나 오 / 짝 2이상=오→나 왼)
+  const marks = forsakenSoakGroupMarks(data);
+  const partner = Object.keys(marks).find((n) => n !== data.me && marks[n] === myMark);
+  const pn = partner === undefined ? undefined : signNum(partner);
+  if (pn !== undefined)
+    return pn === 1 ? 'R' : 'L';
+  return undefined;
 };
 
 // 처리자 본인 안내. withRole=true면 통합 본안내(N탑 ...+꼬임), false면 미리보기(side+시 안).
@@ -894,7 +905,7 @@ const forsaken09Show = (
   let spot: ForsakenSpot;
   if (generic) { // 8탑: 좌/우는 머리 사인으로(없으면 머리징쪽 N). 시계=부채꼴 12/산개 6.
     spot = {
-      side: forsaken8SignSide(data) ?? 'N',
+      side: forsaken8SignSide(data, myMark) ?? 'N',
       clock: forsaken09Vert(myMark, isOdd) === 'U' ? output.c12!() : output.c6!(),
     };
   } else {
