@@ -3138,6 +3138,7 @@ const triggerSet: TriggerSet<Data> = {
         data.dmMudTargets = []; // 혼돈의 진흙 대상 수집 초기화
       },
       durationSeconds: 5, // 시전(4.7s)~HP 드롭까지 유지
+      suppressSeconds: 10, // C571·C572가 같은 시각 쌍으로 시전 → 한 번만 발동(지진은 풀당 1회)
       alertText: (_data, _matches, output) => output.text!(),
       outputStrings: {
         text: { en: 'HP set to 1', ko: 'HP 1로 고정' },
