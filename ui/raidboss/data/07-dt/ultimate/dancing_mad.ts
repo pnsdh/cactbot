@@ -3132,7 +3132,7 @@ const triggerSet: TriggerSet<Data> = {
       // 지진(C571/C572) 시전 완료 시 전원 HP 1. 힐러에게 시전 시작 경고 + 진흙 대상 수집 초기화.
       id: 'DancingMad HP 1 지진',
       type: 'StartsUsing',
-      netRegex: { id: ['C571', 'C572'], source: '카오스', capture: false },
+      netRegex: { id: ['C571', 'C572'], capture: false }, // ★C572는 풀마다 카오스/엑스데스 시전 → 소스 미지정(id로 한정)
       condition: (data) => data.role === 'healer',
       preRun: (data) => {
         data.dmMudTargets = []; // 혼돈의 진흙 대상 수집 초기화
@@ -3592,14 +3592,14 @@ const triggerSet: TriggerSet<Data> = {
     {
       id: 'DancingMad 무의 범람 보라빔 수집',
       type: 'StartsUsing',
-      netRegex: { id: 'C394', source: '네오 엑스데스' }, // 산 자의 암흑광(보라)
+      netRegex: { id: 'C394' }, // 산 자의 암흑광(보라). ★빔 액터가 풀마다 네오/케프카 이름 → 소스 미지정
       run: (data, matches) =>
         data.dmFloodLiving = { x: parseFloat(matches.x), y: parseFloat(matches.y) },
     },
     {
       id: 'DancingMad 무의 범람 파랑빔 수집',
       type: 'StartsUsing',
-      netRegex: { id: 'C395', source: '네오 엑스데스' }, // 죽은 자의 암흑광(파랑)
+      netRegex: { id: 'C395' }, // 죽은 자의 암흑광(파랑). ★빔 액터가 풀마다 네오/케프카 이름 → 소스 미지정
       run: (data, matches) =>
         data.dmFloodDead = { x: parseFloat(matches.x), y: parseFloat(matches.y) },
     },
