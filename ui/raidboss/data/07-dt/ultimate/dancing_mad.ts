@@ -39,7 +39,7 @@ export interface Data extends RaidbossData {
     dmTrineMethod: '09stop' | 'yan';
     dmTetherMethod: '09stop0620' | '09stop' | 'yan';
     dmKefkaDodge: 'finalSpot' | 'position';
-    dmForsakenP5Method: '09stop0621' | '09stop' | 'raidgosu';
+    dmForsakenP5Method: '09stop0621' | '09stop' | 'raidgosu' | 'minimal';
     dmP4Caller: boolean;
   };
   phase: Phase | 'unknown';
@@ -63,7 +63,7 @@ export interface Data extends RaidbossData {
   dmFloodTele?: { t: string; x: number; y: number }[]; // 텔레그래프 분신(웨이브당 2개, r21~25)
   // P5 행방불명 — 영구장판(BB37) 2개씩 4세트. 동선=남 모여→왼90→왼90(북)→세트3분기→세트4분기
   dmFsknP5Set?: number; // 장판 세트 카운트 1~4
-  dmFsknP5Dir?: 'east' | 'west' | 'north'; // 세트3 이동 방향(세트4 분기용). 09stop=west/east, raidgosu=west/north
+  dmFsknP5Dir?: 'east' | 'west' | 'north'; // 세트3 이동 방향(세트4 분기용). 09stop=west/east, raidgosu/minimal=west/north
   dmFsknP5Floors?: { t: string; x: number; y: number }[]; // BB37 영구장판 위치(세트3 동/북 모서리 판정)
   dmFsknP5Temp?: { t: string; x: number; y: number }[]; // BB38 임시장판 위치(RAID GOSU 세트4 NW/NE 판정)
   dmKnockbackGroup?: boolean;
@@ -1564,20 +1564,23 @@ const triggerSet: TriggerSet<Data> = {
       comment: {
         en: '09STOP (0621) (default): start SW, then "left 2" every set (4×, no branching). ' +
           '09STOP (Old): set1/2 left 90°, set3 checks East cardinal floor. ' +
-          'RAID GOSU: set1 left 1 / set2 left 2 / set3 checks North cardinal / set4 checks NW(or NE) temporary floor.',
+          'RAID GOSU: set1 left 1 / set2 left 2 / set3 checks North cardinal / set4 checks NW(or NE) temporary floor. ' +
+          'Minimal Movement: same as RAID GOSU but start SW and set2 left 1 (1-1-1-1).',
         ko: 'P5 행방불명 회전 동선.',
       },
       type: 'select',
       options: {
         en: {
-          '09STOP (0621)': '09stop0621',
-          '09STOP (Old)': '09stop',
-          'RAID GOSU': 'raidgosu',
+          '09STOP (2-2-2-2)': '09stop0621',
+          '09STOP (2-2-2.5-1.5)': '09stop',
+          'RAID GOSU (1-2-1-1)': 'raidgosu',
+          'Minimal Movement (1-1-1-1)': 'minimal',
         },
         ko: {
-          '09STOP (0621) (기본값)': '09stop0621',
-          '09STOP (Old)': '09stop',
-          'RAID GOSU': 'raidgosu',
+          '09STOP (2-2-2-2, 남서쪽 시작) (기본값)': '09stop0621',
+          '09STOP (2-2-2.5-1.5, 남쪽 시작)': '09stop',
+          'RAID GOSU (1-2-1-1, 남쪽 시작)': 'raidgosu',
+          '최소이동 (1-1-1-1, 남서쪽 시작)': 'minimal',
         },
       },
       default: '09stop0621',
@@ -4500,7 +4503,8 @@ const triggerSet: TriggerSet<Data> = {
         data.dmFsknP5Dir = undefined;
         data.dmFsknP5Floors = [];
         data.dmFsknP5Temp = [];
-        if (data.triggerSetConfig.dmForsakenP5Method === '09stop0621')
+        const method = data.triggerSetConfig.dmForsakenP5Method;
+        if (method === '09stop0621' || method === 'minimal')
           return output.gatherSW!();
         return output.gather!();
       },
@@ -4529,7 +4533,9 @@ const triggerSet: TriggerSet<Data> = {
       type: 'StartsUsingExtra',
       netRegex: { id: 'BB38' },
       condition: (data) =>
-        data.phase === 'p5' && data.triggerSetConfig.dmForsakenP5Method === 'raidgosu',
+        data.phase === 'p5' &&
+        (data.triggerSetConfig.dmForsakenP5Method === 'raidgosu' ||
+          data.triggerSetConfig.dmForsakenP5Method === 'minimal'),
       run: (data, matches) => {
         (data.dmFsknP5Temp ??= []).push({
           t: matches.timestamp,
@@ -4544,6 +4550,7 @@ const triggerSet: TriggerSet<Data> = {
       //   09STOP(Old): 세트1·2=왼90 / 세트3=동쪽 모서리 영구장판 분기 / 세트4=세트3 방향 따라.
       //   RAID GOSU: 세트1=왼1칸 / 세트2=왼2칸 / 세트3=북쪽 모서리 영구장판(있음→오른1/dir=west, 없음→왼1/dir=north)
       //     / 세트4=임시장판(BB38) 북서(dir=west)·북동(dir=north)에 있으면 오른1, 없으면 왼1.
+      //   최소이동(Minimal): RAID GOSU와 동일하되 남서 시작 + 세트2=왼1칸 → 1-1-1-1.
       id: 'DancingMad P5 행방불명 이동',
       type: 'StartsUsingExtra',
       netRegex: { id: 'BB37' },
@@ -4561,13 +4568,18 @@ const triggerSet: TriggerSet<Data> = {
           // 분기 없음: 남서 시작 후 매 세트(1~4) 왼쪽으로 2칸 반복.
           dir = 'left';
           dist = 'dist2';
-        } else if (data.triggerSetConfig.dmForsakenP5Method === 'raidgosu') {
+        } else if (
+          data.triggerSetConfig.dmForsakenP5Method === 'raidgosu' ||
+          data.triggerSetConfig.dmForsakenP5Method === 'minimal'
+        ) {
+          // 최소이동 = raidgosu와 동일하되 남서 시작 + 세트2만 왼1칸(1-1-1-1). 세트3·4 분기 로직 공유.
+          const minimal = data.triggerSetConfig.dmForsakenP5Method === 'minimal';
           if (set === 1) {
             dir = 'left';
             dist = 'dist1';
           } else if (set === 2) {
             dir = 'left';
-            dist = 'dist2';
+            dist = minimal ? 'dist1' : 'dist2';
           } else if (set === 3) {
             // 이번 세트 영구장판 2개 중 북쪽 모서리(|dx|<6, dy<-6) 있나? 있음→오른쪽(서로 감)/없음→왼쪽(북으로 감)
             const floors = (data.dmFsknP5Floors ?? []).filter((f) => f.t === matches.timestamp);
