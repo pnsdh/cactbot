@@ -3988,9 +3988,11 @@ const triggerSet: TriggerSet<Data> = {
     {
       // 블리자가 구슬(중앙, P1과 동일 heading ±0.79/2.36) 시전 heading → 안전 대각선(dir 옵션용).
       //   알쏭달쏭/널리널리 구슬마다 갱신. 마력방출엔 새 구슬이 없어 직전 널리널리 값이 그대로 쓰임.
+      //   ★StartsUsingExtra(263)로 읽음(빔과 동일 근거): 시전(type20) heading은 드물게 스폰 스냅샷(0.00·
+      //   뒤집힌 축)으로 흔들림(전수 2.4% 축뒤집힘·10.5% 0.00). 263 heading은 항상 실제(4382/4382 존재).
       id: 'DancingMad P4 블리자가 방향 수집',
-      type: 'StartsUsing',
-      netRegex: { id: ['BA98', 'BA9B'] }, // ★시전자(케프카/카오스/엑스데스…)가 풀마다·한 캐스트 내에서도 랜덤 → 소스 미지정(id+phase+게이트로 한정)
+      type: 'StartsUsingExtra',
+      netRegex: { id: ['BA98', 'BA9B'] }, // 263엔 source 이름 필드 없음 → 이름 불안정도 무관
       condition: (data) => data.phase === 'p4',
       run: (data, matches) =>
         data.dmP4BlizzardDir = getBlizzardSafeNwSe(parseFloat(matches.heading), matches.id),
