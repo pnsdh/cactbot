@@ -3645,6 +3645,10 @@ const triggerSet: TriggerSet<Data> = {
         const color = visiblePurple ? output.purple!() : output.blue!();
         if (target === undefined)
           return output.colorOnly!({ facing: facing, color: color }); // 빔 좌표 미수집 → 방향+색만
+        // ★빔 좌표가 중앙(100,100) 근처면 스폰 직후 스냅샷(클라이언트별 위치 미동기화) → 좌우 산출 불가.
+        //   실제 빔은 항상 가장자리(r~20+). 퇴화 시 자신있게 틀린 좌우 대신 색까지만 안내(직접 확인).
+        if (Math.hypot(target.x - 100, target.y - 100) < 10)
+          return output.colorOnly!({ facing: facing, color: color });
         // 좌우: F=(네오−중앙) 향함, T=(타겟빔−중앙). 외적>0=오른쪽 (실측 보정: 산자 북=서향 시 우).
         const cross = (neoX - 100) * (target.y - 100) - (neoY - 100) * (target.x - 100);
         const side = cross > 0 ? output.right!() : output.left!();
