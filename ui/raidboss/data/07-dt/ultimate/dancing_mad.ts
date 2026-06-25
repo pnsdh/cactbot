@@ -3595,15 +3595,18 @@ const triggerSet: TriggerSet<Data> = {
     },
     {
       id: 'DancingMad 무의 범람 보라빔 수집',
-      type: 'StartsUsing',
-      netRegex: { id: 'C394' }, // 산 자의 암흑광(보라). ★빔 액터가 풀마다 네오/케프카 이름 → 소스 미지정
+      // ★StartsUsingExtra(263)로 읽음: 시전(20) 좌표는 드물게 스폰 스냅샷(중앙 100,100)으로 흔들리나
+      //   263은 항상 실제 가장자리 좌표(전수검증 22/22·퇴화0). 263엔 source 이름도 없어 이름 불안정 무관.
+      type: 'StartsUsingExtra',
+      netRegex: { id: 'C394' }, // 산 자의 암흑광(보라)
       run: (data, matches) =>
         data.dmFloodLiving = { x: parseFloat(matches.x), y: parseFloat(matches.y) },
     },
     {
       id: 'DancingMad 무의 범람 파랑빔 수집',
-      type: 'StartsUsing',
-      netRegex: { id: 'C395' }, // 죽은 자의 암흑광(파랑). ★빔 액터가 풀마다 네오/케프카 이름 → 소스 미지정
+      // ★StartsUsingExtra(263)로 읽음(보라빔과 동일 근거): 263은 항상 실제 좌표 + source 이름 없음.
+      type: 'StartsUsingExtra',
+      netRegex: { id: 'C395' }, // 죽은 자의 암흑광(파랑)
       run: (data, matches) =>
         data.dmFloodDead = { x: parseFloat(matches.x), y: parseFloat(matches.y) },
     },
