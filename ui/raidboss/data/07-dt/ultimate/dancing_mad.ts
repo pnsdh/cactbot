@@ -141,6 +141,7 @@ export interface Data extends RaidbossData {
   dmP4ThunderDone?: boolean; // 찌릿찌릿 발동됨 → 다음 블리자가=널리널리 (널리널리가 false로 되돌림)
   dmP4MagicBlizzard?: boolean; // 마력방출 블리자가 고리 (시전 시 스냅샷)
   dmP4MagicThunder?: boolean; // 마력방출 선더가 고리
+  dmP4MagicPending?: boolean; // 마력방출 시전됨 → 직후 첫 전조 블리자가 대기(dir 방향용)
 }
 
 // 머리 사인(표식) waymark 번호 → 영문 사인 id(cactbot 관례). 인게임 전체 캡처로 검증(2026-06-10).
@@ -3539,6 +3540,7 @@ const triggerSet: TriggerSet<Data> = {
         data.dmP4StdBlizzard = undefined;
         data.dmP4StdThunder = undefined;
         data.dmP4BlizzardDir = undefined;
+        data.dmP4MagicPending = undefined;
         // 디버프 캐스케이드 상태(직전 풀 잔여 방지)
         data.dmForkMine = undefined;
         data.dmAccelMine = undefined;
@@ -3903,17 +3905,13 @@ const triggerSet: TriggerSet<Data> = {
         const w1 = dmP4IsWave1(matches, data.dmP4PosE1, data.dmP4PosE2);
         const id = w1 ? '15AB' : '15AC'; // 1번째 처리=불(15AB) / 2번째=물(15AC) 고정
         const next = (data.dmChaosMove?.[id] ?? false) ? output.move!() : output.wait!();
-        if (w1)
+        // 2차(물)는 마력방출과 거의 동시 발동 → stepDodge면 마력방출 바닥 안내(진실값=시전시작에 확정)를 미리 합침.
+        //   ※ dir 모드는 마력방출 방향이 전조 구슬(이후 시전)로만 결정 → 미포함, '마력 방출 방향(전조)' 트리거가 별도 안내.
+        if (w1 || data.triggerSetConfig.dmBlizzardThunder !== 'stepDodge')
           return output.center!({ next: next });
-        // 2차(물)는 마력방출과 거의 동시 발동(물 만료=마력방출 착탄 ~0.4s 차) → 마력방출 바닥 안내를 미리 합침.
-        //   입력값(Std/Magic 블리자가·선더가·BlizzardDir)은 마력방출 시전시작 preRun에 이미 확정 → 마력방출 트리거와 동일 결과.
-        //   본 안내는 물 만료(=#8 물처리·마력방출 안내 직전)에 사라지므로 다음 안내와 안 겹침.
         const blizzard = (data.dmP4StdBlizzard ?? true) === (data.dmP4MagicBlizzard ?? true);
         const thunder = (data.dmP4StdThunder ?? true) === (data.dmP4MagicThunder ?? true);
-        const safeNwSe = data.dmP4BlizzardDir === undefined
-          ? undefined
-          : ((data.dmP4MagicBlizzard ?? true) ? data.dmP4BlizzardDir : !data.dmP4BlizzardDir);
-        const magic = dmBlizThunText(data, blizzard, thunder, safeNwSe, output);
+        const magic = dmBlizThunText(data, blizzard, thunder, undefined, output); // stepDodge라 방향 미사용
         return output.centerMagic!({ next: next, magic: magic });
       },
       outputStrings: {
@@ -3966,18 +3964,30 @@ const triggerSet: TriggerSet<Data> = {
       outputStrings: { ...dmP4PosOutputs, ...dmP4CallerOutputs },
     },
     {
-      // [캐스케이드 #8] 혼돈물 만료(15AC Loses) → '이동/대기'(마지막). 장판 발동(+5.08s)까지 표시.
+      // [캐스케이드 #8] 혼돈물 만료(15AC Loses) → '이동/대기'(물 처리). stepDodge면 마력방출 바닥 안내도 통합(거의 동시).
+      //   노랑(alertText). 발동=혼돈물 처리 시점. 마력방출 진실값은 시전시작(BAA5 run)에 이미 확정.
+      //   ※ dir 모드는 마력방출 방향이 전조 구슬(이후 시전)로만 결정 → 여기선 물 처리만, 방향은 '마력 방출 방향(전조)'가 별도.
+      //   duration 5.8s = stepDodge 통합 시 마력방출 종료(물만료+~5.8)까지 고정(물 장판 5.1보다 김).
       id: 'DancingMad P4 혼돈물 처리 (캐스케이드)',
       type: 'LosesEffect',
       netRegex: { effectId: '15AC' },
       condition: (data, matches) => dmP4AtResolution(matches, 3000, data.dmP4Water),
-      durationSeconds: 5.1,
+      durationSeconds: 5.8,
       suppressSeconds: 5,
-      infoText: (data, _matches, output) =>
-        (data.dmChaosMove?.['15AC'] ?? false) ? output.move!() : output.wait!(),
+      alertText: (data, _matches, output) => {
+        const move = (data.dmChaosMove?.['15AC'] ?? false) ? output.move!() : output.wait!();
+        if (data.triggerSetConfig.dmBlizzardThunder !== 'stepDodge')
+          return move; // dir 모드: 물 처리만(방향은 전조 트리거)
+        const blizzard = (data.dmP4StdBlizzard ?? true) === (data.dmP4MagicBlizzard ?? true);
+        const thunder = (data.dmP4StdThunder ?? true) === (data.dmP4MagicThunder ?? true);
+        const magic = dmBlizThunText(data, blizzard, thunder, undefined, output); // stepDodge라 방향 미사용
+        return output.combo!({ move: move, magic: magic });
+      },
       outputStrings: {
+        combo: { en: '${move} + ${magic}', ko: '${move} + ${magic}' },
         move: { en: 'Move', ko: '이동' },
         wait: { en: 'Wait', ko: '대기' },
+        ...dmBlizThunStrings,
       },
     },
     // ───────── P4 바닥: 알쏭달쏭 ×3 / 찌릿찌릿 선더가 / 널리널리 블리자가 / 마력 방출 ─────────
@@ -4065,26 +4075,35 @@ const triggerSet: TriggerSet<Data> = {
       },
     },
     {
-      // 마력 방출: 마력방출 고리(시전 시 스냅샷) XNOR 독립 찌릿찌릿/널리널리 → 끝나자마자(시전시간 후) 합친 안내
-      //   거짓의 거짓=진실 → 최종 = (독립 == 마력방출). dir 옵션 방향은 직전 널리널리 구슬을 XNOR로 반전.
+      // 마력 방출: 최종 = 독립(찌릿/널리널리) XNOR 마력방출 고리. 진실값(피하기/밟기·안밖)은 시전시작 고리로 확정.
+      //   바닥 안내 출력은 '혼돈물 처리(#8)'에 통합(stepDodge, 물 만료=마력방출 ~0.4s 차). 여기선 고리 스냅샷 + 전조 대기 플래그만.
+      //   ★dir 방향은 #8 시점엔 전조 구슬이 아직 안 나와 알 수 없음 → dmP4MagicPending으로 전조 대기('마력 방출 방향(전조)').
       id: 'DancingMad P4 마력 방출',
       type: 'StartsUsing',
-      netRegex: { id: 'BAA5', source: '케프카' },
+      netRegex: { id: 'BAA5', source: '케프카', capture: false },
       condition: (data) => data.phase === 'p4',
-      preRun: (data) => {
+      run: (data) => {
         data.dmP4MagicBlizzard = data.dmP4Blizzard ?? true;
         data.dmP4MagicThunder = data.dmP4Thunder ?? true;
+        data.dmP4MagicPending = true; // 직후 첫 전조 블리자가 = 마력방출 방향
       },
-      delaySeconds: (_data, matches) => parseFloat(matches.castTime), // 마력방출 끝나자마자(전조 등장)
-      durationSeconds: 5.4, // 마력방출 착탄~전조 착탄까지
-      alertText: (data, _matches, output) => {
-        const blizzard = (data.dmP4StdBlizzard ?? true) === (data.dmP4MagicBlizzard ?? true);
+    },
+    {
+      // 마력 방출 방향(전조, dir 옵션 전용): 마력방출 직후 시전되는 전조 블리자가 구슬의 실제 heading으로 방향 확정.
+      //   #8(물 만료)엔 전조가 아직 안 나와 못 넣음 → 전조 시전 시 따로(263 heading 직접 읽기, 다른 블리자가와 동일 방식).
+      //   회피까지 ~5초 여유. 전조 한 쌍 중 첫 구슬만(preRun에서 플래그 해제). 안밖(선더)은 시전시작에 확정된 값 사용.
+      id: 'DancingMad P4 마력 방출 방향 (전조)',
+      type: 'StartsUsingExtra',
+      netRegex: { id: ['BA98', 'BA9B'] },
+      condition: (data) =>
+        data.phase === 'p4' && data.dmP4MagicPending === true &&
+        data.triggerSetConfig.dmBlizzardThunder !== 'stepDodge',
+      preRun: (data) => data.dmP4MagicPending = false,
+      durationSeconds: 5, // 전조 시전~회피
+      alertText: (data, matches, output) => {
         const thunder = (data.dmP4StdThunder ?? true) === (data.dmP4MagicThunder ?? true);
-        // dir 옵션: 직전 널리널리 구슬 안전 대각선을 마력방출 블리자가 거짓이면 반전(전조 구슬 재시전 없음)
-        const safeNwSe = data.dmP4BlizzardDir === undefined
-          ? undefined
-          : ((data.dmP4MagicBlizzard ?? true) ? data.dmP4BlizzardDir : !data.dmP4BlizzardDir);
-        return dmBlizThunText(data, blizzard, thunder, safeNwSe, output);
+        const safeNwSe = getBlizzardSafeNwSe(parseFloat(matches.heading), matches.id);
+        return dmBlizThunText(data, true, thunder, safeNwSe, output); // dir 모드라 blizzardTrue 미사용
       },
       outputStrings: dmBlizThunStrings,
     },
