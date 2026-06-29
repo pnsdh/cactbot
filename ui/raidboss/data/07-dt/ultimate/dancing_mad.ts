@@ -4294,7 +4294,7 @@ const triggerSet: TriggerSet<Data> = {
       type: 'StartsUsing',
       netRegex: { id: ['C24E', 'C24F'], source: '케프카' },
       durationSeconds: 4.3, // 실측 캐스팅 ~4.3s → 해소 시점에 종료
-      alertText: (_data, matches, output) => matches.id === 'C24E' ? output.out!() : output.in!(),
+      infoText: (_data, matches, output) => matches.id === 'C24E' ? output.out!() : output.in!(),
       outputStrings: {
         out: { en: 'Out', ko: '밖으로' },
         in: { en: 'In', ko: '안으로' },
