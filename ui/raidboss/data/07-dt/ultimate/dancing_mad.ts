@@ -3360,6 +3360,27 @@ const triggerSet: TriggerSet<Data> = {
       suppressSeconds: 3, // 웨이브당 1회(동시 BAFC 묶기; 웨이브 간 ≥5s)
     },
     {
+      // 줄 안내 (무의파동, 줄2·10): 직전 줄1·9가 터지는 BAFC(무의파동) 기점에 leftover 본 안내.
+      //   테더는 줄2·10에서 '이동'에만 찍혀 거의 미발생(실측 166/167·84/103) → 무의파동(테더 무관·확실)으로 발동.
+      //   바로 앞 '줄 라운드 리셋'(같은 웨이브)이 round++·dmFirstRoundDirs(=직전 줄 스폰활성) 캡처를 끝낸 뒤라
+      //   leftover(=dmSetDirs−dmFirstRoundDirs) 확정. 줄2·10은 세트 마지막 줄이라 infoText 선행 없음(본 안내만).
+      //   dmLineAnnounced 락 공유 → 혹 테더가 떠도 이중안내 차단(테더 '줄 안내'는 폴백으로 남음).
+      id: 'DancingMad 줄 안내 (무의파동)',
+      type: 'Ability',
+      netRegex: { id: 'BAFC', source: '블랙홀', capture: false },
+      condition: (data) => {
+        const r = data.dmTetherRound ?? 0;
+        return (r === 2 || r === 10) && data.dmLineAnnounced !== true;
+      },
+      preRun: (data) => {
+        data.dmLineAnnounced = true; // 테더 폴백 이중 차단
+      },
+      durationSeconds: 5,
+      suppressSeconds: 3, // 웨이브당 1회(줄9→10은 BAFC 2개)
+      alertText: (data, _matches, output) => dmLineHandleText(data, output),
+      outputStrings: dmLineOutputs,
+    },
+    {
       // 줄 테더 수집(리셋 뒤·안내 앞, preRun=동기): 각 테더의 블랙홀 방위를 현재 줄 dirs에 누적(중복 제거).
       //   동기라 같은 테더에서 '줄 안내'의 완료 판정이 방금 추가분까지 본다.
       id: 'DancingMad 줄 테더 수집',
