@@ -101,8 +101,8 @@ export interface Data extends RaidbossData {
   dmLimitCut?: number; // P3 리미트컷 본인 주사위 번호(1~8)
   dmMudTargets?: string[]; // P3 지진(C571/C572) 혼돈의 진흙(644) 대상 2명 이름 (힐러 고지용)
   dmBhDir?: { [id: string]: number }; // P3 블랙홀(줄) id→카디널 방위(0북1동2남3서). AddedCombatant서 수집
-  dmTetherRound?: number; // P3 블랙홀 줄 라운드(1~10). 테더 버스트마다 증가
-  dmRoundDirs?: number[]; // P3 현재 줄의 테더 달린 블랙홀 방위들(수집, 정렬=케프카 기준 시계방향 dmBhSortKey)
+  dmTetherRound?: number; // P3 블랙홀 줄 라운드(1~10). 무의파동(BAFC) 웨이브마다 증가
+  dmRoundDirs?: number[]; // P3 줄1·9 활성 블랙홀 방위(스폰 272+03 수집). dmHandlesRound가 케프카 시계 정렬
   dmSetDirs?: number[]; // P3 현재 세트의 카디널 방향(스폰서 저장). 풀/스왑/leftover 계산 참조
   dmFirstRoundDirs?: number[]; // P3 세트 첫 줄(1·9)이 쓴 방향. 둘째 줄(2·10) leftover 계산용
   dmLineAnnounced?: boolean; // P3 줄 안내 라운드당 1회 잠금. BAFC(라운드 리셋)서 false로 풀림
@@ -1315,7 +1315,7 @@ const dmSpawnActiveDirs = (data: Data): number[] => {
   }
   return dirs;
 };
-// 줄 안내 출력·본문(Tether '줄 안내' + AddedCombatant '줄 안내 (스폰)' 공용).
+// 줄 안내 출력·본문(스폰[03]·무의파동[BAFC]·스왑 안내 공용).
 const dmLineOutputs = {
   ...dmDirOutputs,
   handle: { en: '${round}: ${dir} tether', ko: '${round}줄: ${dir} 줄 처리' },
@@ -3319,6 +3319,14 @@ const triggerSet: TriggerSet<Data> = {
       },
     },
     // ───── P3 블랙홀 줄(테더) — 머리징(공격/속박/금지) 순서대로 줄 처리 (10줄/4세트) ─────
+    //  ★아키텍처(본 안내·선행 출처, 전부 type35 테더 무관):
+    //    데이터: '블랙홀 위치 수집'(03)=dmBhDir·dmSetDirs / '줄 활성 구슬 수집'(272)=dmSpawnActive(활성 구슬)
+    //            / '줄 라운드 리셋'(BAFC)=round++·dmFirstRoundDirs캡처·매 줄 초기화.
+    //    본 안내: 줄1·3·6·9='줄 안내 (스폰)'(03 스폰 즉시) / 줄2·10='줄 안내 (무의파동)'(직전 줄 BAFC)
+    //            / 줄4·5·7·8='줄 스왑 안내'(직전 줄 BAFC).
+    //    선행(infoText 초록): 줄2·4·7·10=줄1·3·6·9 스폰 트리거 / 줄5·8=줄4·7 '줄 스왑 안내'. (세트 마지막 2·5·8·10은 다음=새 세트라 선행 없음.)
+    //    공통 계산: dmHandlesRound(메서드별 방향)·dmLineHandleText(본문)·dmLinePreviewText(선행). dmLineAnnounced=라운드당 1회 락.
+    //    ※type35 테더 경로는 전부 제거됨(이동에만 찍혀 불안정). 위 전부 스폰/폭발(BAFC) 기반이라 이동 무관.
     {
       // 블랙홀 위치 수집: 카디널(테더용)만 id→방위 저장. 비카디널(무의 파동)은 제외.
       //   + 세트 카디널 방향(dmSetDirs): 스폰이 세트당 3개 동시(줄 시작 ~1s 전)라 미리 확보 →
@@ -3364,7 +3372,7 @@ const triggerSet: TriggerSet<Data> = {
       //   테더는 줄2·10에서 '이동'에만 찍혀 거의 미발생(실측 166/167·84/103) → 무의파동(테더 무관·확실)으로 발동.
       //   바로 앞 '줄 라운드 리셋'(같은 웨이브)이 round++·dmFirstRoundDirs(=직전 줄 스폰활성) 캡처를 끝낸 뒤라
       //   leftover(=dmSetDirs−dmFirstRoundDirs) 확정. 줄2·10은 세트 마지막 줄이라 infoText 선행 없음(본 안내만).
-      //   dmLineAnnounced 락 공유 → 혹 테더가 떠도 이중안내 차단(테더 '줄 안내'는 폴백으로 남음).
+      //   dmLineAnnounced 락(라운드당 1회) → 같은 줄 이중안내 차단.
       id: 'DancingMad 줄 안내 (무의파동)',
       type: 'Ability',
       netRegex: { id: 'BAFC', source: '블랙홀', capture: false },
@@ -3373,64 +3381,11 @@ const triggerSet: TriggerSet<Data> = {
         return (r === 2 || r === 10) && data.dmLineAnnounced !== true;
       },
       preRun: (data) => {
-        data.dmLineAnnounced = true; // 테더 폴백 이중 차단
+        data.dmLineAnnounced = true; // 라운드당 1회 락
       },
       durationSeconds: 5,
       suppressSeconds: 3, // 웨이브당 1회(줄9→10은 BAFC 2개)
       alertText: (data, _matches, output) => dmLineHandleText(data, output),
-      outputStrings: dmLineOutputs,
-    },
-    {
-      // 줄 테더 수집(리셋 뒤·안내 앞, preRun=동기): 각 테더의 블랙홀 방위를 현재 줄 dirs에 누적(중복 제거).
-      //   동기라 같은 테더에서 '줄 안내'의 완료 판정이 방금 추가분까지 본다.
-      id: 'DancingMad 줄 테더 수집',
-      type: 'Tether',
-      netRegex: { source: '블랙홀' },
-      preRun: (data, matches) => {
-        const d = data.dmBhDir?.[matches.sourceId];
-        if (d === undefined)
-          return;
-        data.dmRoundDirs ??= [];
-        if (!data.dmRoundDirs.includes(d))
-          data.dmRoundDirs.push(d);
-      },
-    },
-    {
-      // 줄 안내(수집 뒤): 줄별 처리 방향을 **dmHandlesRound(메서드별)** 로 계산해 출력. 수집 완료 즉시 발동.
-      //   - 처리 방향·주체는 dmHandlesRound가 메서드(09stop 기본/yan)별로 결정(1·2·9·10줄만 다름).
-      //   - alertText: now=dmHandlesRound(이번 줄). 같은 세트 다음 줄도 처리(자리 이동)면 '(이후 X)' 덧붙임.
-      //     양쪽(09stop 2·9줄)=handleBoth.
-      //   - infoText: 이번 줄 비처리 + 같은 세트 다음 줄(N+1) 처리자(진입자)면 초록 선행. 스왑=가져오기.
-      //   - 줄4·5·7·8(스왑): 본 안내는 '줄 스왑 안내'(무의파동) 담당 → alertText skip, infoText 선행만.
-      //   - 세트 마지막(2·5·8·10)은 다음 줄=새 세트(스폰 전 미상)라 선행/덧붙임 제외.
-      id: 'DancingMad 줄 안내',
-      type: 'Tether',
-      netRegex: { source: '블랙홀', capture: false },
-      condition: (data) => {
-        if (data.dmLineAnnounced === true)
-          return false; // 라운드당 1회(BAFC서 해제). 테더 재형성 중복·줄9 재안내 차단.
-        const round = data.dmTetherRound ?? 0;
-        const active = dmTetherActive[round];
-        if (active === undefined)
-          return false;
-        // 스왑(4·5·7·8)도 발동시킴: 본 안내는 alertText서 skip, 다음 줄 진입자 선행(infoText)만.
-        if (round === 1 || round === 9)
-          return (data.dmRoundDirs?.length ?? 0) >= active.length; // 수집 완료 시 발동
-        return true; // 풀(3·6)·leftover(2·10)·스왑(선행안내) = 즉시
-      },
-      preRun: (data) => {
-        data.dmLineAnnounced = true; // 동기 잠금 → 같은 줄의 후속/동시 테더 차단
-        // ★ dmFirstRoundDirs는 preRun에서 세팅해야 함(run 아님): 같은 트리거의 infoText(선행 미리보기)가
-        //   줄2·10 leftover(=dmSetDirs−dmFirstRoundDirs)를 계산하는데, popup-text 실행순서가
-        //   infoText < run이라 run에 두면 줄1·9 미리보기 시점엔 빈 배열 → leftover=세트 전체(3개)로 오안내.
-        //   preRun은 동기·infoText보다 먼저 + condition이 dmRoundDirs 수집 완료를 보장하므로 안전.
-        const round = data.dmTetherRound ?? 0;
-        if (round === 1 || round === 9)
-          data.dmFirstRoundDirs = [...(data.dmRoundDirs ?? [])]; // 둘째 줄(2·10) leftover용
-      },
-      durationSeconds: 5,
-      alertText: (data, _matches, output) => dmLineHandleText(data, output),
-      infoText: (data, _matches, output) => dmLinePreviewText(data, output),
       outputStrings: dmLineOutputs,
     },
     {
@@ -3452,13 +3407,13 @@ const triggerSet: TriggerSet<Data> = {
       //   ① 줄1·9: 272가 미리 표시한 활성 구슬들의 방위가 다 모이면 발동. ★파일순서 272<03(같은 스폰; 03 timestamp가
       //      더 이르나 파일선 272 먼저)이라 03 시점엔 활성표시 확보됨. dmBhDir은 03 자신('블랙홀 위치 수집' run, 이
       //      트리거보다 앞 배치)이 채우므로 03 라인서 읽어야 안전(272 시점 미비). 활성 구슬 중 dmBhDir(카디널) 있는
-      //      것만 세어 active.length와 정확히 일치할 때만(비블홀·수 과부족이면 테더 폴백). dmRoundDirs는 dmHandlesRound가
-      //      케프카 시계로 재정렬, 줄1은 활성 1개라 수집 순서 무관.
+      //      것만 세어 active.length와 정확히 일치할 때만(비블홀·수 과부족이면 미발동; 폴백 없음, 단 실측 0건). dmRoundDirs는
+      //      dmHandlesRound가 케프카 시계로 재정렬, 줄1은 활성 1개라 수집 순서 무관.
       //   ② 줄3·6(풀): 내용이 dmSetDirs(스폰 3카디널)+마커+케프카로만 나와 테더 무관 → 세트 3카디널 완비 시 발동.
       //      ★카디널 가드 필수: dmSetDirs는 다음 세트 첫 카디널까지 이전 세트 값(3)이 남음 → 이 라인이 카디널일 때만
       //      판정(카디널 라인이면 '블랙홀 위치 수집'이 먼저 stale 리셋·재집계 → ===3은 항상 현재 세트). 전 로그 295/295
       //      완비·round 오검출 0 검증. 줄3·6은 leftover 안 먹이므로 dmRoundDirs/dmFirstRoundDirs는 안 건드림.
-      //   dmLineAnnounced 락을 Tether '줄 안내'와 공유 → 이중안내 차단.
+      //   dmLineAnnounced 락(라운드당 1회, '줄 라운드 리셋'서 해제) → 같은 줄 이중안내 차단.
       id: 'DancingMad 줄 안내 (스폰)',
       type: 'AddedCombatant',
       netRegex: { name: '블랙홀' },
@@ -3484,7 +3439,7 @@ const triggerSet: TriggerSet<Data> = {
         return false;
       },
       preRun: (data) => {
-        data.dmLineAnnounced = true; // Tether '줄 안내'와 공유 락
+        data.dmLineAnnounced = true; // 라운드당 1회 락
         const round = data.dmTetherRound ?? 0;
         if (round === 1 || round === 9) {
           const dirs = dmSpawnActiveDirs(data);
@@ -3502,7 +3457,11 @@ const triggerSet: TriggerSet<Data> = {
       // 스왑 줄(4·5·7·8) 안내: **이전 줄 무의 파동(BAFC 피격) 기점**에 다음 줄 스왑 예고(가로채기 전 이동 시간 확보).
       //   카디널(테더) 블랙홀 source만(스프레딩 무의파동 제외), suppress로 웨이브당 1회. 다음 줄=dmTetherRound
       //   (같은 BAFC 웨이브의 '줄 라운드 리셋' preRun이 이미 +1 해둠).
-      //   새 마커(swap.to)만, 방향=세트 스폰 dmSetDirs[이전 마커 슬롯].
+      //   - alertText(본 안내): 새 마커(swap.to)만, 방향=세트 스폰 dmSetDirs[이전 마커 슬롯].
+      //   - infoText(선행): 스왑 줄(4·7)서 같은 세트 다음 줄(5·8) 진입자에게 미리. 줄5·8 선행은 직전 줄이 스왑이라
+      //     스폰/2·10 트리거에 infoText가 없어 예전엔 테더가 담당(이동 의존)했는데, 여기로 옮겨 테더 무관·확실.
+      //     ★스왑 줄에서만 호출(dmTetherSwap[round]): 비스왑 줄은 이 트리거가 stale dmSetDirs 시점(새 세트 미스폰)에
+      //     떠서 잘못된 선행이 나갈 수 있으므로 게이트. round 5·8은 세트 마지막이라 dmLinePreviewText가 자동 undefined.
       id: 'DancingMad 줄 스왑 안내',
       type: 'Ability',
       netRegex: { id: 'BAFC' },
@@ -3531,8 +3490,14 @@ const triggerSet: TriggerSet<Data> = {
           from: dmMarkerLabel(swap.from),
         });
       },
+      infoText: (data, _matches, output) => {
+        const round = data.dmTetherRound ?? 0;
+        if (dmTetherSwap[round] === undefined)
+          return; // 스왑 줄(4·7)서만 다음 줄(5·8) 선행. 비스왑은 stale dmSetDirs 회피.
+        return dmLinePreviewText(data, output);
+      },
       outputStrings: {
-        ...dmDirOutputs,
+        ...dmLineOutputs, // preview/previewTake/previewBoth(선행) + 방위 키
         take: {
           en: '${round}: ${dir} take ${from} tether',
           ko: '${round}줄: ${dir} ${from} 줄 가져오기',
