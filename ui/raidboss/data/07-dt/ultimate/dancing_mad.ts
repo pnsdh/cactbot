@@ -497,13 +497,14 @@ const forsakenRankByName = (data: Data, name: string): number | undefined => {
 };
 
 // 같은 조(탱힐 또는 딜러)의 쉐어 대상자 이름. isTh=본인이 탱힐인지.
-const forsakenStackName = (data: Data, isTh: boolean): string | undefined => {
+// 쉐어 대상자: 직접 이름 대신 data.party.member(플레이어 객체) 반환 → 출력 시 닉네임(기본)/직업명(옵션) 반영.
+const forsakenStackName = (data: Data, isTh: boolean) => {
   for (const [name, role] of Object.entries(data.dmForsakenMarks ?? {})) {
     if (role !== 'stack')
       continue;
     const nameTh = data.party.isTank(name) || data.party.isHealer(name);
     if (nameTh === isTh)
-      return name;
+      return data.party.member(name);
   }
   return undefined;
 };
@@ -1775,8 +1776,9 @@ const triggerSet: TriggerSet<Data> = {
       // C403 = 1타(1어글자 대상, 시전 4.7s). C4E1 = 2타(2어글자 대상).
       netRegex: { id: 'C403', source: '케프카' },
       durationSeconds: 4.7, // 시전 4.7s → 1타 해소
-      // 탱커 포함 모두 초록색(info). 대상 닉네임 표시.
-      infoText: (_data, matches, output) => output.text!({ target: matches.target }),
+      // 탱커 포함 모두 초록색(info). 대상 표시(닉네임 기본 / 직업명 옵션).
+      infoText: (data, matches, output) =>
+        output.text!({ target: data.party.member(matches.target) }),
       outputStrings: {
         text: {
           en: 'Tankbuster on ${target}',
