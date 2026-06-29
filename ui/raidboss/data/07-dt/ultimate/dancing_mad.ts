@@ -3469,8 +3469,13 @@ const triggerSet: TriggerSet<Data> = {
         const active = dmTetherActive[round];
         if (active === undefined)
           return false;
-        if (round === 1 || round === 9)
-          return dmSpawnActiveDirs(data).length === active.length; // 활성 구슬 방위 다 모임(정확히 일치)
+        if (round === 1 || round === 9) {
+          // 활성 구슬 방위 정확히 일치 + **dmSetDirs 3카디널 완비**. 후자가 없으면 같은 트리거 infoText 선행이
+          //   줄2·10 leftover(=dmSetDirs−dmFirstRoundDirs)를 미완성 dmSetDirs로 계산해 빈 방향(`이후 줄 처리`) 출력.
+          //   활성 구슬 03이 나머지 카디널보다 먼저 처리되면 발생. (활성 게이트가 현재 세트 보장→stale 무관, 가드 불필요.)
+          return dmSpawnActiveDirs(data).length === active.length &&
+            (data.dmSetDirs?.length ?? 0) === 3;
+        }
         if (round === 3 || round === 6) {
           if (dmBhCardinal(parseFloat(matches.x), parseFloat(matches.y)) < 0)
             return false; // 카디널 라인에서만(stale dmSetDirs 회피)
