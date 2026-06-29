@@ -106,7 +106,7 @@ export interface Data extends RaidbossData {
   dmSetDirs?: number[]; // P3 현재 세트의 카디널 방향(스폰서 저장). 풀/스왑/leftover 계산 참조
   dmFirstRoundDirs?: number[]; // P3 세트 첫 줄(1·9)이 쓴 방향. 둘째 줄(2·10) leftover 계산용
   dmLineAnnounced?: boolean; // P3 줄 안내 라운드당 1회 잠금. BAFC(라운드 리셋)서 false로 풀림
-  dmLineSpawnFire?: boolean; // P3 '줄 안내 (스폰)' 이 272 라인서 출력할지(preRun→alertText 전달용)
+  dmSpawnActive?: { [id: string]: boolean }; // P3 272(스폰)서 활성(parentId≠E0)인 블랙홀 id. BAFC 리셋서 초기화
   dmKefkaDir?: number; // P3 거대 케프카 직전 위치(0=북~7=북서). 전멸기 '중앙 대기' + 블랙홀 줄 우선순위 12시 기준
   dmIamCount?: number; // P3 '있는 그대로의 나'(BAEC/BAED) 횟수. 2번째(마지막)에 전멸기 시퀀스 안내
   dmEnrageHit?: number; // P3 전멸기 탑/쉐어 1라운드 피격 처리 플래그(스왑 1회만)
@@ -1304,7 +1304,17 @@ const dmResolveMyMark = (data: Data): string | undefined => {
   return missing.length === 1 ? `${cohort}${missing[0]}` : undefined;
 };
 
-// 줄 안내 출력·본문(Tether '줄 안내' + SpawnNpcExtra '줄 안내(스폰)' 공용).
+// 272(스폰)서 활성 표시된 블랙홀 중 dmBhDir(카디널) 잡힌 것들의 방위(중복 제거). '줄 안내 (스폰)' 완료판정·수집 공용.
+const dmSpawnActiveDirs = (data: Data): number[] => {
+  const dirs: number[] = [];
+  for (const id of Object.keys(data.dmSpawnActive ?? {})) {
+    const d = data.dmBhDir?.[id];
+    if (d !== undefined && !dirs.includes(d))
+      dirs.push(d);
+  }
+  return dirs;
+};
+// 줄 안내 출력·본문(Tether '줄 안내' + AddedCombatant '줄 안내 (스폰)' 공용).
 const dmLineOutputs = {
   ...dmDirOutputs,
   handle: { en: '${round}: ${dir} tether', ko: '${round}줄: ${dir} 줄 처리' },
@@ -3337,6 +3347,7 @@ const triggerSet: TriggerSet<Data> = {
       preRun: (data) => {
         data.dmTetherRound = (data.dmTetherRound ?? 1) + 1;
         data.dmRoundDirs = [];
+        data.dmSpawnActive = {}; // 새 줄 → 직전 세트 활성표시 비움(stale 방위 오집계 차단)
         data.dmLineAnnounced = false; // 새 줄 → 안내 잠금 해제
         // 새 줄이 2·10(=직전 줄1·9 해소 직후)이면 dmFirstRoundDirs 비움 → '줄 해소 수집'이 이 웨이브
         //   BAFC 소스로 채움. ★줄1 테더가 '고정'(이동 0)이면 type35가 안 찍혀 트리거가 못 보지만,
@@ -3420,44 +3431,50 @@ const triggerSet: TriggerSet<Data> = {
       outputStrings: dmLineOutputs,
     },
     {
-      // 줄 안내 (스폰, SpawnNpcExtra 272): 줄1·9 견고화 전용. 활성 구슬(parentId≠E0000000, dmBhDir 존재)을
-      //   dmRoundDirs에 누적하고, 줄1·9 활성 구슬이 다 모이는 그 라인서 즉시 안내(테더 이동 무관·스폰 시 확정).
-      //   ★type35 테더는 줄의 '이동'에만 찍혀 처음부터 고정으로 든 줄(이상적 플레이)은 미발생 → 줄1·9 늦음/미발동.
-      //     272는 구슬 스폰 시 항상 발생(폭발 ~7s 전). dmLineAnnounced 락을 Tether '줄 안내'와 공유.
-      //   ★수집+안내를 한 트리거로: 에뮬은 라인별 처리라 별도 수집기→안내(다른 트리거, 같은 라인)는 수집 결과가
-      //     안 보일 수 있음. 같은 트리거의 preRun(수집·완료판정)→alertText(발동)는 항상 보임(라이브도 동일).
-      id: 'DancingMad 줄 안내 (스폰)',
+      // 줄 활성 구슬 수집 (스폰, SpawnNpcExtra 272): 스폰 시 parentId(플레이어 배정)≠E0000000인 구슬 id 기록.
+      //   272는 03(블랙홀 위치)보다 timestamp는 늦으나 **로그/네트워크 파일순서상 먼저** 옴(에뮬·인게임 공통) →
+      //   272 시점엔 dmBhDir 미설정이라 방위를 못 읽음. 여기선 '활성 여부'만 표시하고, 방위는 '줄 안내 (스폰)'이 03서 읽음.
+      //   비블랙홀 272도 잡히나 안내 시 dmBhDir 없으면 자동 제외되어 무해. '줄 라운드 리셋'(BAFC)서 매 줄 초기화.
+      id: 'DancingMad 줄 활성 구슬 수집',
       type: 'SpawnNpcExtra',
       netRegex: {},
-      condition: (data) => data.phase === 'p3',
-      preRun: (data, matches) => {
-        data.dmLineSpawnFire = false; // 이 라인서 출력할지
+      run: (data, matches) => {
         if (matches.parentId === 'E0000000')
-          return; // 빈 구슬(다음 줄 대기)
-        const d = data.dmBhDir?.[matches.id];
-        if (d === undefined)
-          return; // 블랙홀 아님 / 위치 미수집
-        data.dmRoundDirs ??= [];
-        if (!data.dmRoundDirs.includes(d))
-          data.dmRoundDirs.push(d);
-        // 줄1·9: 활성 구슬 다 모이면 이 라인서 안내(락 설정). 나머지 줄은 기존 Tether/BAFC 즉시 경로.
-        if (data.dmLineAnnounced === true)
           return;
+        (data.dmSpawnActive ??= {})[matches.id] = true;
+      },
+    },
+    {
+      // 줄 안내 (스폰): 줄1·9 조기 안내. 03('블랙홀 위치 수집')이 dmBhDir을 채운 **그 라인**에서, 272가 미리 표시한
+      //   활성 구슬들의 방위가 다 모이면 즉시 안내 → 테더(줄 '이동' 시에만 찍힘; 고정으로 들면 늦음/미발동)보다 ~3s 빠름.
+      //   ★파일순서 272<03(같은 스폰; 03 timestamp가 더 이르나 파일선 272 먼저)이라, 03 시점엔 활성표시가 이미 확보됨.
+      //     dmBhDir은 03 자신('블랙홀 위치 수집' run, 이 트리거보다 앞 배치)이 채우므로 03 라인서 읽어야 안전(272 시점 미비).
+      //   활성 구슬 중 dmBhDir(카디널) 있는 것만 세어 active.length와 정확히 일치할 때만 발동(비블홀·수 과부족이면 테더 폴백).
+      //   dmLineAnnounced 락을 Tether '줄 안내'와 공유 → 이중안내 차단. round 9 dmRoundDirs는 dmHandlesRound가
+      //   케프카 시계로 재정렬, round 1은 활성 1개라 수집 순서 무관(안전).
+      id: 'DancingMad 줄 안내 (스폰)',
+      type: 'AddedCombatant',
+      netRegex: { name: '블랙홀', capture: false },
+      condition: (data) => {
+        if (data.dmLineAnnounced === true)
+          return false;
         const round = data.dmTetherRound ?? 0;
         if (round !== 1 && round !== 9)
-          return;
+          return false;
         const active = dmTetherActive[round];
-        if (active === undefined || data.dmRoundDirs.length < active.length)
-          return;
+        if (active === undefined)
+          return false;
+        return dmSpawnActiveDirs(data).length === active.length; // 활성 구슬 방위 다 모임(정확히 일치)
+      },
+      preRun: (data) => {
         data.dmLineAnnounced = true; // Tether '줄 안내'와 공유 락
-        data.dmFirstRoundDirs = [...data.dmRoundDirs]; // 둘째 줄(2·10) leftover용
-        data.dmLineSpawnFire = true;
+        const dirs = dmSpawnActiveDirs(data);
+        data.dmRoundDirs = dirs;
+        data.dmFirstRoundDirs = [...dirs]; // 둘째 줄(2·10) leftover용
       },
       durationSeconds: 5,
-      alertText: (data, _matches, output) =>
-        data.dmLineSpawnFire === true ? dmLineHandleText(data, output) : undefined,
-      infoText: (data, _matches, output) =>
-        data.dmLineSpawnFire === true ? dmLinePreviewText(data, output) : undefined,
+      alertText: (data, _matches, output) => dmLineHandleText(data, output),
+      infoText: (data, _matches, output) => dmLinePreviewText(data, output),
       outputStrings: dmLineOutputs,
     },
     {
