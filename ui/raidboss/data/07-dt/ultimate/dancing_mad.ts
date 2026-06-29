@@ -3900,14 +3900,31 @@ const triggerSet: TriggerSet<Data> = {
       },
       suppressSeconds: 10,
       infoText: (data, matches, output) => {
-        const id = dmP4IsWave1(matches, data.dmP4PosE1, data.dmP4PosE2) ? '15AB' : '15AC'; // 불 먼저/물 나중
+        const w1 = dmP4IsWave1(matches, data.dmP4PosE1, data.dmP4PosE2);
+        const id = w1 ? '15AB' : '15AC'; // 1번째 처리=불(15AB) / 2번째=물(15AC) 고정
         const next = (data.dmChaosMove?.[id] ?? false) ? output.move!() : output.wait!();
-        return output.center!({ next: next });
+        if (w1)
+          return output.center!({ next: next });
+        // 2차(물)는 마력방출과 거의 동시 발동(물 만료=마력방출 착탄 ~0.4s 차) → 마력방출 바닥 안내를 미리 합침.
+        //   입력값(Std/Magic 블리자가·선더가·BlizzardDir)은 마력방출 시전시작 preRun에 이미 확정 → 마력방출 트리거와 동일 결과.
+        //   본 안내는 물 만료(=#8 물처리·마력방출 안내 직전)에 사라지므로 다음 안내와 안 겹침.
+        const blizzard = (data.dmP4StdBlizzard ?? true) === (data.dmP4MagicBlizzard ?? true);
+        const thunder = (data.dmP4StdThunder ?? true) === (data.dmP4MagicThunder ?? true);
+        const safeNwSe = data.dmP4BlizzardDir === undefined
+          ? undefined
+          : ((data.dmP4MagicBlizzard ?? true) ? data.dmP4BlizzardDir : !data.dmP4BlizzardDir);
+        const magic = dmBlizThunText(data, blizzard, thunder, safeNwSe, output);
+        return output.centerMagic!({ next: next, magic: magic });
       },
       outputStrings: {
         center: { en: 'To center (then ${next})', ko: '중앙으로 (이후 ${next})' },
+        centerMagic: {
+          en: 'To center (then ${next} + ${magic})',
+          ko: '중앙으로 (이후 ${next} + ${magic})',
+        },
         move: { en: 'Move', ko: '이동' },
         wait: { en: 'Wait', ko: '대기' },
+        ...dmBlizThunStrings,
       },
     },
     {
