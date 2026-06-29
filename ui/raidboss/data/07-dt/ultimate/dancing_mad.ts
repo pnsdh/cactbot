@@ -2854,18 +2854,6 @@ const triggerSet: TriggerSet<Data> = {
         beta: { en: 'Attack Exdeath only', ko: '엑스데스만 공격 가능' },
       },
     },
-    {
-      // 결전 알파/베타 대상 디버프 제거 → 타겟 제한 해제. (condition=targetIsYou가 matches 사용 → capture 유지)
-      id: 'DancingMad 결전 해제',
-      type: 'LosesEffect',
-      netRegex: { effectId: ['1060', '1062'] },
-      condition: Conditions.targetIsYou(),
-      durationSeconds: 5,
-      infoText: (_data, _matches, output) => output.text!(),
-      outputStrings: {
-        text: { en: 'Free target', ko: '자유 타겟 가능' },
-      },
-    },
     // ───── P3 불·물·바람 크리스탈 ─────
     {
       // 고통의 심핵 시전 완료 직후 직업군별 안내(여기서 끝, 이후 출력 없음). 방향은 인게임에서 크리스탈 색으로 직접.
@@ -2900,7 +2888,7 @@ const triggerSet: TriggerSet<Data> = {
       outputStrings: {
         text: {
           en: 'Proximity Thundaga: away from Exdeath',
-          ko: '범위 선더가: 엑스데스에서 떨어지기',
+          ko: '자유 타겟 가능 + 범위 선더가',
         },
       },
     },
