@@ -3346,36 +3346,16 @@ const triggerSet: TriggerSet<Data> = {
       netRegex: { id: 'BAFC', source: '블랙홀', capture: false },
       preRun: (data) => {
         data.dmTetherRound = (data.dmTetherRound ?? 1) + 1;
+        // 줄2·10 진입(=직전 줄1·9 해소 직후): leftover 기준 dmFirstRoundDirs를 직전 줄1·9의 **스폰 활성 방위**로
+        //   확정(dmSpawnActive 리셋 前 캡처). 스폰 데이터(03 위치 + 272 활성)는 테더 '이동' 무관·항상 존재라
+        //   '고정으로 든 줄'(type35 미발생)도 정확. 전 로그 278/278 BAFC 폭발소스와 일치 확인(구 '줄 해소 수집' 대체).
+        if (data.dmTetherRound === 2 || data.dmTetherRound === 10)
+          data.dmFirstRoundDirs = dmSpawnActiveDirs(data);
         data.dmRoundDirs = [];
         data.dmSpawnActive = {}; // 새 줄 → 직전 세트 활성표시 비움(stale 방위 오집계 차단)
         data.dmLineAnnounced = false; // 새 줄 → 안내 잠금 해제
-        // 새 줄이 2·10(=직전 줄1·9 해소 직후)이면 dmFirstRoundDirs 비움 → '줄 해소 수집'이 이 웨이브
-        //   BAFC 소스로 채움. ★줄1 테더가 '고정'(이동 0)이면 type35가 안 찍혀 트리거가 못 보지만,
-        //   BAFC는 그 줄이 실제 터진 블랙홀이 쏘므로 테더 무관하게 줄1 방위 확보 → 줄2 leftover 견고.
-        if (data.dmTetherRound === 2 || data.dmTetherRound === 10)
-          data.dmFirstRoundDirs = [];
       },
       suppressSeconds: 3, // 웨이브당 1회(동시 BAFC 묶기; 웨이브 간 ≥5s)
-    },
-    {
-      // 줄 해소 수집: 직전 줄(1·9)에 실제 터진 블랙홀(=BAFC 카디널 소스) 방위를 dmFirstRoundDirs에 누적.
-      //   suppress 없음(줄9는 BAFC 2개라 둘 다 받아야 함). '줄 라운드 리셋'(suppress, 증가+비움) 뒤 배치 →
-      //   증가된 dmTetherRound(2·10)일 때만 누적. 비카디널(내부 무의파동)은 dmBhDir 없어 자동 제외.
-      //   → 테더 이동 유무와 무관하게 줄2·10 leftover(=세트−직전줄)가 정확·즉시.
-      id: 'DancingMad 줄 해소 수집',
-      type: 'Ability',
-      netRegex: { id: 'BAFC', source: '블랙홀' },
-      preRun: (data, matches) => {
-        const r = data.dmTetherRound ?? 0;
-        if (r !== 2 && r !== 10)
-          return;
-        const d = data.dmBhDir?.[matches.sourceId];
-        if (d === undefined)
-          return;
-        data.dmFirstRoundDirs ??= [];
-        if (!data.dmFirstRoundDirs.includes(d))
-          data.dmFirstRoundDirs.push(d);
-      },
     },
     {
       // 줄 테더 수집(리셋 뒤·안내 앞, preRun=동기): 각 테더의 블랙홀 방위를 현재 줄 dirs에 누적(중복 제거).
