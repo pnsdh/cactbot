@@ -3427,32 +3427,45 @@ const triggerSet: TriggerSet<Data> = {
       },
     },
     {
-      // 줄 안내 (스폰): 줄1·9 조기 안내. 03('블랙홀 위치 수집')이 dmBhDir을 채운 **그 라인**에서, 272가 미리 표시한
-      //   활성 구슬들의 방위가 다 모이면 즉시 안내 → 테더(줄 '이동' 시에만 찍힘; 고정으로 들면 늦음/미발동)보다 ~3s 빠름.
-      //   ★파일순서 272<03(같은 스폰; 03 timestamp가 더 이르나 파일선 272 먼저)이라, 03 시점엔 활성표시가 이미 확보됨.
-      //     dmBhDir은 03 자신('블랙홀 위치 수집' run, 이 트리거보다 앞 배치)이 채우므로 03 라인서 읽어야 안전(272 시점 미비).
-      //   활성 구슬 중 dmBhDir(카디널) 있는 것만 세어 active.length와 정확히 일치할 때만 발동(비블홀·수 과부족이면 테더 폴백).
-      //   dmLineAnnounced 락을 Tether '줄 안내'와 공유 → 이중안내 차단. round 9 dmRoundDirs는 dmHandlesRound가
-      //   케프카 시계로 재정렬, round 1은 활성 1개라 수집 순서 무관(안전).
+      // 줄 안내 (스폰): 줄1·9·3·6 조기 안내 — 그 줄을 끄는 테더 발동(이동 시에만 찍힘) 대신 스폰 03에서 즉시.
+      //   ① 줄1·9: 272가 미리 표시한 활성 구슬들의 방위가 다 모이면 발동. ★파일순서 272<03(같은 스폰; 03 timestamp가
+      //      더 이르나 파일선 272 먼저)이라 03 시점엔 활성표시 확보됨. dmBhDir은 03 자신('블랙홀 위치 수집' run, 이
+      //      트리거보다 앞 배치)이 채우므로 03 라인서 읽어야 안전(272 시점 미비). 활성 구슬 중 dmBhDir(카디널) 있는
+      //      것만 세어 active.length와 정확히 일치할 때만(비블홀·수 과부족이면 테더 폴백). dmRoundDirs는 dmHandlesRound가
+      //      케프카 시계로 재정렬, 줄1은 활성 1개라 수집 순서 무관.
+      //   ② 줄3·6(풀): 내용이 dmSetDirs(스폰 3카디널)+마커+케프카로만 나와 테더 무관 → 세트 3카디널 완비 시 발동.
+      //      ★카디널 가드 필수: dmSetDirs는 다음 세트 첫 카디널까지 이전 세트 값(3)이 남음 → 이 라인이 카디널일 때만
+      //      판정(카디널 라인이면 '블랙홀 위치 수집'이 먼저 stale 리셋·재집계 → ===3은 항상 현재 세트). 전 로그 295/295
+      //      완비·round 오검출 0 검증. 줄3·6은 leftover 안 먹이므로 dmRoundDirs/dmFirstRoundDirs는 안 건드림.
+      //   dmLineAnnounced 락을 Tether '줄 안내'와 공유 → 이중안내 차단.
       id: 'DancingMad 줄 안내 (스폰)',
       type: 'AddedCombatant',
-      netRegex: { name: '블랙홀', capture: false },
-      condition: (data) => {
+      netRegex: { name: '블랙홀' },
+      condition: (data, matches) => {
         if (data.dmLineAnnounced === true)
           return false;
         const round = data.dmTetherRound ?? 0;
-        if (round !== 1 && round !== 9)
-          return false;
         const active = dmTetherActive[round];
         if (active === undefined)
           return false;
-        return dmSpawnActiveDirs(data).length === active.length; // 활성 구슬 방위 다 모임(정확히 일치)
+        if (round === 1 || round === 9)
+          return dmSpawnActiveDirs(data).length === active.length; // 활성 구슬 방위 다 모임(정확히 일치)
+        if (round === 3 || round === 6) {
+          if (dmBhCardinal(parseFloat(matches.x), parseFloat(matches.y)) < 0)
+            return false; // 카디널 라인에서만(stale dmSetDirs 회피)
+          return (data.dmSetDirs?.length ?? 0) === 3; // 세트 3카디널 완비
+        }
+        return false;
       },
       preRun: (data) => {
         data.dmLineAnnounced = true; // Tether '줄 안내'와 공유 락
-        const dirs = dmSpawnActiveDirs(data);
-        data.dmRoundDirs = dirs;
-        data.dmFirstRoundDirs = [...dirs]; // 둘째 줄(2·10) leftover용
+        const round = data.dmTetherRound ?? 0;
+        if (round === 1 || round === 9) {
+          const dirs = dmSpawnActiveDirs(data);
+          data.dmRoundDirs = dirs;
+          data.dmFirstRoundDirs = [...dirs]; // 둘째 줄(2·10) leftover용
+        }
+        // 줄3·6은 dmSetDirs 기반(dmHandlesRound)이라 별도 상태 세팅 불필요.
       },
       durationSeconds: 5,
       alertText: (data, _matches, output) => dmLineHandleText(data, output),
