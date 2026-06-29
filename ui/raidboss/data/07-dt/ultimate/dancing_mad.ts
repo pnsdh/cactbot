@@ -1303,6 +1303,61 @@ const dmResolveMyMark = (data: Data): string | undefined => {
   return missing.length === 1 ? `${cohort}${missing[0]}` : undefined;
 };
 
+// 줄 안내 출력·본문(Tether '줄 안내' + SpawnNpcExtra '줄 안내(스폰)' 공용).
+const dmLineOutputs = {
+  ...dmDirOutputs,
+  handle: { en: '${round}: ${dir} tether', ko: '${round}줄: ${dir} 줄 처리' },
+  handleBoth: { en: '${round}: ${dir} (both)', ko: '${round}줄: ${dir} 양쪽 처리' },
+  handleNext: {
+    en: '${round}: ${dir} tether (next ${next})',
+    ko: '${round}줄: ${dir} 줄 처리 (이후 ${next})',
+  },
+  preview: { en: 'Next: ${dir} tether', ko: '이후 ${dir} 줄 처리' },
+  previewTake: { en: 'Next: ${dir} take tether', ko: '이후 ${dir} 줄 가져오기' },
+  previewBoth: { en: 'Next: ${dir} (both)', ko: '이후 ${dir} 양쪽 처리' },
+} as const;
+// 본 안내(alertText): 이번 줄 처리자면 방향. 같은 세트 다음 줄도 처리(자리 이동)면 '(이후 X)' 덧붙임. 양쪽=handleBoth.
+const dmLineHandleText = (data: Data, output: Output): string | undefined => {
+  const round = data.dmTetherRound ?? 0;
+  if (dmTetherSwap[round] !== undefined)
+    return; // 스왑(4·5·7·8) 본 안내는 '줄 스왑 안내'가 담당(여기선 infoText 선행만)
+  const myMark = dmResolveMyMark(data);
+  if (myMark === undefined)
+    return;
+  const now = dmHandlesRound(data, round, myMark);
+  if (now === undefined)
+    return; // 이 줄 비처리(선행은 infoText)
+  const nowStr = now.map((d) => output[dmDirKey(d)]!()).join(' + ');
+  const next = [2, 5, 8, 10].includes(round)
+    ? undefined
+    : dmHandlesRound(data, round + 1, myMark);
+  if (next !== undefined && next.length === 1 && now.length === 1 && next[0] !== now[0])
+    return output.handleNext!({ round: round, dir: nowStr, next: output[dmDirKey(next[0]!)]!() });
+  return now.length >= 2
+    ? output.handleBoth!({ round: round, dir: nowStr })
+    : output.handle!({ round: round, dir: nowStr });
+};
+// 선행 안내(infoText, 초록): 이번 줄 비처리 + 같은 세트 다음 줄(N+1) 진입자면 미리. 세트경계(2·5·8·10) 제외.
+const dmLinePreviewText = (data: Data, output: Output): string | undefined => {
+  const round = data.dmTetherRound ?? 0;
+  const myMark = dmResolveMyMark(data);
+  if (myMark === undefined)
+    return;
+  if (dmHandlesRound(data, round, myMark) !== undefined)
+    return; // 이 줄 처리자는 alertText
+  if ([2, 5, 8, 10].includes(round))
+    return; // 세트 마지막 줄 → 다음은 새 세트(스폰 전, 미상)
+  const next = dmHandlesRound(data, round + 1, myMark);
+  if (next === undefined)
+    return; // 다음 줄도 비처리
+  const nextStr = next.map((d) => output[dmDirKey(d)]!()).join(' + ');
+  if (dmTetherSwap[round + 1] !== undefined)
+    return output.previewTake!({ dir: nextStr }); // 다음이 스왑=가져오기
+  return next.length >= 2
+    ? output.previewBoth!({ dir: nextStr })
+    : output.preview!({ dir: nextStr });
+};
+
 // 블리자가+선더가 통합 출력(dmBlizzardThunder 옵션). P1 알쏭달쏭2 + P4 알쏭달쏭/마력방출 공용.
 //   blizzardTrue: BA98/고리02A4=true · thunderTrue: 고리02A6=true · safeNwSe: dir옵션 방향(없으면 ???).
 const dmBlizThunStrings = {
@@ -3359,63 +3414,57 @@ const triggerSet: TriggerSet<Data> = {
           data.dmFirstRoundDirs = [...(data.dmRoundDirs ?? [])]; // 둘째 줄(2·10) leftover용
       },
       durationSeconds: 5,
-      alertText: (data, _matches, output) => {
+      alertText: (data, _matches, output) => dmLineHandleText(data, output),
+      infoText: (data, _matches, output) => dmLinePreviewText(data, output),
+      outputStrings: dmLineOutputs,
+    },
+    {
+      // 줄 활성 구슬 수집(SpawnNpcExtra 272): parentId(테더 플레이어)≠E0000000인 블랙홀 = 활성 → dmBhDir로 방향 누적.
+      //   ★type35 테더는 줄의 '이동'에만 찍혀 처음부터 고정으로 든 줄(이상적 플레이)은 미발생 → 줄1·9 늦음/미발동.
+      //   272는 구슬 스폰 시 항상 발생(폭발 ~7s 전, 테더 이동 무관) → 견고. (빈 구슬=다음 줄 대기=E0000000.)
+      id: 'DancingMad 줄 활성 수집',
+      type: 'SpawnNpcExtra',
+      netRegex: {},
+      condition: (data) => data.phase === 'p3',
+      preRun: (data, matches) => {
+        if (matches.parentId === 'E0000000')
+          return; // 빈 구슬
+        const d = data.dmBhDir?.[matches.id];
+        if (d === undefined)
+          return; // 블랙홀 아님 / 위치 미수집
+        data.dmRoundDirs ??= [];
+        if (!data.dmRoundDirs.includes(d))
+          data.dmRoundDirs.push(d);
+      },
+    },
+    {
+      // 줄 안내(스폰, 272): 줄1·9 견고화 전용. 활성 구슬이 272로 확정(테더 이동 무관)되면 즉시 안내.
+      //   dmLineAnnounced 락을 Tether '줄 안내'와 공유 → 보통 272(스폰)가 먼저라 이쪽이 발동, 테더는 중복 차단.
+      //   ('줄 활성 수집'이 위에서 먼저 dmRoundDirs 채움 → 같은 272 라인서 완료 판정.)
+      id: 'DancingMad 줄 안내 (스폰)',
+      type: 'SpawnNpcExtra',
+      netRegex: { capture: false },
+      condition: (data) => {
+        if (data.dmLineAnnounced === true || data.phase !== 'p3')
+          return false;
         const round = data.dmTetherRound ?? 0;
-        if (dmTetherSwap[round] !== undefined)
-          return; // 스왑(4·5·7·8) 본 안내는 '줄 스왑 안내'가 담당(여기선 infoText 선행만)
-        const myMark = dmResolveMyMark(data); // 내 마커(없으면 표적 디버프 cohort로 보수)
-        if (myMark === undefined)
-          return;
-        const now = dmHandlesRound(data, round, myMark);
-        if (now === undefined)
-          return; // 이 줄 비처리(선행은 infoText)
-        const nowStr = now.map((d) => output[dmDirKey(d)]!()).join(' + ');
-        // 같은 세트 다음 줄도 처리(자리 이동)면 '(이후 ...)' 덧붙임. 세트 마지막(2·5·8·10)=새 세트라 제외.
-        const next = [2, 5, 8, 10].includes(round)
-          ? undefined
-          : dmHandlesRound(data, round + 1, myMark);
-        if (next !== undefined && next.length === 1 && now.length === 1 && next[0] !== now[0])
-          return output.handleNext!({
-            round: round,
-            dir: nowStr,
-            next: output[dmDirKey(next[0]!)]!(),
-          });
-        return now.length >= 2
-          ? output.handleBoth!({ round: round, dir: nowStr })
-          : output.handle!({ round: round, dir: nowStr });
+        if (round !== 1 && round !== 9)
+          return false; // 272 안내는 1·9줄 전용(나머지는 기존 Tether/BAFC 즉시 경로)
+        const active = dmTetherActive[round];
+        if (active === undefined)
+          return false;
+        return (data.dmRoundDirs?.length ?? 0) >= active.length; // 활성 구슬 다 수집되면 발동
       },
-      infoText: (data, _matches, output) => {
-        // 선행 안내(비처리자): 같은 세트 다음 줄(N+1) 진입자에게 자리 미리(초록). 세트 경계(2·5·8·10) 제외.
+      preRun: (data) => {
+        data.dmLineAnnounced = true; // 동기 잠금(테더 '줄 안내'와 공유)
         const round = data.dmTetherRound ?? 0;
-        const myMark = dmResolveMyMark(data); // 내 마커(없으면 표적 디버프 cohort로 보수)
-        if (myMark === undefined)
-          return;
-        if (dmHandlesRound(data, round, myMark) !== undefined)
-          return; // 이 줄 처리자는 alertText
-        if ([2, 5, 8, 10].includes(round))
-          return; // 세트 마지막 줄 → 다음은 새 세트(스폰 전, 미상)
-        const next = dmHandlesRound(data, round + 1, myMark);
-        if (next === undefined)
-          return; // 다음 줄도 비처리
-        const nextStr = next.map((d) => output[dmDirKey(d)]!()).join(' + ');
-        if (dmTetherSwap[round + 1] !== undefined)
-          return output.previewTake!({ dir: nextStr }); // 다음이 스왑=가져오기
-        return next.length >= 2
-          ? output.previewBoth!({ dir: nextStr })
-          : output.preview!({ dir: nextStr });
+        if (round === 1 || round === 9)
+          data.dmFirstRoundDirs = [...(data.dmRoundDirs ?? [])]; // 둘째 줄(2·10) leftover용
       },
-      outputStrings: {
-        ...dmDirOutputs,
-        handle: { en: '${round}: ${dir} tether', ko: '${round}줄: ${dir} 줄 처리' },
-        handleBoth: { en: '${round}: ${dir} (both)', ko: '${round}줄: ${dir} 양쪽 처리' },
-        handleNext: {
-          en: '${round}: ${dir} tether (next ${next})',
-          ko: '${round}줄: ${dir} 줄 처리 (이후 ${next})',
-        },
-        preview: { en: 'Next: ${dir} tether', ko: '이후 ${dir} 줄 처리' },
-        previewTake: { en: 'Next: ${dir} take tether', ko: '이후 ${dir} 줄 가져오기' },
-        previewBoth: { en: 'Next: ${dir} (both)', ko: '이후 ${dir} 양쪽 처리' },
-      },
+      durationSeconds: 5,
+      alertText: (data, _matches, output) => dmLineHandleText(data, output),
+      infoText: (data, _matches, output) => dmLinePreviewText(data, output),
+      outputStrings: dmLineOutputs,
     },
     {
       // 스왑 줄(4·5·7·8) 안내: **이전 줄 무의 파동(BAFC 피격) 기점**에 다음 줄 스왑 예고(가로채기 전 이동 시간 확보).
