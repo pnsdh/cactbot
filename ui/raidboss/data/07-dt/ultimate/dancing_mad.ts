@@ -106,6 +106,7 @@ export interface Data extends RaidbossData {
   dmSetDirs?: number[]; // P3 현재 세트의 카디널 방향(스폰서 저장). 풀/스왑/leftover 계산 참조
   dmFirstRoundDirs?: number[]; // P3 세트 첫 줄(1·9)이 쓴 방향. 둘째 줄(2·10) leftover 계산용
   dmLineAnnounced?: boolean; // P3 줄 안내 라운드당 1회 잠금. BAFC(라운드 리셋)서 false로 풀림
+  dmLineSpawnFire?: boolean; // P3 '줄 안내 (스폰)' 이 272 라인서 출력할지(preRun→alertText 전달용)
   dmKefkaDir?: number; // P3 거대 케프카 직전 위치(0=북~7=북서). 전멸기 '중앙 대기' + 블랙홀 줄 우선순위 12시 기준
   dmIamCount?: number; // P3 '있는 그대로의 나'(BAEC/BAED) 횟수. 2번째(마지막)에 전멸기 시퀀스 안내
   dmEnrageHit?: number; // P3 전멸기 탑/쉐어 1라운드 피격 처리 플래그(스왑 1회만)
@@ -3419,51 +3420,44 @@ const triggerSet: TriggerSet<Data> = {
       outputStrings: dmLineOutputs,
     },
     {
-      // 줄 활성 구슬 수집(SpawnNpcExtra 272): parentId(테더 플레이어)≠E0000000인 블랙홀 = 활성 → dmBhDir로 방향 누적.
+      // 줄 안내 (스폰, SpawnNpcExtra 272): 줄1·9 견고화 전용. 활성 구슬(parentId≠E0000000, dmBhDir 존재)을
+      //   dmRoundDirs에 누적하고, 줄1·9 활성 구슬이 다 모이는 그 라인서 즉시 안내(테더 이동 무관·스폰 시 확정).
       //   ★type35 테더는 줄의 '이동'에만 찍혀 처음부터 고정으로 든 줄(이상적 플레이)은 미발생 → 줄1·9 늦음/미발동.
-      //   272는 구슬 스폰 시 항상 발생(폭발 ~7s 전, 테더 이동 무관) → 견고. (빈 구슬=다음 줄 대기=E0000000.)
-      id: 'DancingMad 줄 활성 수집',
+      //     272는 구슬 스폰 시 항상 발생(폭발 ~7s 전). dmLineAnnounced 락을 Tether '줄 안내'와 공유.
+      //   ★수집+안내를 한 트리거로: 에뮬은 라인별 처리라 별도 수집기→안내(다른 트리거, 같은 라인)는 수집 결과가
+      //     안 보일 수 있음. 같은 트리거의 preRun(수집·완료판정)→alertText(발동)는 항상 보임(라이브도 동일).
+      id: 'DancingMad 줄 안내 (스폰)',
       type: 'SpawnNpcExtra',
       netRegex: {},
       condition: (data) => data.phase === 'p3',
       preRun: (data, matches) => {
+        data.dmLineSpawnFire = false; // 이 라인서 출력할지
         if (matches.parentId === 'E0000000')
-          return; // 빈 구슬
+          return; // 빈 구슬(다음 줄 대기)
         const d = data.dmBhDir?.[matches.id];
         if (d === undefined)
           return; // 블랙홀 아님 / 위치 미수집
         data.dmRoundDirs ??= [];
         if (!data.dmRoundDirs.includes(d))
           data.dmRoundDirs.push(d);
-      },
-    },
-    {
-      // 줄 안내(스폰, 272): 줄1·9 견고화 전용. 활성 구슬이 272로 확정(테더 이동 무관)되면 즉시 안내.
-      //   dmLineAnnounced 락을 Tether '줄 안내'와 공유 → 보통 272(스폰)가 먼저라 이쪽이 발동, 테더는 중복 차단.
-      //   ('줄 활성 수집'이 위에서 먼저 dmRoundDirs 채움 → 같은 272 라인서 완료 판정.)
-      id: 'DancingMad 줄 안내 (스폰)',
-      type: 'SpawnNpcExtra',
-      netRegex: { capture: false },
-      condition: (data) => {
-        if (data.dmLineAnnounced === true || data.phase !== 'p3')
-          return false;
+        // 줄1·9: 활성 구슬 다 모이면 이 라인서 안내(락 설정). 나머지 줄은 기존 Tether/BAFC 즉시 경로.
+        if (data.dmLineAnnounced === true)
+          return;
         const round = data.dmTetherRound ?? 0;
         if (round !== 1 && round !== 9)
-          return false; // 272 안내는 1·9줄 전용(나머지는 기존 Tether/BAFC 즉시 경로)
+          return;
         const active = dmTetherActive[round];
-        if (active === undefined)
-          return false;
-        return (data.dmRoundDirs?.length ?? 0) >= active.length; // 활성 구슬 다 수집되면 발동
-      },
-      preRun: (data) => {
-        data.dmLineAnnounced = true; // 동기 잠금(테더 '줄 안내'와 공유)
-        const round = data.dmTetherRound ?? 0;
-        if (round === 1 || round === 9)
-          data.dmFirstRoundDirs = [...(data.dmRoundDirs ?? [])]; // 둘째 줄(2·10) leftover용
+        if (active === undefined || data.dmRoundDirs.length < active.length)
+          return;
+        data.dmLineAnnounced = true; // Tether '줄 안내'와 공유 락
+        data.dmFirstRoundDirs = [...data.dmRoundDirs]; // 둘째 줄(2·10) leftover용
+        data.dmLineSpawnFire = true;
       },
       durationSeconds: 5,
-      alertText: (data, _matches, output) => dmLineHandleText(data, output),
-      infoText: (data, _matches, output) => dmLinePreviewText(data, output),
+      alertText: (data, _matches, output) =>
+        data.dmLineSpawnFire === true ? dmLineHandleText(data, output) : undefined,
+      infoText: (data, _matches, output) =>
+        data.dmLineSpawnFire === true ? dmLinePreviewText(data, output) : undefined,
       outputStrings: dmLineOutputs,
     },
     {
