@@ -4099,7 +4099,7 @@ const triggerSet: TriggerSet<Data> = {
         data.phase === 'p4' && data.dmP4MagicPending === true &&
         data.triggerSetConfig.dmBlizzardThunder !== 'stepDodge',
       preRun: (data) => data.dmP4MagicPending = false,
-      durationSeconds: 5, // 전조 시전~회피
+      durationSeconds: 5.5, // 전조 시전(BAA5+~7s)~회피(BAA5+~12.1s) 여유 덮음
       alertText: (data, matches, output) => {
         const thunder = (data.dmP4StdThunder ?? true) === (data.dmP4MagicThunder ?? true);
         const safeNwSe = getBlizzardSafeNwSe(parseFloat(matches.heading), matches.id);
