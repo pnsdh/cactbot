@@ -271,6 +271,24 @@ const dmP4AtResolution = (
   return times.some((x) => x !== undefined && Math.abs(t - x) < tolMs);
 };
 
+// 타임스탬프 근접 비교/그룹핑(공용). ★한 사건의 여러 라인이 1ms 갈려(패킷 경계 지터, 예 .551/.552) 도착해도
+//   '정확 일치(===)'면 다른 사건으로 오인 → 드롭/오집계. 사건 내(~1ms) vs 사건 간(≥수백ms)이 100배+라 허용오차로 흡수.
+const dmTsClose = (a: string, b: string, tolMs = 25): boolean =>
+  Math.abs(Date.parse(a) - Date.parse(b)) <= tolMs;
+// 항목들을 타임스탬프 근접으로 클러스터(정렬 후 직전과 tolMs 이내면 같은 그룹). exact-키 그룹핑(byT[e.t]) 대체.
+const dmGroupByTime = <T>(items: readonly T[], getT: (x: T) => string, tolMs = 25): T[][] => {
+  const sorted = [...items].sort((a, b) => Date.parse(getT(a)) - Date.parse(getT(b)));
+  const groups: T[][] = [];
+  for (const it of sorted) {
+    const last = groups[groups.length - 1];
+    if (last !== undefined && dmTsClose(getT(last[last.length - 1]!), getT(it), tolMs))
+      last.push(it);
+    else
+      groups.push([it]);
+  }
+  return groups;
+};
+
 // P4 산개/쉐어(+가속도) 공용 출력(1·2차 동일). 키는 혼돈불 처리(#4) 병합에서 재사용하므로 충돌 회피용 고유명
 //   (posCombo/accelMove). 가속도는 자기 차수(E1/E2)에 맞을 때만 합침.
 const dmP4PosOutputs = {
@@ -4382,16 +4400,13 @@ const triggerSet: TriggerSet<Data> = {
       condition: (data) => data.dmStarOn === true,
       run: (data, matches) => {
         // 새 세트 판정: 활성 점등은 세트마다 ~6s 간격. ★단 한 세트의 4탑이 1ms 갈려(예 .551/.552) 도착할 수 있어
-        //   정확 타임스탬프 비교(!==)는 **거짓 세트증가**를 유발 → 회전식(myTower.zone+120°*set)이 한 세트 더 돌아
-        //   방위·속성 오안내(0630로그 set3: 불/북서여야 하나 번개/북동 출력). → **시간 갭(>2s)으로 세트 경계만 판정**
-        //   전 P5 로그 점검: 진짜 탑 gap은 양봉(세트 내 0~1ms / 세트 간 ≥4002ms)이라 안전대(1ms,4002ms)의 중간값 2s 사용.
-        const t = Date.parse(matches.timestamp);
-        const prev = data.dmStarSetTime !== undefined ? Date.parse(data.dmStarSetTime) : -Infinity;
-        if (t - prev > 2000) {
+        //   정확 타임스탬프 비교(!==)는 **거짓 세트증가** → 회전식(myTower.zone+120°*set)이 한 세트 더 돌아 오안내
+        //   (0630로그 set3: 불/북서여야 하나 번개/북동). → dmTsClose(근접 허용오차)로 직전 활성과 같은 세트인지 판정.
+        if (data.dmStarSetTime === undefined || !dmTsClose(matches.timestamp, data.dmStarSetTime)) {
           data.dmStarSet = (data.dmStarSet ?? 0) + 1;
           data.dmStarActive = [];
         }
-        data.dmStarSetTime = matches.timestamp; // 같은 세트 내 .551→.552도 최신으로(다음 갭 비교 기준)
+        data.dmStarSetTime = matches.timestamp; // 같은 세트 내 .551→.552도 최신으로(다음 근접 비교 기준)
         (data.dmStarActive ??= []).push(matches.id.toUpperCase());
       },
     },
@@ -4520,17 +4535,12 @@ const triggerSet: TriggerSet<Data> = {
       delaySeconds: 1.5,
       durationSeconds: 7.5,
       alertText: (data, _matches, output) => {
-        const tele = data.dmFloodTele ?? [];
-        // 웨이브(타임스탬프)별 그룹 → 각 웨이브 2분신
-        const byT: { [t: string]: { x: number; y: number }[] } = {};
-        for (const e of tele)
-          (byT[e.t] ??= []).push(e);
         const d2r = Math.PI / 180;
         const r2 = (c: { x: number; y: number }) => (c.x - 100) ** 2 + (c.y - 100) ** 2;
-        // 첫 2웨이브 대각선 bearing(near→far 벡터)
+        // 웨이브별 그룹(각 2분신) → 첫 2웨이브 대각선 bearing(near→far). ★타임스탬프 근접 클러스터(dmGroupByTime):
+        //   2분신이 1ms 갈리면 exact-키 그룹핑(byT[e.t])은 둘 다 cl.length<2로 드롭→그 웨이브 손실→미발동(실측 발생).
         const diags: number[] = [];
-        for (const t of Object.keys(byT).sort()) {
-          const cl = byT[t]!;
+        for (const cl of dmGroupByTime(data.dmFloodTele ?? [], (e) => e.t)) {
           if (cl.length < 2)
             continue;
           const a = cl[0]!;
@@ -4665,14 +4675,18 @@ const triggerSet: TriggerSet<Data> = {
             dist = minimal ? 'dist1' : 'dist2';
           } else if (set === 3) {
             // 이번 세트 영구장판 2개 중 북쪽 모서리(|dx|<6, dy<-6) 있나? 있음→오른쪽(서로 감)/없음→왼쪽(북으로 감)
-            const floors = (data.dmFsknP5Floors ?? []).filter((f) => f.t === matches.timestamp);
+            const floors = (data.dmFsknP5Floors ?? []).filter((f) =>
+              dmTsClose(f.t, matches.timestamp)
+            );
             const north = floors.some((f) => Math.abs(f.x - 100) < 6 && (f.y - 100) < -6);
             data.dmFsknP5Dir = north ? 'west' : 'north';
             dir = north ? 'right' : 'left';
             dist = 'dist1';
           } else if (set === 4) {
             // 임시장판(BB38) 북반구 대각선: dir=west면 북서(dx<-3) / dir=north면 북동(dx>3) 체크
-            const temps = (data.dmFsknP5Temp ?? []).filter((f) => f.t === matches.timestamp);
+            const temps = (data.dmFsknP5Temp ?? []).filter((f) =>
+              dmTsClose(f.t, matches.timestamp)
+            );
             const checkNW = data.dmFsknP5Dir === 'west';
             const hit = temps.some((f) =>
               (f.y - 100) < -3 && (checkNW ? (f.x - 100) < -3 : (f.x - 100) > 3)
@@ -4689,7 +4703,9 @@ const triggerSet: TriggerSet<Data> = {
             dist = 'dist2';
           } else if (set === 3) {
             // 이번 세트 영구장판 2개 중 동쪽 모서리(dx>6, |dy|<6) 있나? (대각선 제외)
-            const floors = (data.dmFsknP5Floors ?? []).filter((f) => f.t === matches.timestamp);
+            const floors = (data.dmFsknP5Floors ?? []).filter((f) =>
+              dmTsClose(f.t, matches.timestamp)
+            );
             const east = floors.some((f) => (f.x - 100) > 6 && Math.abs(f.y - 100) < 6);
             data.dmFsknP5Dir = east ? 'west' : 'east';
             dir = east ? 'right' : 'left';
