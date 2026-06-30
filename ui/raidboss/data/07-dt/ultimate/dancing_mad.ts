@@ -1,4 +1,5 @@
 import Conditions from '../../../../../resources/conditions';
+import Outputs from '../../../../../resources/outputs';
 import { callOverlayHandler } from '../../../../../resources/overlay_plugin_api';
 import { Responses } from '../../../../../resources/responses';
 import Util, { Directions } from '../../../../../resources/util';
@@ -293,8 +294,8 @@ const dmGroupByTime = <T>(items: readonly T[], getT: (x: T) => string, tolMs = 2
 //   (posCombo/accelMove). 가속도는 자기 차수(E1/E2)에 맞을 때만 합침.
 const dmP4PosOutputs = {
   posCombo: { en: '${pos} + ${accel}', ko: '${pos} + ${accel}' },
-  spread: { en: 'Spread', ko: '산개' },
-  stack: { en: 'Stack', ko: '쉐어' },
+  spread: Outputs.spread,
+  stack: Outputs.stackMarker,
   stop: { en: 'Stop', ko: '정지' },
   accelMove: { en: 'Move', ko: '움직이기' },
 };
@@ -530,10 +531,10 @@ const forsakenStackName = (data: Data, isTh: boolean) => {
 // 행방불명 공통 라벨(역할·폴백). 실제 위치/포맷은 forsakenFmt(통합 포맷)에서 조립.
 const forsakenOutputs = {
   // 역할 라벨(처리 마커).
-  stack: { en: 'Stack', ko: '쉐어' },
+  stack: Outputs.stackMarker,
   cone: { en: 'Cone', ko: '부채꼴' },
   conePair: { en: 'Cone (pair)', ko: '부채꼴(부+부)' }, // 잼잼 짝수탑 부채 2명(같이 부채 유도)
-  spread: { en: 'Spread', ko: '산개' },
+  spread: Outputs.spread,
   // 비표준/역할불명 → 탑 번호 + 마커종류만.
   jingOnly: { en: 'T${tower} / Mark: ${role}', ko: '${tower}탑 / 징: ${role}' },
   // 비처리 짝수 = 분신 설치(탱힐).
@@ -1211,10 +1212,10 @@ const dmMarkerLabel = (m: string): string => {
 };
 // 방위(0북1동2남3서) 공유 outputStrings + 키 헬퍼 (줄 안내 트리거 공용).
 const dmDirOutputs = {
-  n: { en: 'N', ko: '북쪽' },
-  e: { en: 'E', ko: '동쪽' },
-  s: { en: 'S', ko: '남쪽' },
-  w: { en: 'W', ko: '서쪽' },
+  n: { en: 'N', de: 'N', fr: 'N', ja: '北', cn: '上', ko: '북쪽' },
+  e: { en: 'E', de: 'O', fr: 'E', ja: '東', cn: '右', ko: '동쪽' },
+  s: { en: 'S', de: 'S', fr: 'S', ja: '南', cn: '下', ko: '남쪽' },
+  w: { en: 'W', de: 'W', fr: 'O', ja: '西', cn: '左', ko: '서쪽' },
 } as const;
 const dmDirKey = (d: number): 'n' | 'e' | 's' | 'w' => (['n', 'e', 's', 'w'] as const)[d] ?? 'n';
 // 줄(블랙홀) 우선순위 정렬 키: 케프카 기준 위치(8방향 dmKefkaDir)부터 시계방향.
@@ -1392,11 +1393,11 @@ const dmLinePreviewText = (data: Data, output: Output): string | undefined => {
 //   blizzardTrue: BA98/고리02A4=true · thunderTrue: 고리02A6=true · safeNwSe: dir옵션 방향(없으면 ???).
 const dmBlizThunStrings = {
   combo2: { en: '${dir} / ${inout}', ko: '${dir}에서 ${inout}' },
-  inner: { en: 'In', ko: '안으로' },
-  outer: { en: 'Out', ko: '밖으로' },
+  inner: Outputs.in,
+  outer: Outputs.out,
   dirNeSw: { en: 'NE/SW', ko: '북동/남서' },
   dirNwSe: { en: 'NW/SE', ko: '북서/남동' },
-  dirUnknown: { en: '???', ko: '???' },
+  dirUnknown: Outputs.unknown,
   dodgeBoth: { en: 'Dodge both', ko: '둘 다 피하기' },
   stepFan: { en: 'Step on fan only', ko: '부채꼴만 밟기' },
   stepLine: { en: 'Step on line only', ko: '직선만 밟기' },
@@ -1914,10 +1915,10 @@ const triggerSet: TriggerSet<Data> = {
         noKbRole: { en: '${ns} + ${ss}', ko: '${ns}쪽에서 ${ss}' },
         kbUnknown: { en: 'Knockback + ${ss} / Blizzard: ???', ko: '넉백 + ${ss} / 블리자가: ???' },
         noKbUnknown: { en: '${ss} / Blizzard: ???', ko: '${ss} / 블리자가: ???' },
-        spread: { en: 'Spread', ko: '산개' },
-        stack: { en: 'Stack', ko: '쉐어' },
-        right: { en: 'Right', ko: '오른쪽' },
-        left: { en: 'Left', ko: '왼쪽' },
+        spread: Outputs.spread,
+        stack: Outputs.stackMarker,
+        right: Outputs.right,
+        left: Outputs.left,
         north: { en: 'North', ko: '위' },
         south: { en: 'South', ko: '아래' },
       },
@@ -2002,8 +2003,8 @@ const triggerSet: TriggerSet<Data> = {
         return kb ? output.kbStack!() : output.stack!();
       },
       outputStrings: {
-        spread: { en: 'Spread', ko: '산개' },
-        stack: { en: 'Stack', ko: '쉐어' },
+        spread: Outputs.spread,
+        stack: Outputs.stackMarker,
         kbSpread: { en: 'Knockback + Spread', ko: '넉백 + 산개' },
         kbStack: { en: 'Knockback + Stack', ko: '넉백 + 쉐어' },
       },
@@ -2197,10 +2198,7 @@ const triggerSet: TriggerSet<Data> = {
           en: 'Center',
           ko: '중앙으로',
         },
-        spread: {
-          en: 'Spread',
-          ko: '산개',
-        },
+        spread: Outputs.spread,
       },
     },
     {
@@ -2325,9 +2323,9 @@ const triggerSet: TriggerSet<Data> = {
         combo3: { en: '${inout} ${ss} + ${gaze}', ko: '${inout} ${ss} + ${gaze}' },
         inner: { en: 'In', ko: '바닥 안에서' },
         outer: { en: 'Out', ko: '바닥 밖에서' },
-        spread: { en: 'Spread', ko: '산개' },
-        stack: { en: 'Stack', ko: '쉐어' },
-        gaze: { en: 'Look Away', ko: '뒤돌기' },
+        spread: Outputs.spread,
+        stack: Outputs.stackMarker,
+        gaze: Outputs.lookAway,
         look: { en: 'Look at Statue', ko: '신상 보기' },
         gazeUnknown: { en: 'Gaze?', ko: '시선?' },
       },
@@ -2882,12 +2880,12 @@ const triggerSet: TriggerSet<Data> = {
         consecutive: { en: '3-in-row', ko: '3연속' },
         twoOne: { en: '2:1', ko: '2:1' },
         oneEach: { en: '1:1:1', ko: '1:1:1' },
-        dirN: { en: 'N', ko: '북쪽' },
-        dirNE: { en: 'NE', ko: '북동쪽' },
-        dirSE: { en: 'SE', ko: '남동쪽' },
-        dirS: { en: 'S', ko: '남쪽' },
-        dirSW: { en: 'SW', ko: '남서쪽' },
-        dirNW: { en: 'NW', ko: '북서쪽' },
+        dirN: { en: 'N', de: 'N', fr: 'N', ja: '北', cn: '上', ko: '북쪽' },
+        dirNE: { en: 'NE', de: 'NO', fr: 'NE', ja: '北東', cn: '右上', ko: '북동쪽' },
+        dirSE: { en: 'SE', de: 'SO', fr: 'SE', ja: '南東', cn: '右下', ko: '남동쪽' },
+        dirS: { en: 'S', de: 'S', fr: 'S', ja: '南', cn: '下', ko: '남쪽' },
+        dirSW: { en: 'SW', de: 'SW', fr: 'SO', ja: '南西', cn: '左下', ko: '남서쪽' },
+        dirNW: { en: 'NW', de: 'NW', fr: 'NO', ja: '北西', cn: '左上', ko: '북서쪽' },
         relLeft: { en: 'left', ko: '왼쪽' },
         relMid: { en: 'mid', ko: '중간' },
         relRight: { en: 'right', ko: '오른쪽' },
@@ -3101,7 +3099,7 @@ const triggerSet: TriggerSet<Data> = {
       outputStrings: {
         look: { en: 'Knockback: Look at Exdeath', ko: '넉백: 엑스데스 바라보기' },
         away: { en: 'Knockback: Look away from Exdeath', ko: '넉백: 엑스데스 보지 않기' },
-        plain: { en: 'Knockback', ko: '넉백' },
+        plain: Outputs.knockback,
       },
     },
     {
@@ -3157,14 +3155,14 @@ const triggerSet: TriggerSet<Data> = {
         text: { en: 'Start ${dir} / ${rot}', ko: '${dir}에서 시작 / ${rot} 회전' },
         cw: { en: 'CW', ko: '시계' },
         ccw: { en: 'CCW', ko: '반시계' },
-        n: { en: 'N', ko: '북' },
-        ne: { en: 'NE', ko: '북동' },
-        e: { en: 'E', ko: '동' },
-        se: { en: 'SE', ko: '남동' },
-        s: { en: 'S', ko: '남' },
-        sw: { en: 'SW', ko: '남서' },
-        w: { en: 'W', ko: '서' },
-        nw: { en: 'NW', ko: '북서' },
+        n: Outputs.dirN,
+        ne: Outputs.dirNE,
+        e: Outputs.dirE,
+        se: Outputs.dirSE,
+        s: Outputs.dirS,
+        sw: Outputs.dirSW,
+        w: Outputs.dirW,
+        nw: Outputs.dirNW,
       },
     },
     {
@@ -3709,14 +3707,14 @@ const triggerSet: TriggerSet<Data> = {
         blue: { en: 'Blue', ko: '파랑' },
         left: { en: 'left', ko: '왼쪽' },
         right: { en: 'right', ko: '오른쪽' },
-        dirN: { en: 'N', ko: '북쪽' },
-        dirNE: { en: 'NE', ko: '북동쪽' },
-        dirE: { en: 'E', ko: '동쪽' },
-        dirSE: { en: 'SE', ko: '남동쪽' },
-        dirS: { en: 'S', ko: '남쪽' },
-        dirSW: { en: 'SW', ko: '남서쪽' },
-        dirW: { en: 'W', ko: '서쪽' },
-        dirNW: { en: 'NW', ko: '북서쪽' },
+        dirN: { en: 'N', de: 'N', fr: 'N', ja: '北', cn: '上', ko: '북쪽' },
+        dirNE: { en: 'NE', de: 'NO', fr: 'NE', ja: '北東', cn: '右上', ko: '북동쪽' },
+        dirE: { en: 'E', de: 'O', fr: 'E', ja: '東', cn: '右', ko: '동쪽' },
+        dirSE: { en: 'SE', de: 'SO', fr: 'SE', ja: '南東', cn: '右下', ko: '남동쪽' },
+        dirS: { en: 'S', de: 'S', fr: 'S', ja: '南', cn: '下', ko: '남쪽' },
+        dirSW: { en: 'SW', de: 'SW', fr: 'SO', ja: '南西', cn: '左下', ko: '남서쪽' },
+        dirW: { en: 'W', de: 'W', fr: 'O', ja: '西', cn: '左', ko: '서쪽' },
+        dirNW: { en: 'NW', de: 'NW', fr: 'NO', ja: '北西', cn: '左上', ko: '북서쪽' },
         unknown: { en: '?', ko: '?' },
       },
     },
@@ -4222,7 +4220,7 @@ const triggerSet: TriggerSet<Data> = {
       outputStrings: {
         combo: { en: '${action} (then ${next})', ko: '${action} (이후 ${next})' },
         aHit: { en: 'Point-blank', ko: '칼끝딜' },
-        aIn: { en: 'In', ko: '안으로' },
+        aIn: Outputs.in,
         nSouth: { en: 'S', ko: '남쪽으로' },
       },
     },
@@ -4305,8 +4303,8 @@ const triggerSet: TriggerSet<Data> = {
       durationSeconds: 4.3, // 실측 캐스팅 ~4.3s → 해소 시점에 종료
       infoText: (_data, matches, output) => matches.id === 'C24E' ? output.out!() : output.in!(),
       outputStrings: {
-        out: { en: 'Out', ko: '밖으로' },
-        in: { en: 'In', ko: '안으로' },
+        out: Outputs.out,
+        in: Outputs.in,
       },
     },
     {
@@ -4564,10 +4562,10 @@ const triggerSet: TriggerSet<Data> = {
         text: { en: 'From ${start}, ${rot} (${path})', ko: '${start}에서 ${rot} (${path})' },
         left: { en: 'Left', ko: '왼쪽으로' },
         right: { en: 'Right', ko: '오른쪽으로' },
-        n: { en: 'N', ko: '북' },
-        e: { en: 'E', ko: '동' },
-        s: { en: 'S', ko: '남' },
-        w: { en: 'W', ko: '서' },
+        n: Outputs.dirN,
+        e: Outputs.dirE,
+        s: Outputs.dirS,
+        w: Outputs.dirW,
       },
     },
     {
