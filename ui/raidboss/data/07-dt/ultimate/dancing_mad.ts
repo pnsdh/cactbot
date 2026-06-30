@@ -293,11 +293,17 @@ const dmGroupByTime = <T>(items: readonly T[], getT: (x: T) => string, tolMs = 2
 // P4 산개/쉐어(+가속도) 공용 출력(1·2차 동일). 키는 혼돈불 처리(#4) 병합에서 재사용하므로 충돌 회피용 고유명
 //   (posCombo/accelMove). 가속도는 자기 차수(E1/E2)에 맞을 때만 합침.
 const dmP4PosOutputs = {
-  posCombo: { en: '${pos} + ${accel}', ko: '${pos} + ${accel}' },
+  posCombo: {
+    en: '${pos} + ${accel}',
+    de: '${pos} + ${accel}',
+    fr: '${pos} + ${accel}',
+    ja: '${pos} + ${accel}',
+    ko: '${pos} + ${accel}',
+  },
   spread: Outputs.spread,
   stack: Outputs.stackMarker,
-  stop: { en: 'Stop', ko: '정지' },
-  accelMove: { en: 'Move', ko: '움직이기' },
+  stop: { en: 'Stop', de: 'Stopp', fr: 'Stop', ja: '停止', ko: '정지' },
+  accelMove: { en: 'Move', de: 'Bewegen', fr: 'Bouger', ja: '動く', ko: '움직이기' },
 };
 // 내 positioning/가속도가 해당 차수(early=E1/!early=E2)면 행동, 아니면 쉐어/생략.
 const dmP4PosText = (data: Data, early: boolean, output: Output): string => {
@@ -313,12 +319,30 @@ const dmP4PosText = (data: Data, early: boolean, output: Output): string => {
 
 // P4 콜러 접미(옵션 ON): 산개/쉐어 안내 뒤에 ' (산개자: 직업… / 가속)' 덧붙임. 가속=차수 전체 정지/이동 일치.
 const dmP4CallerOutputs = {
-  caller: { en: ' (${jobs} / ${accel})', ko: ' (${jobs} / ${accel})' },
-  accStop: { en: 'All stop', ko: '전부 멈춰' },
-  accMove: { en: 'All move', ko: '전부 움직여' },
-  accMaranStop: { en: 'Eyes stop', ko: '마안만 멈춰' },
-  accMaranMove: { en: 'Eyes move', ko: '마안만 움직여' },
-  accMixed: { en: 'Each', ko: '각자 봐' },
+  caller: {
+    en: ' (${jobs} / ${accel})',
+    de: ' (${jobs} / ${accel})',
+    fr: ' (${jobs} / ${accel})',
+    ja: ' (${jobs} / ${accel})',
+    ko: ' (${jobs} / ${accel})',
+  },
+  accStop: { en: 'All stop', de: 'Alle stoppen', fr: 'Tous stop', ja: '全員停止', ko: '전부 멈춰' },
+  accMove: { en: 'All move', de: 'Alle bewegen', fr: 'Tous bougent', ja: '全員移動', ko: '전부 움직여' },
+  accMaranStop: {
+    en: 'Eyes stop',
+    de: 'Augen stoppen',
+    fr: 'Yeux stop',
+    ja: '魔眼だけ停止',
+    ko: '마안만 멈춰',
+  },
+  accMaranMove: {
+    en: 'Eyes move',
+    de: 'Augen bewegen',
+    fr: 'Yeux bougent',
+    ja: '魔眼だけ移動',
+    ko: '마안만 움직여',
+  },
+  accMixed: { en: 'Each', de: 'Einzeln', fr: 'Chacun', ja: '各自', ko: '각자 봐' },
 };
 const dmP4CallerSuffix = (data: Data, early: boolean, output: Output): string => {
   if (data.triggerSetConfig.dmP4Caller !== true)
@@ -356,7 +380,13 @@ const dmP4CallerSuffix = (data: Data, early: boolean, output: Output): string =>
 
 // 마안 콜러 접미(옵션 ON): 해당 회차 마안 대상자 직업만 덧붙임(보기/보지않기는 공통이라 앞에 이미 안내).
 const dmP4CurseOutputs = {
-  targets: { en: ' (${jobs})', ko: ' (${jobs})' },
+  targets: {
+    en: ' (${jobs})',
+    de: ' (${jobs})',
+    fr: ' (${jobs})',
+    ja: ' (${jobs})',
+    ko: ' (${jobs})',
+  },
 };
 const dmP4CurseSuffix = (data: Data, wave1: boolean, output: Output): string => {
   if (data.triggerSetConfig.dmP4Caller !== true)
@@ -532,21 +562,51 @@ const forsakenStackName = (data: Data, isTh: boolean) => {
 const forsakenOutputs = {
   // 역할 라벨(처리 마커).
   stack: Outputs.stackMarker,
-  cone: { en: 'Cone', ko: '부채꼴' },
+  cone: { en: 'Cone', de: 'Kegel', fr: 'Cône', ja: '扇', ko: '부채꼴' },
   conePair: { en: 'Cone (pair)', ko: '부채꼴(부+부)' }, // 잼잼 짝수탑 부채 2명(같이 부채 유도)
   spread: Outputs.spread,
   // 비표준/역할불명 → 탑 번호 + 마커종류만.
-  jingOnly: { en: 'T${tower} / Mark: ${role}', ko: '${tower}탑 / 징: ${role}' },
+  jingOnly: {
+    en: 'T${tower} / Mark: ${role}',
+    de: 'T${tower} / Marker: ${role}',
+    fr: 'T${tower} / marque : ${role}',
+    ja: '${tower}塔 / マーカー: ${role}',
+    ko: '${tower}탑 / 징: ${role}',
+  },
   // 비처리 짝수 = 분신 설치(탱힐).
-  placeClone: { en: 'T${tower} / Go place clone', ko: '${tower}탑 / 분신 설치 위치로' },
+  placeClone: {
+    en: 'T${tower} / Go place clone',
+    de: 'T${tower} / Klon platzieren',
+    fr: 'T${tower} / placer le clone',
+    ja: '${tower}塔 / 分身設置位置へ',
+    ko: '${tower}탑 / 분신 설치 위치로',
+  },
   // 탑 처리인데 본인 마커 판정 실패 시 폴백(위치/종류 생략). 본안내는 탑 번호 포함.
-  soak: { en: 'Tower', ko: '탑' },
-  soakOnly: { en: 'T${tower} / Soak tower', ko: '${tower}탑 / 탑 처리' },
+  soak: { en: 'Tower', de: 'Turm', fr: 'Tour', ja: '塔', ko: '탑' },
+  soakOnly: {
+    en: 'T${tower} / Soak tower',
+    de: 'T${tower} / Turm nehmen',
+    fr: 'T${tower} / prendre la tour',
+    ja: '${tower}塔 / 塔を踏む',
+    ko: '${tower}탑 / 탑 처리',
+  },
   // 본인 디버프가 정원 초과로 꼬였을 때 접미(위치는 강행 표시).
-  withTangle: { en: '${text} [conflict]', ko: '${text} [디버프 꼬임]' },
-  unknown: { en: '?', ko: '?' },
+  withTangle: {
+    en: '${text} [conflict]',
+    de: '${text} [Konflikt]',
+    fr: '${text} [conflit]',
+    ja: '${text} [デバフ重複]',
+    ko: '${text} [디버프 꼬임]',
+  },
+  unknown: { en: '?', de: '?', fr: '?', ja: '?', ko: '?' },
   // 비표준 구성(역할별 자리 불확정) 비처리 폴백.
-  nonSoakGeneric: { en: 'Bait by role', ko: '역할대로 유도' },
+  nonSoakGeneric: {
+    en: 'Bait by role',
+    de: 'Nach Rolle ködern',
+    fr: 'Attirer selon rôle',
+    ja: '役割通り誘導',
+    ko: '역할대로 유도',
+  },
 } as const;
 
 // 통합 안내 포맷(잼잼·09STOP 공통). 처리/비처리 본안내 = 'N탑 역할 / 탑side + 시 안|밖' + 꼬임.
@@ -554,27 +614,42 @@ const forsakenOutputs = {
 const forsakenFmt = {
   soakLine: {
     en: 'T${tower} ${role} / ${side}+${clock} ${inout}',
+    de: 'T${tower} ${role} / ${side}+${clock} ${inout}',
+    fr: 'T${tower} ${role} / ${side}+${clock} ${inout}',
+    ja: '${tower}塔 ${role} / ${side}+${clock} ${inout}',
     ko: '${tower}탑 ${role} / ${side}+${clock} ${inout}',
   },
-  previewLine: { en: '${side}+${clock} ${inout}', ko: '${side}+${clock} ${inout}' },
-  sideL: { en: 'Left tower', ko: '왼쪽 탑' },
-  sideR: { en: 'Right tower', ko: '오른쪽 탑' },
+  previewLine: {
+    en: '${side}+${clock} ${inout}',
+    de: '${side}+${clock} ${inout}',
+    fr: '${side}+${clock} ${inout}',
+    ja: '${side}+${clock} ${inout}',
+    ko: '${side}+${clock} ${inout}',
+  },
+  sideL: { en: 'Left tower', de: 'Linker Turm', fr: 'Tour gauche', ja: '左の塔', ko: '왼쪽 탑' },
+  sideR: { en: 'Right tower', de: 'Rechter Turm', fr: 'Tour droite', ja: '右の塔', ko: '오른쪽 탑' },
   sideN: { en: 'Marked-side tower', ko: '머리징쪽 탑' }, // 8탑: 좌/오 미정 → 머리 징 방향 탑
-  inside: { en: 'in', ko: '안' },
-  outside: { en: 'out', ko: '밖' },
+  inside: { en: 'in', de: 'rein', fr: 'dedans', ja: '中', ko: '안' },
+  outside: { en: 'out', de: 'raus', fr: 'dehors', ja: '外', ko: '밖' },
   // 비처리 역할 라벨(유도 동작).
-  nonSoakStack: { en: 'share stack', ko: '쉐어 맞기' },
-  nonSoakCone: { en: 'bait cone', ko: '부채꼴 유도' },
+  nonSoakStack: { en: 'share stack', de: 'Sammeln', fr: 'package', ja: '頭割り', ko: '쉐어 맞기' },
+  nonSoakCone: {
+    en: 'bait cone',
+    de: 'Kegel ködern',
+    fr: 'Attirer cône',
+    ja: '扇を誘導',
+    ko: '부채꼴 유도',
+  },
   // 시계(시만, side는 별도).
   cCenter: Outputs.middle,
-  c3: { en: '3:00', ko: '3시' },
-  c4: { en: '4:00', ko: '4시' },
-  c5: { en: '5:00', ko: '5시' },
-  c6: { en: '6:00', ko: '6시' },
-  c7: { en: '7:00', ko: '7시' },
-  c9: { en: '9:00', ko: '9시' },
-  c10: { en: '10:00', ko: '10시' },
-  c12: { en: '12:00', ko: '12시' },
+  c3: { en: '3:00', de: '3:00', fr: '3:00', ja: '3時', ko: '3시' },
+  c4: { en: '4:00', de: '4:00', fr: '4:00', ja: '4時', ko: '4시' },
+  c5: { en: '5:00', de: '5:00', fr: '5:00', ja: '5時', ko: '5시' },
+  c6: { en: '6:00', de: '6:00', fr: '6:00', ja: '6時', ko: '6시' },
+  c7: { en: '7:00', de: '7:00', fr: '7:00', ja: '7時', ko: '7시' },
+  c9: { en: '9:00', de: '9:00', fr: '9:00', ja: '9時', ko: '9시' },
+  c10: { en: '10:00', de: '10:00', fr: '10:00', ja: '10時', ko: '10시' },
+  c12: { en: '12:00', de: '12:00', fr: '12:00', ja: '12時', ko: '12시' },
 } as const;
 
 // 행방불명 트리거 공용 outputStrings(잼잼·09STOP 공통).
@@ -1162,16 +1237,28 @@ const dmLimitCutText = (data: Data, output: Output): string | undefined => {
 // 리미트컷 자리 출력 문자열. dmLimitCutText가 text·fallback·clockN 키 사용.
 //   clockN은 편집 가능한 시계 라벨(기본 'N시로'/'N o'clock'). 사용자가 방위징으로 교체.
 const dmLimitCutOutputs = {
-  text: { en: '#${num}: ${clock}', ko: '주사위 ${num}번: ${clock}' },
-  fallback: { en: '#${num}', ko: '주사위 ${num}번' },
-  clock1: { en: '1 o\'clock', ko: '1시로' },
-  clock2: { en: '2 o\'clock', ko: '2시로' },
-  clock4: { en: '4 o\'clock', ko: '4시로' },
-  clock5: { en: '5 o\'clock', ko: '5시로' },
-  clock7: { en: '7 o\'clock', ko: '7시로' },
-  clock8: { en: '8 o\'clock', ko: '8시로' },
-  clock10: { en: '10 o\'clock', ko: '10시로' },
-  clock11: { en: '11 o\'clock', ko: '11시로' },
+  text: {
+    en: '#${num}: ${clock}',
+    de: 'Würfel ${num}: ${clock}',
+    fr: 'Dé ${num} : ${clock}',
+    ja: 'ダイス${num}: ${clock}',
+    ko: '주사위 ${num}번: ${clock}',
+  },
+  fallback: {
+    en: '#${num}',
+    de: 'Würfel ${num}',
+    fr: 'Dé ${num}',
+    ja: 'ダイス${num}',
+    ko: '주사위 ${num}번',
+  },
+  clock1: { en: '1 o\'clock', de: '1 Uhr', fr: '1h', ja: '1時', ko: '1시로' },
+  clock2: { en: '2 o\'clock', de: '2 Uhr', fr: '2h', ja: '2時', ko: '2시로' },
+  clock4: { en: '4 o\'clock', de: '4 Uhr', fr: '4h', ja: '4時', ko: '4시로' },
+  clock5: { en: '5 o\'clock', de: '5 Uhr', fr: '5h', ja: '5時', ko: '5시로' },
+  clock7: { en: '7 o\'clock', de: '7 Uhr', fr: '7h', ja: '7時', ko: '7시로' },
+  clock8: { en: '8 o\'clock', de: '8 Uhr', fr: '8h', ja: '8時', ko: '8시로' },
+  clock10: { en: '10 o\'clock', de: '10 Uhr', fr: '10h', ja: '10時', ko: '10시로' },
+  clock11: { en: '11 o\'clock', de: '11 Uhr', fr: '11h', ja: '11時', ko: '11시로' },
 } as const;
 
 // P3 블랙홀 줄(테더) 기믹.
@@ -1346,15 +1433,48 @@ const dmLineOutputs = {
     cn: '${dir}',
     ko: '${dir}쪽',
   },
-  handle: { en: '${round}: ${dir} tether', ko: '${round}줄: ${dir} 줄 처리' },
-  handleBoth: { en: '${round}: ${dir} (both)', ko: '${round}줄: ${dir} 양쪽 처리' },
+  handle: {
+    en: '${round}: ${dir} tether',
+    de: '${round}: ${dir} Verbindung',
+    fr: '${round} : ${dir} lien',
+    ja: '${round}本目: ${dir} 線処理',
+    ko: '${round}줄: ${dir} 줄 처리',
+  },
+  handleBoth: {
+    en: '${round}: ${dir} (both)',
+    de: '${round}: ${dir} (beide)',
+    fr: '${round} : ${dir} (deux)',
+    ja: '${round}本目: ${dir} 両方',
+    ko: '${round}줄: ${dir} 양쪽 처리',
+  },
   handleNext: {
     en: '${round}: ${dir} tether (next ${next})',
+    de: '${round}: ${dir} Verbindung (dann ${next})',
+    fr: '${round} : ${dir} lien (puis ${next})',
+    ja: '${round}本目: ${dir} 線処理 (次: ${next})',
     ko: '${round}줄: ${dir} 줄 처리 (이후 ${next})',
   },
-  preview: { en: 'Next: ${dir} tether', ko: '이후 ${dir} 줄 처리' },
-  previewTake: { en: 'Next: ${dir} take tether', ko: '이후 ${dir} 줄 가져오기' },
-  previewBoth: { en: 'Next: ${dir} (both)', ko: '이후 ${dir} 양쪽 처리' },
+  preview: {
+    en: 'Next: ${dir} tether',
+    de: 'Nächste: ${dir} Verbindung',
+    fr: 'Suite : ${dir} lien',
+    ja: '次: ${dir} 線処理',
+    ko: '이후 ${dir} 줄 처리',
+  },
+  previewTake: {
+    en: 'Next: ${dir} take tether',
+    de: 'Nächste: ${dir} Verbindung nehmen',
+    fr: 'Suite : ${dir} prendre lien',
+    ja: '次: ${dir} 線を取る',
+    ko: '이후 ${dir} 줄 가져오기',
+  },
+  previewBoth: {
+    en: 'Next: ${dir} (both)',
+    de: 'Nächste: ${dir} (beide)',
+    fr: 'Suite : ${dir} (deux)',
+    ja: '次: ${dir} 両方',
+    ko: '이후 ${dir} 양쪽 처리',
+  },
 } as const;
 // 본 안내(alertText): 이번 줄 처리자면 방향. 같은 세트 다음 줄도 처리(자리 이동)면 '(이후 X)' 덧붙임. 양쪽=handleBoth.
 const dmLineHandleText = (data: Data, output: Output): string | undefined => {
@@ -1401,16 +1521,46 @@ const dmLinePreviewText = (data: Data, output: Output): string | undefined => {
 // 블리자가+선더가 통합 출력(dmBlizzardThunder 옵션). P1 알쏭달쏭2 + P4 알쏭달쏭/마력방출 공용.
 //   blizzardTrue: BA98/고리02A4=true · thunderTrue: 고리02A6=true · safeNwSe: dir옵션 방향(없으면 ???).
 const dmBlizThunStrings = {
-  combo2: { en: '${dir} / ${inout}', ko: '${dir}에서 ${inout}' },
+  combo2: {
+    en: '${dir} / ${inout}',
+    de: '${dir} / ${inout}',
+    fr: '${dir} / ${inout}',
+    ja: '${dir}で${inout}',
+    ko: '${dir}에서 ${inout}',
+  },
   inner: Outputs.in,
   outer: Outputs.out,
-  dirNeSw: { en: 'NE/SW', ko: '북동/남서' },
-  dirNwSe: { en: 'NW/SE', ko: '북서/남동' },
+  dirNeSw: { en: 'NE/SW', de: 'NO/SW', fr: 'NE/SO', ja: '北東/南西', ko: '북동/남서' },
+  dirNwSe: { en: 'NW/SE', de: 'NW/SO', fr: 'NO/SE', ja: '北西/南東', ko: '북서/남동' },
   dirUnknown: Outputs.unknown,
-  dodgeBoth: { en: 'Dodge both', ko: '둘 다 피하기' },
-  stepFan: { en: 'Step on fan only', ko: '부채꼴만 밟기' },
-  stepLine: { en: 'Step on line only', ko: '직선만 밟기' },
-  stepBoth: { en: 'Step on both', ko: '둘 다 밟기' },
+  dodgeBoth: {
+    en: 'Dodge both',
+    de: 'Beide meiden',
+    fr: 'Éviter les deux',
+    ja: '両方回避',
+    ko: '둘 다 피하기',
+  },
+  stepFan: {
+    en: 'Step on fan only',
+    de: 'Nur Kegel betreten',
+    fr: 'Marcher cône seulement',
+    ja: '扇のみ踏む',
+    ko: '부채꼴만 밟기',
+  },
+  stepLine: {
+    en: 'Step on line only',
+    de: 'Nur Linie betreten',
+    fr: 'Marcher ligne seulement',
+    ja: '直線のみ踏む',
+    ko: '직선만 밟기',
+  },
+  stepBoth: {
+    en: 'Step on both',
+    de: 'Beide betreten',
+    fr: 'Marcher sur les deux',
+    ja: '両方踏む',
+    ko: '둘 다 밟기',
+  },
 } as const;
 const dmBlizThunText = (
   data: Data,
@@ -1442,6 +1592,9 @@ const triggerSet: TriggerSet<Data> = {
       id: 'dmFakeMeleeCaster',
       name: {
         en: 'Fake-melee caster priority',
+        de: 'Fake-Melee-Caster-Priorität',
+        fr: 'Priorité caster en mêlée',
+        ja: '近接枠キャスター優先順',
         ko: '근딜 자리 캐스터 우선순위',
       },
       comment: {
@@ -1466,10 +1619,16 @@ const triggerSet: TriggerSet<Data> = {
       id: 'dmBlizzardThunder',
       name: {
         en: 'Blizzard + Thunder guidance',
+        de: 'Eisga + Blitzga Hinweis',
+        fr: 'Indication Glace + Foudre',
+        ja: 'ブリザガ + サンダガ案内',
         ko: '블리자가 + 선더가 안내',
       },
       comment: {
         en: 'Whether to show the Blizzard guidance by step/dodge, or by safe direction.',
+        de: 'Ob die Eisga-Hinweise als Betreten/Meiden oder als sichere Richtung angezeigt werden.',
+        fr: 'Afficher l\'indication Glace en marcher/éviter, ou en direction sûre.',
+        ja: 'ブリザガ案内を踏む/避ける基準で出すか、安全方向で出すか',
         ko: '블리자가 안내를 밟기, 안 밟기 기준으로 표시할지, 안전 방향을 안내할지를 설정',
       },
       type: 'select',
@@ -1489,6 +1648,9 @@ const triggerSet: TriggerSet<Data> = {
       id: 'dmBlizzardKnockback',
       name: {
         en: 'P1 Blizzard + knockback positioning',
+        de: 'P1 Eisga + Rückstoß Positionierung',
+        fr: 'P1 placement Glace + poussée',
+        ja: 'P1 ブリザガ+ノックバック 配置',
         ko: 'P1 알쏭달쏭1 (블리자가+파이가+넉백) 위치',
       },
       comment: {
@@ -1513,10 +1675,16 @@ const triggerSet: TriggerSet<Data> = {
       id: 'dmForsakenMethod',
       name: {
         en: 'P2 Forsaken strategy',
+        de: 'P2 Verloren Strategie',
+        fr: 'P2 stratégie Cataclysme',
+        ja: 'P2 ミッシング 攻略',
         ko: 'P2 행방불명 처리법',
       },
       comment: {
         en: 'Position guidance for the P2 Forsaken phase, per strategy.',
+        de: 'Positions-Hinweis für P2 Verloren je nach Strategie.',
+        fr: 'Indication de placement pour P2 Cataclysme selon strat.',
+        ja: '攻略別のミッシング位置案内',
         ko: '행방불명 공략에 따른 위치 안내 방식 설정',
       },
       type: 'select',
@@ -1536,10 +1704,17 @@ const triggerSet: TriggerSet<Data> = {
       id: 'dmForsakenSwap',
       name: {
         en: 'P2 Forsaken swap person (09STOP only)',
+        de: 'P2 Verloren Tausch-Person (nur 09STOP)',
+        fr: 'P2 personne échange Cataclysme (09STOP)',
+        ja: 'P2 ミッシング スワップ担当 (09STOP)',
         ko: 'P2 행방불명 스왑 주체 (09STOP)',
       },
       comment: {
         en: 'In 09STOP, when two same markers land on one tower, who moves to the other tower.',
+        de:
+          'Bei 09STOP: wer zum anderen Turm geht, wenn zwei gleiche Marker auf einem Turm landen.',
+        fr: 'En 09STOP : qui va à l\'autre tour si deux mêmes marques sur une tour.',
+        ja: '09STOPで同じマーカー2人が1つの塔に重なった時、誰が反対の塔へ行くか',
         ko: '09STOP에서 한 탑에 같은 마커 2명이 겹치면 누가 반대 탑으로 넘어가는지 설정',
       },
       type: 'select',
@@ -1559,10 +1734,16 @@ const triggerSet: TriggerSet<Data> = {
       id: 'dmTrineMethod',
       name: {
         en: 'P2 Trine strategy',
+        de: 'P2 Trine Strategie',
+        fr: 'P2 stratégie Trine',
+        ja: 'P2 トライン 攻略',
         ko: 'P2 트라인 처리법',
       },
       comment: {
         en: 'Trine guidance, per strategy.',
+        de: 'Trine-Hinweis je nach Strategie.',
+        fr: 'Indication Trine selon stratégie.',
+        ja: '攻略別のトライン案内',
         ko: '공략에 따른 트라인 안내 방식 설정',
       },
       type: 'select',
@@ -1582,10 +1763,16 @@ const triggerSet: TriggerSet<Data> = {
       id: 'dmTetherMethod',
       name: {
         en: 'P3 Black hole tether strategy',
+        de: 'P3 Schwarzes-Loch-Verbindung Strategie',
+        fr: 'P3 stratégie lien trou noir',
+        ja: 'P3 ブラックホール線 攻略',
         ko: 'P3 블랙홀 줄 처리법',
       },
       comment: {
         en: 'Black hole tether handling, per strategy.',
+        de: 'Schwarzes-Loch-Verbindung je nach Strategie.',
+        fr: 'Gestion du lien trou noir selon la strat.',
+        ja: '攻略別のブラックホール線処理',
         ko: '공략에 따른 블랙홀 줄 처리 방식',
       },
       type: 'select',
@@ -1607,6 +1794,9 @@ const triggerSet: TriggerSet<Data> = {
       id: 'dmKefkaDodge',
       name: {
         en: 'P3 Giant Kefka dodge guidance',
+        de: 'P3 Riesen-Kefka Ausweich-Hinweis',
+        fr: 'P3 indication esquive Kefka géant',
+        ja: 'P3 巨大ケフカ 回避案内',
         ko: 'P3 거대 케프카 회피 안내',
       },
       comment: {
@@ -1631,6 +1821,9 @@ const triggerSet: TriggerSet<Data> = {
       id: 'dmP4Caller',
       name: {
         en: 'P4 caller (spread/accel group call)',
+        de: 'P4 Ansager (Verteilen/Beschl.-Gruppe)',
+        fr: 'P4 annonceur (dispersion/groupe accél.)',
+        ja: 'P4 コール (散開/加速グループ)',
         ko: 'P4 콜러 (산개/가속 그룹 콜)',
       },
       comment: {
@@ -1645,10 +1838,16 @@ const triggerSet: TriggerSet<Data> = {
       id: 'dmForsakenP5Method',
       name: {
         en: 'P5 Forsaken movement',
+        de: 'P5 Verloren Bewegung',
+        fr: 'P5 déplacement Cataclysme',
+        ja: 'P5 ミッシング 移動',
         ko: 'P5 행방불명 이동 공략',
       },
       comment: {
         en: 'P5 Forsaken rotation movement.',
+        de: 'P5 Verloren Rotationsbewegung.',
+        fr: 'P5 déplacement rotation Cataclysme.',
+        ja: 'P5 ミッシング 回転動線',
         ko: 'P5 행방불명 회전 동선.',
       },
       type: 'select',
@@ -1709,7 +1908,13 @@ const triggerSet: TriggerSet<Data> = {
         data.dmEnrageHit = 0; // 전멸기 탑/쉐어 피격 플래그
       },
       outputStrings: {
-        text: { en: 'Knockback, under boss', ko: '넉백, 보스 밑으로' },
+        text: {
+          en: 'Knockback, under boss',
+          de: 'Rückstoß, unter Boss',
+          fr: 'Poussée, sous le boss',
+          ja: 'ノックバック、ボス下へ',
+          ko: '넉백, 보스 밑으로',
+        },
       },
     },
     {
@@ -1781,6 +1986,9 @@ const triggerSet: TriggerSet<Data> = {
       outputStrings: {
         text: {
           en: 'AoE Tankbuster x3',
+          de: 'AoE-Tankbuster x3',
+          fr: 'Tank buster AoE x3',
+          ja: '範囲タンク強攻撃 x3',
           ko: '광역 탱버 3연타',
         },
       },
@@ -1797,6 +2005,9 @@ const triggerSet: TriggerSet<Data> = {
       outputStrings: {
         text: {
           en: 'Tankbuster on ${target}',
+          de: 'Tankbuster auf ${target}',
+          fr: 'Tank buster sur ${target}',
+          ja: '${target}にタンク強攻撃',
           ko: '${target}에게 탱버',
         },
       },
@@ -1814,6 +2025,9 @@ const triggerSet: TriggerSet<Data> = {
       outputStrings: {
         secondTank: {
           en: '2nd Aggro Tankbuster',
+          de: 'Tankbuster (2. Aggro)',
+          fr: 'Tank buster (2e aggro)',
+          ja: '2番目タンク強攻撃',
           ko: '2어글자 탱버',
         },
       },
@@ -1826,10 +2040,7 @@ const triggerSet: TriggerSet<Data> = {
       durationSeconds: 4.7,
       infoText: (_data, _matches, output) => output.enrage!(),
       outputStrings: {
-        enrage: {
-          en: 'Enrage!',
-          ko: '전멸기',
-        },
+        enrage: { en: 'Enrage!', de: 'Finalangriff!', fr: 'Enrage !', ja: '時間切れ!', ko: '전멸기' },
       },
     },
     // ───────── 알쏭달쏭 마법 + 신들의 상 (P1) ─────────
@@ -1918,18 +2129,54 @@ const triggerSet: TriggerSet<Data> = {
         return isKb ? output.kb!({ side: side, ss: ss }) : output.noKb!({ side: side, ss: ss });
       },
       outputStrings: {
-        kb: { en: '${side} + Knockback + ${ss}', ko: '${side}에서 넉백 + ${ss}' },
-        noKb: { en: '${side} + ${ss}', ko: '${side} + ${ss}' },
-        kbRole: { en: 'Knockback + ${ns} + ${ss}', ko: '넉백 이후 ${ns}쪽에서 ${ss}' },
-        noKbRole: { en: '${ns} + ${ss}', ko: '${ns}쪽에서 ${ss}' },
-        kbUnknown: { en: 'Knockback + ${ss} / Blizzard: ???', ko: '넉백 + ${ss} / 블리자가: ???' },
-        noKbUnknown: { en: '${ss} / Blizzard: ???', ko: '${ss} / 블리자가: ???' },
+        kb: {
+          en: '${side} + Knockback + ${ss}',
+          de: '${side} + Rückstoß + ${ss}',
+          fr: '${side} + poussée + ${ss}',
+          ja: '${side}でノックバック + ${ss}',
+          ko: '${side}에서 넉백 + ${ss}',
+        },
+        noKb: {
+          en: '${side} + ${ss}',
+          de: '${side} + ${ss}',
+          fr: '${side} + ${ss}',
+          ja: '${side} + ${ss}',
+          ko: '${side} + ${ss}',
+        },
+        kbRole: {
+          en: 'Knockback + ${ns} + ${ss}',
+          de: 'Rückstoß + ${ns} + ${ss}',
+          fr: 'Poussée + ${ns} + ${ss}',
+          ja: 'ノックバック後 ${ns}で${ss}',
+          ko: '넉백 이후 ${ns}쪽에서 ${ss}',
+        },
+        noKbRole: {
+          en: '${ns} + ${ss}',
+          de: '${ns} + ${ss}',
+          fr: '${ns} + ${ss}',
+          ja: '${ns}で${ss}',
+          ko: '${ns}쪽에서 ${ss}',
+        },
+        kbUnknown: {
+          en: 'Knockback + ${ss} / Blizzard: ???',
+          de: 'Rückstoß + ${ss} / Eisga: ???',
+          fr: 'Poussée + ${ss} / Glace : ???',
+          ja: 'ノックバック + ${ss} / ブリザガ: ???',
+          ko: '넉백 + ${ss} / 블리자가: ???',
+        },
+        noKbUnknown: {
+          en: '${ss} / Blizzard: ???',
+          de: '${ss} / Eisga: ???',
+          fr: '${ss} / Glace : ???',
+          ja: '${ss} / ブリザガ: ???',
+          ko: '${ss} / 블리자가: ???',
+        },
         spread: Outputs.spread,
         stack: Outputs.stackMarker,
         right: Outputs.right,
         left: Outputs.left,
-        north: { en: 'North', ko: '위' },
-        south: { en: 'South', ko: '아래' },
+        north: { en: 'North', de: 'Norden', fr: 'Nord', ja: '上', ko: '위' },
+        south: { en: 'South', de: 'Süden', fr: 'Sud', ja: '下', ko: '아래' },
       },
     },
     // 출력: 2번째 알쏭달쏭 (블리자가+선더가) — 산개/쉐어 마커가 없을 때만
@@ -1986,8 +2233,20 @@ const triggerSet: TriggerSet<Data> = {
         return matches.id === 'BA9B' ? output.stepStack!() : output.avoidStack!();
       },
       outputStrings: {
-        stepStack: { en: 'Step on floor', ko: '바닥 밟기' },
-        avoidStack: { en: 'Avoid floor', ko: '바닥 피하기' },
+        stepStack: {
+          en: 'Step on floor',
+          de: 'Boden betreten',
+          fr: 'Marcher sur le sol',
+          ja: '床を踏む',
+          ko: '바닥 밟기',
+        },
+        avoidStack: {
+          en: 'Avoid floor',
+          de: 'Boden meiden',
+          fr: 'Éviter le sol',
+          ja: '床を避ける',
+          ko: '바닥 피하기',
+        },
       },
     },
     // 출력: 산개/쉐어 트리거 (블리자가 없는 조합 전용; 조합1은 위 블리자가 통합이 처리)
@@ -2014,8 +2273,20 @@ const triggerSet: TriggerSet<Data> = {
       outputStrings: {
         spread: Outputs.spread,
         stack: Outputs.stackMarker,
-        kbSpread: { en: 'Knockback + Spread', ko: '넉백 + 산개' },
-        kbStack: { en: 'Knockback + Stack', ko: '넉백 + 쉐어' },
+        kbSpread: {
+          en: 'Knockback + Spread',
+          de: 'Rückstoß + Verteilen',
+          fr: 'Poussée + dispersion',
+          ja: 'ノックバック + 散開',
+          ko: '넉백 + 산개',
+        },
+        kbStack: {
+          en: 'Knockback + Stack',
+          de: 'Rückstoß + Sammeln',
+          fr: 'Poussée + package',
+          ja: 'ノックバック + 頭割り',
+          ko: '넉백 + 쉐어',
+        },
       },
     },
     // 정리기: 알쏭달쏭 마법 1회 끝나면 플래그 리셋
@@ -2049,6 +2320,9 @@ const triggerSet: TriggerSet<Data> = {
       outputStrings: {
         text: {
           en: 'Wave Cannon: Spread',
+          de: 'Wellenkanone: Verteilen',
+          fr: 'Canon plasma : dispersion',
+          ja: '波動砲: 散開',
           ko: '파동포 산개',
         },
       },
@@ -2079,10 +2353,16 @@ const triggerSet: TriggerSet<Data> = {
       outputStrings: {
         soak: {
           en: 'Soak Tower',
+          de: 'Turm nehmen',
+          fr: 'Prendre la tour',
+          ja: '塔を踏む',
           ko: '탑 처리',
         },
         avoid: {
           en: 'Avoid Tower',
+          de: 'Turm meiden',
+          fr: 'Éviter la tour',
+          ja: '塔を避ける',
           ko: '탑 피하기',
         },
       },
@@ -2118,6 +2398,9 @@ const triggerSet: TriggerSet<Data> = {
       outputStrings: {
         mine: {
           en: 'My trap! Expiring: {{CD}}',
+          de: 'Meine Falle! Läuft ab: {{CD}}',
+          fr: 'Mon piège ! Expire : {{CD}}',
+          ja: '自分の罠! 満了: {{CD}}',
           ko: '내 함정! 만료: {{CD}}',
         },
       },
@@ -2144,6 +2427,9 @@ const triggerSet: TriggerSet<Data> = {
       outputStrings: {
         other: {
           en: 'Trap expiring: {{CD}}',
+          de: 'Falle läuft ab: {{CD}}',
+          fr: 'Piège expire : {{CD}}',
+          ja: '罠満了: {{CD}}',
           ko: '함정 만료: {{CD}}',
         },
       },
@@ -2180,10 +2466,16 @@ const triggerSet: TriggerSet<Data> = {
       outputStrings: {
         thenCenter: {
           en: 'Then: Center',
+          de: 'Dann: Mitte',
+          fr: 'Puis : centre',
+          ja: '次: 中央へ',
           ko: '이후 중앙으로',
         },
         thenSpread: {
           en: 'Then: Prepare spread',
+          de: 'Dann: Verteilen vorbereiten',
+          fr: 'Puis : préparer dispersion',
+          ja: '次: 散開準備',
           ko: '이후 산개 준비',
         },
       },
@@ -2256,14 +2548,8 @@ const triggerSet: TriggerSet<Data> = {
           ? output.goRight!()
           : output.goLeft!(),
       outputStrings: {
-        goRight: {
-          en: 'Right',
-          ko: '오른쪽으로',
-        },
-        goLeft: {
-          en: 'Left',
-          ko: '왼쪽으로',
-        },
+        goRight: { en: 'Right', de: 'Rechts', fr: 'Droite', ja: '右へ', ko: '오른쪽으로' },
+        goLeft: { en: 'Left', de: 'Links', fr: 'Gauche', ja: '左へ', ko: '왼쪽으로' },
       },
     },
     // ───────── 신들의 상 3상: 태만·아베(시선) / 알쏭달쏭3 / 성모수마 ─────────
@@ -2295,8 +2581,20 @@ const triggerSet: TriggerSet<Data> = {
         data.dmGazeType = (data.dmTeleIds?.eye.includes(matches.id) ?? false) ? 'gaze' : 'look';
       },
       outputStrings: {
-        gaze: { en: 'Look Away (soon)', ko: '곧 뒤돌기' },
-        look: { en: 'Look at Statue (soon)', ko: '곧 신상 보기' },
+        gaze: {
+          en: 'Look Away (soon)',
+          de: 'Bald wegsehen',
+          fr: 'Bientôt regarder ailleurs',
+          ja: 'まもなく見ない',
+          ko: '곧 뒤돌기',
+        },
+        look: {
+          en: 'Look at Statue (soon)',
+          de: 'Bald Statue ansehen',
+          fr: 'Bientôt regarder la statue',
+          ja: 'まもなく像を見る',
+          ko: '곧 신상 보기',
+        },
       },
     },
     {
@@ -2326,14 +2624,26 @@ const triggerSet: TriggerSet<Data> = {
         return output.combo3!({ inout: inout, ss: ss, gaze: gaze });
       },
       outputStrings: {
-        combo3: { en: '${inout} ${ss} + ${gaze}', ko: '${inout} ${ss} + ${gaze}' },
-        inner: { en: 'In', ko: '바닥 안에서' },
-        outer: { en: 'Out', ko: '바닥 밖에서' },
+        combo3: {
+          en: '${inout} ${ss} + ${gaze}',
+          de: '${inout} ${ss} + ${gaze}',
+          fr: '${inout} ${ss} + ${gaze}',
+          ja: '${inout} ${ss} + ${gaze}',
+          ko: '${inout} ${ss} + ${gaze}',
+        },
+        inner: { en: 'In', de: 'Rein', fr: 'Dedans', ja: '床の中', ko: '바닥 안에서' },
+        outer: { en: 'Out', de: 'Raus', fr: 'Dehors', ja: '床の外', ko: '바닥 밖에서' },
         spread: Outputs.spread,
         stack: Outputs.stackMarker,
         gaze: Outputs.lookAway,
-        look: { en: 'Look at Statue', ko: '신상 보기' },
-        gazeUnknown: { en: 'Gaze?', ko: '시선?' },
+        look: {
+          en: 'Look at Statue',
+          de: 'Statue ansehen',
+          fr: 'Regarder la statue',
+          ja: '像を見る',
+          ko: '신상 보기',
+        },
+        gazeUnknown: { en: 'Gaze?', de: 'Blick?', fr: 'Regard ?', ja: '視線?', ko: '시선?' },
       },
     },
     {
@@ -2359,14 +2669,23 @@ const triggerSet: TriggerSet<Data> = {
       outputStrings: {
         outer: {
           en: 'Outer Spread (Confusion)',
+          de: 'Äußeres Verteilen (Verwirrung)',
+          fr: 'Dispersion extérieure (confusion)',
+          ja: '混乱: 外側散開',
           ko: '혼란: 바깥쪽 산개',
         },
         inner: {
           en: 'Inner Spread (Sleep)',
+          de: 'Inneres Verteilen (Schlaf)',
+          fr: 'Dispersion intérieure (sommeil)',
+          ja: '睡眠: 内側散開',
           ko: '수면: 안쪽 산개',
         },
         unknown: {
           en: 'Spread (check tether)',
+          de: 'Verteilen (Verbindung prüfen)',
+          fr: 'Dispersion (vérifier lien)',
+          ja: '散開 (線確認)',
           ko: '산개 (선 확인)',
         },
       },
@@ -2440,19 +2759,79 @@ const triggerSet: TriggerSet<Data> = {
       },
       run: (data) => data.dmMarch = [],
       outputStrings: {
-        nwOut: { en: 'NW outside (U/D)', ko: '북서 바깥쪽 (상하로)' },
-        neOut: { en: 'NE outside (L/R)', ko: '북동 바깥쪽 (좌우로)' },
-        seOut: { en: 'SE outside (U/D)', ko: '남동 바깥쪽 (상하로)' },
-        swOut: { en: 'SW outside (L/R)', ko: '남서 바깥쪽 (좌우로)' },
-        nwIn: { en: 'NW inside · ${from}', ko: '북서 안쪽 · ${from}' },
-        neIn: { en: 'NE inside · ${from}', ko: '북동 안쪽 · ${from}' },
-        seIn: { en: 'SE inside · ${from}', ko: '남동 안쪽 · ${from}' },
-        swIn: { en: 'SW inside · ${from}', ko: '남서 안쪽 · ${from}' },
+        nwOut: {
+          en: 'NW outside (U/D)',
+          de: 'NW außen (O/U)',
+          fr: 'NO extérieur (H/B)',
+          ja: '北西 外側 (上下)',
+          ko: '북서 바깥쪽 (상하로)',
+        },
+        neOut: {
+          en: 'NE outside (L/R)',
+          de: 'NO außen (L/R)',
+          fr: 'NE extérieur (G/D)',
+          ja: '北東 外側 (左右)',
+          ko: '북동 바깥쪽 (좌우로)',
+        },
+        seOut: {
+          en: 'SE outside (U/D)',
+          de: 'SO außen (O/U)',
+          fr: 'SE extérieur (H/B)',
+          ja: '南東 外側 (上下)',
+          ko: '남동 바깥쪽 (상하로)',
+        },
+        swOut: {
+          en: 'SW outside (L/R)',
+          de: 'SW außen (L/R)',
+          fr: 'SO extérieur (G/D)',
+          ja: '南西 外側 (左右)',
+          ko: '남서 바깥쪽 (좌우로)',
+        },
+        nwIn: {
+          en: 'NW inside · ${from}',
+          de: 'NW innen · ${from}',
+          fr: 'NO intérieur · ${from}',
+          ja: '北西 内側 · ${from}',
+          ko: '북서 안쪽 · ${from}',
+        },
+        neIn: {
+          en: 'NE inside · ${from}',
+          de: 'NO innen · ${from}',
+          fr: 'NE intérieur · ${from}',
+          ja: '北東 内側 · ${from}',
+          ko: '북동 안쪽 · ${from}',
+        },
+        seIn: {
+          en: 'SE inside · ${from}',
+          de: 'SO innen · ${from}',
+          fr: 'SE intérieur · ${from}',
+          ja: '南東 内側 · ${from}',
+          ko: '남동 안쪽 · ${from}',
+        },
+        swIn: {
+          en: 'SW inside · ${from}',
+          de: 'SW innen · ${from}',
+          fr: 'SO intérieur · ${from}',
+          ja: '南西 内側 · ${from}',
+          ko: '남서 안쪽 · ${from}',
+        },
         // 먼저 처리할 자리 → 뒤에 처리할 자리 흐름
-        fromUp: { en: 'Top→Bottom', ko: '위에서 아래로' },
-        fromDown: { en: 'Bottom→Top', ko: '아래에서 위로' },
-        fromLeft: { en: 'Left→Right', ko: '왼쪽에서 오른쪽으로' },
-        fromRight: { en: 'Right→Left', ko: '오른쪽에서 왼쪽으로' },
+        fromUp: { en: 'Top→Bottom', de: 'Oben→Unten', fr: 'Haut→Bas', ja: '上→下', ko: '위에서 아래로' },
+        fromDown: { en: 'Bottom→Top', de: 'Unten→Oben', fr: 'Bas→Haut', ja: '下→上', ko: '아래에서 위로' },
+        fromLeft: {
+          en: 'Left→Right',
+          de: 'Links→Rechts',
+          fr: 'Gauche→Droite',
+          ja: '左→右',
+          ko: '왼쪽에서 오른쪽으로',
+        },
+        fromRight: {
+          en: 'Right→Left',
+          de: 'Rechts→Links',
+          fr: 'Droite→Gauche',
+          ja: '右→左',
+          ko: '오른쪽에서 왼쪽으로',
+        },
       },
     },
 
@@ -2590,6 +2969,9 @@ const triggerSet: TriggerSet<Data> = {
         // 1탑(첫 안내) 부채/산개 전용: 위치 대신 같은 역할군 쉐어 대상자만(빛의 파동 전이라 A/B 미정).
         onlyStack: {
           en: 'T${tower} ${role} / stack: ${stack}',
+          de: 'T${tower} ${role} / Sammeln: ${stack}',
+          fr: 'T${tower} ${role} / package : ${stack}',
+          ja: '${tower}塔 ${role} / 頭割り: ${stack}',
           ko: '${tower}탑 ${role} / 쉐어: ${stack}',
         },
       },
@@ -2724,9 +3106,27 @@ const triggerSet: TriggerSet<Data> = {
         return matches.id === 'BAD2' ? output.future!() : output.past!();
       },
       outputStrings: {
-        bait8: { en: 'Then bait between burst towers', ko: '이후 터진 8탑 사이에서 머리 유도' },
-        future: { en: 'Then bait behind boss', ko: '이후 보스 너머에서 머리 유도' },
-        past: { en: 'Then bait between towers', ko: '이후 탑 사이에서 머리 유도' },
+        bait8: {
+          en: 'Then bait between burst towers',
+          de: 'Dann zwischen explodierten Türmen ködern',
+          fr: 'Puis attirer entre tours explosées',
+          ja: '次: 爆発した塔の間で誘導',
+          ko: '이후 터진 8탑 사이에서 머리 유도',
+        },
+        future: {
+          en: 'Then bait behind boss',
+          de: 'Dann hinter Boss ködern',
+          fr: 'Puis attirer derrière boss',
+          ja: '次: ボスの後ろで誘導',
+          ko: '이후 보스 너머에서 머리 유도',
+        },
+        past: {
+          en: 'Then bait between towers',
+          de: 'Dann zwischen Türmen ködern',
+          fr: 'Puis attirer entre tours',
+          ja: '次: 塔の間で誘導',
+          ko: '이후 탑 사이에서 머리 유도',
+        },
       },
     },
     {
@@ -2756,10 +3156,34 @@ const triggerSet: TriggerSet<Data> = {
       },
       outputStrings: {
         ...forsakenOutputsAll,
-        bait8: { en: 'Bait between burst towers', ko: '터진 8탑 사이에서 머리 유도' },
-        dirFuture: { en: 'Behind boss', ko: '보스 너머로' },
-        dirPast: { en: 'Between towers', ko: '탑 사이로' },
-        baitNext: { en: '${dir} (then ${next})', ko: '${dir} (이후 ${next})' },
+        bait8: {
+          en: 'Bait between burst towers',
+          de: 'Zwischen explodierten Türmen ködern',
+          fr: 'Attirer entre tours explosées',
+          ja: '爆発した塔の間で誘導',
+          ko: '터진 8탑 사이에서 머리 유도',
+        },
+        dirFuture: {
+          en: 'Behind boss',
+          de: 'Hinter Boss',
+          fr: 'Derrière le boss',
+          ja: 'ボスの後ろ',
+          ko: '보스 너머로',
+        },
+        dirPast: {
+          en: 'Between towers',
+          de: 'Zwischen Türmen',
+          fr: 'Entre les tours',
+          ja: '塔の間',
+          ko: '탑 사이로',
+        },
+        baitNext: {
+          en: '${dir} (then ${next})',
+          de: '${dir} (dann ${next})',
+          fr: '${dir} (puis ${next})',
+          ja: '${dir} (次: ${next})',
+          ko: '${dir} (이후 ${next})',
+        },
       },
     },
     {
@@ -2783,8 +3207,8 @@ const triggerSet: TriggerSet<Data> = {
       },
       outputStrings: {
         ...forsakenOutputsAll,
-        move: { en: 'Move!', ko: '이동!' },
-        wait: { en: 'Wait!', ko: '대기!' },
+        move: { en: 'Move!', de: 'Bewegen!', fr: 'Bouger !', ja: '移動!', ko: '이동!' },
+        wait: { en: 'Wait!', de: 'Warten!', fr: 'Attendre !', ja: '待機!', ko: '대기!' },
       },
     },
     {
@@ -2805,8 +3229,8 @@ const triggerSet: TriggerSet<Data> = {
       alertText: (_data, matches, output) =>
         matches.id === 'BACD' ? output.right!() : output.left!(),
       outputStrings: {
-        right: { en: 'Right', ko: '오른쪽으로' },
-        left: { en: 'Left', ko: '왼쪽으로' },
+        right: { en: 'Right', de: 'Rechts', fr: 'Droite', ja: '右へ', ko: '오른쪽으로' },
+        left: { en: 'Left', de: 'Links', fr: 'Gauche', ja: '左へ', ko: '왼쪽으로' },
       },
     },
     {
@@ -2880,9 +3304,9 @@ const triggerSet: TriggerSet<Data> = {
         return output.body!({ type: type, spot: fmt(assign.body, assign.relBody) });
       },
       outputStrings: {
-        consecutive: { en: '3-in-row', ko: '3연속' },
-        twoOne: { en: '2:1', ko: '2:1' },
-        oneEach: { en: '1:1:1', ko: '1:1:1' },
+        consecutive: { en: '3-in-row', de: '3 in Reihe', fr: '3 à la suite', ja: '3連続', ko: '3연속' },
+        twoOne: { en: '2:1', de: '2:1', fr: '2:1', ja: '2:1', ko: '2:1' },
+        oneEach: { en: '1:1:1', de: '1:1:1', fr: '1:1:1', ja: '1:1:1', ko: '1:1:1' },
         dirN: Outputs.dirN,
         dirNE: Outputs.dirNE,
         dirSE: Outputs.dirSE,
@@ -2898,12 +3322,30 @@ const triggerSet: TriggerSet<Data> = {
           ko: '${dir}쪽',
         },
         relLeft: Outputs.left,
-        relMid: { en: 'mid', ko: '중간' },
+        relMid: { en: 'mid', de: 'Mitte', fr: 'milieu', ja: '中間', ko: '중간' },
         relRight: Outputs.right,
-        relOne: { en: '1 away', ko: '1칸' },
-        tank: { en: 'Then ${type} - ${left} + ${right}', ko: '이후 ${type} - ${left} + ${right}' },
-        body: { en: 'Then ${type} - ${spot}', ko: '이후 ${type} - ${spot}' },
-        yan: { en: 'Then ${spot}', ko: '이후 ${spot}' },
+        relOne: { en: '1 away', de: '1 weg', fr: '1 case', ja: '1マス', ko: '1칸' },
+        tank: {
+          en: 'Then ${type} - ${left} + ${right}',
+          de: 'Dann ${type} - ${left} + ${right}',
+          fr: 'Puis ${type} - ${left} + ${right}',
+          ja: '次: ${type} - ${left} + ${right}',
+          ko: '이후 ${type} - ${left} + ${right}',
+        },
+        body: {
+          en: 'Then ${type} - ${spot}',
+          de: 'Dann ${type} - ${spot}',
+          fr: 'Puis ${type} - ${spot}',
+          ja: '次: ${type} - ${spot}',
+          ko: '이후 ${type} - ${spot}',
+        },
+        yan: {
+          en: 'Then ${spot}',
+          de: 'Dann ${spot}',
+          fr: 'Puis ${spot}',
+          ja: '次: ${spot}',
+          ko: '이후 ${spot}',
+        },
       },
     },
     {
@@ -2917,8 +3359,20 @@ const triggerSet: TriggerSet<Data> = {
       alertText: (data, _matches, output) =>
         data.role === 'tank' ? output.tankMove!() : output.bodyMove!(),
       outputStrings: {
-        tankMove: { en: 'Move! Farthest / Closest!', ko: '이동! 가장 멀리 / 가까이!' },
-        bodyMove: { en: 'Move to party spot!', ko: '이동! 본대 위치로!' },
+        tankMove: {
+          en: 'Move! Farthest / Closest!',
+          de: 'Bewegen! Am weitesten / nächsten!',
+          fr: 'Bouger ! Le plus loin / proche !',
+          ja: '移動! 一番遠く / 近く!',
+          ko: '이동! 가장 멀리 / 가까이!',
+        },
+        bodyMove: {
+          en: 'Move to party spot!',
+          de: 'Zur Gruppen-Position!',
+          fr: 'Aller à la position groupe !',
+          ja: '本隊の位置へ移動!',
+          ko: '이동! 본대 위치로!',
+        },
       },
     },
     // ───── P3 결전 (알파/베타 타겟 제한) ─────
@@ -2933,8 +3387,20 @@ const triggerSet: TriggerSet<Data> = {
       infoText: (_data, matches, output) =>
         matches.effectId === '1060' ? output.alpha!() : output.beta!(),
       outputStrings: {
-        alpha: { en: 'Attack Chaos only', ko: '카오스만 공격 가능' },
-        beta: { en: 'Attack Exdeath only', ko: '엑스데스만 공격 가능' },
+        alpha: {
+          en: 'Attack Chaos only',
+          de: 'Nur Chaos angreifen',
+          fr: 'Attaquer seulement Chaos',
+          ja: 'カオスのみ攻撃',
+          ko: '카오스만 공격 가능',
+        },
+        beta: {
+          en: 'Attack Exdeath only',
+          de: 'Nur Exdeath angreifen',
+          fr: 'Attaquer seulement Exdeath',
+          ja: 'エクスデスのみ攻撃',
+          ko: '엑스데스만 공격 가능',
+        },
       },
     },
     // ───── P3 불·물·바람 크리스탈 ─────
@@ -2955,9 +3421,27 @@ const triggerSet: TriggerSet<Data> = {
         return dmCrystalRangedNames(data).has(data.me ?? '') ? output.water!() : output.wind!();
       },
       outputStrings: {
-        wind: { en: 'Wind crystal', ko: '바람 크리스탈로' },
-        water: { en: 'Water crystal', ko: '물 크리스탈로' },
-        both: { en: 'Wind (party) / Water (ranged)', ko: '본대 바람 / 원딜 물 크리스탈로' },
+        wind: {
+          en: 'Wind crystal',
+          de: 'Wind-Kristall',
+          fr: 'Cristal de vent',
+          ja: '風クリスタルへ',
+          ko: '바람 크리스탈로',
+        },
+        water: {
+          en: 'Water crystal',
+          de: 'Wasser-Kristall',
+          fr: 'Cristal d\'eau',
+          ja: '水クリスタルへ',
+          ko: '물 크리스탈로',
+        },
+        both: {
+          en: 'Wind (party) / Water (ranged)',
+          de: 'Wind (Gruppe) / Wasser (Fern)',
+          fr: 'Vent (groupe) / Eau (distance)',
+          ja: '本隊 風 / 遠隔 水',
+          ko: '본대 바람 / 원딜 물 크리스탈로',
+        },
       },
     },
     // ───── P3 범위 선더가 → 선더가 탱버 → 내파 → 디버프 자리 ─────
@@ -2971,6 +3455,9 @@ const triggerSet: TriggerSet<Data> = {
       outputStrings: {
         text: {
           en: 'Free target + AoE Thundaga',
+          de: 'Freies Ziel + AoE-Blitzga',
+          fr: 'Cible libre + Foudre AoE',
+          ja: 'フリーターゲット + 範囲サンダガ',
           ko: '자유 타겟 가능 + 범위 선더가',
         },
       },
@@ -2986,9 +3473,18 @@ const triggerSet: TriggerSet<Data> = {
       infoText: (data, _matches, output) =>
         data.role === 'tank' ? output.tank!() : output.nonTank!(),
       outputStrings: {
-        tank: { en: 'Thundaga x2: close to Exdeath', ko: '선더가 2연타: 엑스데스와 가까이' },
+        tank: {
+          en: 'Thundaga x2: close to Exdeath',
+          de: 'Blitzga x2: nah an Exdeath',
+          fr: 'Foudre x2 : près d\'Exdeath',
+          ja: 'サンダガx2: エクスデスに近く',
+          ko: '선더가 2연타: 엑스데스와 가까이',
+        },
         nonTank: {
           en: 'Thundaga: avoid tank',
+          de: 'Blitzga: Tank meiden',
+          fr: 'Foudre : éviter le tank',
+          ja: 'サンダガ: タンク回避',
           ko: '선더가: 탱커 피하기',
         },
       },
@@ -3008,8 +3504,20 @@ const triggerSet: TriggerSet<Data> = {
       infoText: (_data, matches, output) =>
         matches.id === 'BAFD' ? output.leftRight!() : output.frontBack!(),
       outputStrings: {
-        leftRight: { en: 'Chaos: Left/Right', ko: '카오스 좌우로' },
-        frontBack: { en: 'Chaos: Front/Back', ko: '카오스 앞뒤로' },
+        leftRight: {
+          en: 'Chaos: Left/Right',
+          de: 'Chaos: links/rechts',
+          fr: 'Chaos : gauche/droite',
+          ja: 'カオス: 左右',
+          ko: '카오스 좌우로',
+        },
+        frontBack: {
+          en: 'Chaos: Front/Back',
+          de: 'Chaos: vorn/hinten',
+          fr: 'Chaos : avant/arrière',
+          ja: 'カオス: 前後',
+          ko: '카오스 앞뒤로',
+        },
       },
     },
     {
@@ -3021,7 +3529,7 @@ const triggerSet: TriggerSet<Data> = {
       suppressSeconds: 5,
       infoText: (_data, _matches, output) => output.move!(),
       outputStrings: {
-        move: { en: 'Move!', ko: '이동!' },
+        move: { en: 'Move!', de: 'Bewegen!', fr: 'Bouger !', ja: '移動!', ko: '이동!' },
       },
     },
     {
@@ -3042,7 +3550,13 @@ const triggerSet: TriggerSet<Data> = {
           return output.text!();
       },
       outputStrings: {
-        text: { en: 'Move to debuff spot', ko: '디버프 자리로 이동' },
+        text: {
+          en: 'Move to debuff spot',
+          de: 'Zu Debuff-Position',
+          fr: 'Aller à la position debuff',
+          ja: 'デバフ位置へ移動',
+          ko: '디버프 자리로 이동',
+        },
       },
     },
     {
@@ -3068,7 +3582,13 @@ const triggerSet: TriggerSet<Data> = {
         data.dmAfterImplosion = false; // 1회만(다음 사이클 내파에서 다시 true)
       },
       outputStrings: {
-        text: { en: 'Bait Shadow Strike', ko: '그림자 타격 유도' },
+        text: {
+          en: 'Bait Shadow Strike',
+          de: 'Schattenschlag ködern',
+          fr: 'Attirer Frappe ombrale',
+          ja: '影撃を誘導',
+          ko: '그림자 타격 유도',
+        },
       },
     },
     {
@@ -3108,8 +3628,20 @@ const triggerSet: TriggerSet<Data> = {
         return output.plain!();
       },
       outputStrings: {
-        look: { en: 'Knockback: Look at Exdeath', ko: '넉백: 엑스데스 바라보기' },
-        away: { en: 'Knockback: Look away from Exdeath', ko: '넉백: 엑스데스 보지 않기' },
+        look: {
+          en: 'Knockback: Look at Exdeath',
+          de: 'Rückstoß: Exdeath ansehen',
+          fr: 'Poussée : regarder Exdeath',
+          ja: 'ノックバック: エクスデスを見る',
+          ko: '넉백: 엑스데스 바라보기',
+        },
+        away: {
+          en: 'Knockback: Look away from Exdeath',
+          de: 'Rückstoß: von Exdeath wegsehen',
+          fr: 'Poussée : ne pas regarder Exdeath',
+          ja: 'ノックバック: エクスデスを見ない',
+          ko: '넉백: 엑스데스 보지 않기',
+        },
         plain: Outputs.knockback,
       },
     },
@@ -3163,9 +3695,15 @@ const triggerSet: TriggerSet<Data> = {
         return output.text!({ dir: names[r.start]!, rot: r.cw ? output.cw!() : output.ccw!() });
       },
       outputStrings: {
-        text: { en: 'Start ${dir} / ${rot}', ko: '${dir}에서 시작 / ${rot} 회전' },
-        cw: { en: 'CW', ko: '시계' },
-        ccw: { en: 'CCW', ko: '반시계' },
+        text: {
+          en: 'Start ${dir} / ${rot}',
+          de: 'Start ${dir} / ${rot}',
+          fr: 'Départ ${dir} / ${rot}',
+          ja: '${dir}から開始 / ${rot}回転',
+          ko: '${dir}에서 시작 / ${rot} 회전',
+        },
+        cw: { en: 'CW', de: 'IUZS', fr: 'Horaire', ja: '時計回り', ko: '시계' },
+        ccw: { en: 'CCW', de: 'GUZS', fr: 'Anti-horaire', ja: '反時計', ko: '반시계' },
         n: Outputs.dirN,
         ne: Outputs.dirNE,
         e: Outputs.dirE,
@@ -3215,7 +3753,7 @@ const triggerSet: TriggerSet<Data> = {
       suppressSeconds: 10, // C571·C572가 같은 시각 쌍으로 시전 → 한 번만 발동(지진은 풀당 1회)
       alertText: (_data, _matches, output) => output.text!(),
       outputStrings: {
-        text: { en: 'HP set to 1', ko: 'HP 1로 고정' },
+        text: { en: 'HP set to 1', de: 'HP auf 1', fr: 'PV à 1', ja: 'HP1固定', ko: 'HP 1로 고정' },
       },
     },
     {
@@ -3242,7 +3780,13 @@ const triggerSet: TriggerSet<Data> = {
         return output.text!({ players: targets.join(', ') });
       },
       outputStrings: {
-        text: { en: 'Mud: ${players}', ko: '진흙 대상자: ${players}' },
+        text: {
+          en: 'Mud: ${players}',
+          de: 'Schlamm: ${players}',
+          fr: 'Boue : ${players}',
+          ja: '泥対象: ${players}',
+          ko: '진흙 대상자: ${players}',
+        },
       },
     },
     // ───── P3 거대 케프카(맥시멈 후): 중앙 고정·회전. heading으로 위치 추적(위치=heading 반대편) ─────
@@ -3276,11 +3820,41 @@ const triggerSet: TriggerSet<Data> = {
       },
       outputStrings: {
         ...Directions.outputStrings8Dir,
-        text: { en: 'Kefka ${pos} / ${dodge}', ko: '케프카 ${pos}쪽 / ${dodge}' },
-        left: { en: 'Left: role spread', ko: '왼쪽에서 직군 산개' },
-        right: { en: 'Right: full share', ko: '오른쪽에서 전체 쉐어' },
-        spread: { en: '${dir}: role spread', ko: '${dir}쪽에서 직군 산개' },
-        share: { en: '${dir}: full share', ko: '${dir}쪽에서 쉐어' },
+        text: {
+          en: 'Kefka ${pos} / ${dodge}',
+          de: 'Kefka ${pos} / ${dodge}',
+          fr: 'Kefka ${pos} / ${dodge}',
+          ja: 'ケフカ ${pos} / ${dodge}',
+          ko: '케프카 ${pos}쪽 / ${dodge}',
+        },
+        left: {
+          en: 'Left: role spread',
+          de: 'Links: Rollen-Verteilen',
+          fr: 'Gauche : dispersion par rôle',
+          ja: '左で職別散開',
+          ko: '왼쪽에서 직군 산개',
+        },
+        right: {
+          en: 'Right: full share',
+          de: 'Rechts: Sammeln',
+          fr: 'Droite : package',
+          ja: '右で全体頭割り',
+          ko: '오른쪽에서 전체 쉐어',
+        },
+        spread: {
+          en: '${dir}: role spread',
+          de: '${dir}: Rollen-Verteilen',
+          fr: '${dir} : dispersion par rôle',
+          ja: '${dir}で職別散開',
+          ko: '${dir}쪽에서 직군 산개',
+        },
+        share: {
+          en: '${dir}: full share',
+          de: '${dir}: Sammeln',
+          fr: '${dir} : package',
+          ja: '${dir}で頭割り',
+          ko: '${dir}쪽에서 쉐어',
+        },
       },
     },
     {
@@ -3311,14 +3885,32 @@ const triggerSet: TriggerSet<Data> = {
         ...Directions.outputStrings8Dir,
         text: {
           en: 'Kefka ${pos} / Left or Right (far)',
+          de: 'Kefka ${pos} / links oder rechts (weit)',
+          fr: 'Kefka ${pos} / gauche ou droite (loin)',
+          ja: 'ケフカ ${pos} / 左右へ遠く',
           ko: '케프카 ${pos}쪽 / 좌우로 멀리',
         },
         text2: {
           en: 'Kefka ${pos} / Left (far)',
+          de: 'Kefka ${pos} / links (weit)',
+          fr: 'Kefka ${pos} / gauche (loin)',
+          ja: 'ケフカ ${pos} / 左へ遠く',
           ko: '케프카 ${pos}쪽 / 왼쪽으로 멀리',
         },
-        finalSingle: { en: '${dir} (far)', ko: '${dir}쪽으로 회피' },
-        finalEither: { en: '${dir1} or ${dir2} (far)', ko: '${dir1}쪽 또는 ${dir2}쪽으로 회피' },
+        finalSingle: {
+          en: '${dir} (far)',
+          de: '${dir} (weit)',
+          fr: '${dir} (loin)',
+          ja: '${dir}へ回避',
+          ko: '${dir}쪽으로 회피',
+        },
+        finalEither: {
+          en: '${dir1} or ${dir2} (far)',
+          de: '${dir1} oder ${dir2} (weit)',
+          fr: '${dir1} ou ${dir2} (loin)',
+          ja: '${dir1}か${dir2}へ回避',
+          ko: '${dir1}쪽 또는 ${dir2}쪽으로 회피',
+        },
       },
     },
     {
@@ -3329,7 +3921,13 @@ const triggerSet: TriggerSet<Data> = {
       durationSeconds: 4.7, // 시전 동안만(종료 시 소멸)
       infoText: (_data, _matches, output) => output.text!(),
       outputStrings: {
-        text: { en: 'Behind Chaos', ko: '카오스 뒤로' },
+        text: {
+          en: 'Behind Chaos',
+          de: 'Hinter Chaos',
+          fr: 'Derrière Chaos',
+          ja: 'カオスの後ろ',
+          ko: '카오스 뒤로',
+        },
       },
     },
     // ───── P3 블랙홀 줄(테더) — 머리징(공격/속박/금지) 순서대로 줄 처리 (10줄/4세트) ─────
@@ -3514,6 +4112,9 @@ const triggerSet: TriggerSet<Data> = {
         ...dmLineOutputs, // preview/previewTake/previewBoth(선행) + 방위 키
         take: {
           en: '${round}: ${dir} take ${from} tether',
+          de: '${round}: ${dir} ${from}-Verbindung nehmen',
+          fr: '${round} : ${dir} prendre lien ${from}',
+          ja: '${round}本目: ${dir} ${from}の線を取る',
           ko: '${round}줄: ${dir} ${from} 줄 가져오기',
         },
       },
@@ -3534,8 +4135,20 @@ const triggerSet: TriggerSet<Data> = {
       },
       outputStrings: {
         ...Directions.outputStrings8Dir,
-        text: { en: '${pos} = 12:00, bait Blizzard center', ko: '${pos}쪽이 12시, 중앙에서 블리자가 유도' },
-        center: { en: 'Wait center', ko: '중앙 대기' },
+        text: {
+          en: '${pos} = 12:00, bait Blizzard center',
+          de: '${pos} = 12 Uhr, Eisga mittig ködern',
+          fr: '${pos} = 12h, attirer Glace au centre',
+          ja: '${pos}が12時、中央でブリザガ誘導',
+          ko: '${pos}쪽이 12시, 중앙에서 블리자가 유도',
+        },
+        center: {
+          en: 'Wait center',
+          de: 'Mitte warten',
+          fr: 'Attendre au centre',
+          ja: '中央で待機',
+          ko: '중앙 대기',
+        },
       },
     },
     {
@@ -3555,8 +4168,20 @@ const triggerSet: TriggerSet<Data> = {
         return markedIsTh === myIsTh ? output.share!() : output.tower!();
       },
       outputStrings: {
-        share: { en: 'Place floor, then share (center)', ko: '바닥 설치 후 중앙 쉐어' },
-        tower: { en: 'Place floor, then tower (sides)', ko: '바닥 설치 후 좌우 탑' },
+        share: {
+          en: 'Place floor, then share (center)',
+          de: 'Boden setzen, dann Sammeln (Mitte)',
+          fr: 'Poser sol, puis package (centre)',
+          ja: '床設置後、中央で頭割り',
+          ko: '바닥 설치 후 중앙 쉐어',
+        },
+        tower: {
+          en: 'Place floor, then tower (sides)',
+          de: 'Boden setzen, dann Türme (Seiten)',
+          fr: 'Poser sol, puis tours (côtés)',
+          ja: '床設置後、左右の塔',
+          ko: '바닥 설치 후 좌우 탑',
+        },
       },
     },
     {
@@ -3572,8 +4197,20 @@ const triggerSet: TriggerSet<Data> = {
       alertText: (_data, matches, output) =>
         matches.id === 'BAF0' ? output.share!() : output.tower!(),
       outputStrings: {
-        share: { en: 'Share (center)', ko: '중앙 쉐어 처리' },
-        tower: { en: 'Tower (sides)', ko: '좌우 탑 처리' },
+        share: {
+          en: 'Share (center)',
+          de: 'Sammeln (Mitte)',
+          fr: 'Package (centre)',
+          ja: '中央で頭割り',
+          ko: '중앙 쉐어 처리',
+        },
+        tower: {
+          en: 'Tower (sides)',
+          de: 'Türme (Seiten)',
+          fr: 'Tours (côtés)',
+          ja: '左右の塔',
+          ko: '좌우 탑 처리',
+        },
       },
     },
     {
@@ -3584,7 +4221,13 @@ const triggerSet: TriggerSet<Data> = {
       durationSeconds: 4.7, // 돌출하라 시전 동안
       alertText: (_data, _matches, output) => output.text!(),
       outputStrings: {
-        text: { en: 'Keep moving + avoid center', ko: '계속 움직이기 + 중앙 피하기' },
+        text: {
+          en: 'Keep moving + avoid center',
+          de: 'Weiter bewegen + Mitte meiden',
+          fr: 'Continuer à bouger + éviter centre',
+          ja: '動き続ける + 中央回避',
+          ko: '계속 움직이기 + 중앙 피하기',
+        },
       },
     },
     // ───────── P4 진입(C2DC) + 진실/거짓 디버프: 무의 범람 ─────────
@@ -3710,16 +4353,31 @@ const triggerSet: TriggerSet<Data> = {
       outputStrings: {
         go: {
           en: 'Face ${facing}, ${side} ${color} beam',
+          de: '${facing} ansehen, ${side} ${color} Strahl',
+          fr: 'Regarder ${facing}, rayon ${color} ${side}',
+          ja: '${facing}を見て${side}${color}ビーム',
           ko: '${facing}쪽을 보고 ${side} ${color} 빔 맞기',
         },
-        colorOnly: { en: 'Face ${facing}, ${color} beam', ko: '${facing}쪽을 보고 ${color} 빔 맞기' },
-        faceOnly: { en: 'Face ${facing} (check beam)', ko: '${facing}쪽을 보고 빔 직접 확인' },
-        purple: { en: 'Purple', ko: '보라' },
-        blue: { en: 'Blue', ko: '파랑' },
+        colorOnly: {
+          en: 'Face ${facing}, ${color} beam',
+          de: '${facing} ansehen, ${color} Strahl',
+          fr: 'Regarder ${facing}, rayon ${color}',
+          ja: '${facing}を見て${color}ビーム',
+          ko: '${facing}쪽을 보고 ${color} 빔 맞기',
+        },
+        faceOnly: {
+          en: 'Face ${facing} (check beam)',
+          de: '${facing} ansehen (Strahl prüfen)',
+          fr: 'Regarder ${facing} (vérifier rayon)',
+          ja: '${facing}を見てビーム確認',
+          ko: '${facing}쪽을 보고 빔 직접 확인',
+        },
+        purple: { en: 'Purple', de: 'Lila', fr: 'Violet', ja: '紫', ko: '보라' },
+        blue: { en: 'Blue', de: 'Blau', fr: 'Bleu', ja: '青', ko: '파랑' },
         left: Outputs.left,
         right: Outputs.right,
         ...Directions.outputStrings8Dir,
-        unknown: { en: '?', ko: '?' },
+        unknown: { en: '?', de: '?', fr: '?', ja: '?', ko: '?' },
       },
     },
     // ───────── P4 디버프 캐스케이드 (산개·쉐어/가속도/마안/혼돈불물) ─────────
@@ -3761,8 +4419,20 @@ const triggerSet: TriggerSet<Data> = {
       infoText: (_data, matches, output) =>
         parseFloat(matches.duration) < 56 ? output.early!() : output.late!(),
       outputStrings: {
-        early: { en: 'Early spread', ko: '빠른 산개' },
-        late: { en: 'Late spread', ko: '늦은 산개' },
+        early: {
+          en: 'Early spread',
+          de: 'Frühes Verteilen',
+          fr: 'Dispersion tôt',
+          ja: '早い散開',
+          ko: '빠른 산개',
+        },
+        late: {
+          en: 'Late spread',
+          de: 'Spätes Verteilen',
+          fr: 'Dispersion tard',
+          ja: '遅い散開',
+          ko: '늦은 산개',
+        },
       },
     },
     {
@@ -3901,10 +4571,28 @@ const triggerSet: TriggerSet<Data> = {
         return base + dmP4CurseSuffix(data, wave1, output);
       },
       outputStrings: {
-        mine: { en: 'My ${dir}', ko: '내가 ${dir}' },
-        notMine: { en: '${dir}', ko: '${dir}' },
-        away: { en: 'Evil Eye: Look Away', ko: '마안 보지 않기' },
-        look: { en: 'Evil Eye: Look', ko: '마안 보기' },
+        mine: {
+          en: 'My ${dir}',
+          de: 'Ich ${dir}',
+          fr: 'Moi ${dir}',
+          ja: '自分 ${dir}',
+          ko: '내가 ${dir}',
+        },
+        notMine: { en: '${dir}', de: '${dir}', fr: '${dir}', ja: '${dir}', ko: '${dir}' },
+        away: {
+          en: 'Evil Eye: Look Away',
+          de: 'Böses Auge: wegsehen',
+          fr: 'Œil maléfique : ne pas regarder',
+          ja: '魔眼: 見ない',
+          ko: '마안 보지 않기',
+        },
+        look: {
+          en: 'Evil Eye: Look',
+          de: 'Böses Auge: hinsehen',
+          fr: 'Œil maléfique : regarder',
+          ja: '魔眼: 見る',
+          ko: '마안 보기',
+        },
         ...dmP4CurseOutputs,
       },
     },
@@ -3968,13 +4656,22 @@ const triggerSet: TriggerSet<Data> = {
         return output.centerMagic!({ next: next, magic: magic });
       },
       outputStrings: {
-        center: { en: 'To center (then ${next})', ko: '중앙으로 (이후 ${next})' },
+        center: {
+          en: 'To center (then ${next})',
+          de: 'Zur Mitte (dann ${next})',
+          fr: 'Au centre (puis ${next})',
+          ja: '中央へ (次: ${next})',
+          ko: '중앙으로 (이후 ${next})',
+        },
         centerMagic: {
           en: 'To center (then ${next} + ${magic})',
+          de: 'Zur Mitte (dann ${next} + ${magic})',
+          fr: 'Au centre (puis ${next} + ${magic})',
+          ja: '中央へ (次: ${next} + ${magic})',
           ko: '중앙으로 (이후 ${next} + ${magic})',
         },
-        move: { en: 'Move', ko: '이동' },
-        wait: { en: 'Wait', ko: '대기' },
+        move: { en: 'Move', de: 'Bewegen', fr: 'Bouger', ja: '移動', ko: '이동' },
+        wait: { en: 'Wait', de: 'Warten', fr: 'Attendre', ja: '待機', ko: '대기' },
         ...dmBlizThunStrings,
       },
     },
@@ -3998,9 +4695,15 @@ const triggerSet: TriggerSet<Data> = {
       outputStrings: {
         ...dmP4PosOutputs, // 이후 안내(산개/쉐어+가속도) 재사용
         ...dmP4CallerOutputs, // 콜러 ON 시 미리보기에도 그룹 콜
-        combo: { en: '${move} → ${next}', ko: '${move} → ${next}' },
-        fireMove: { en: 'Move', ko: '이동' },
-        fireWait: { en: 'Wait', ko: '대기' },
+        combo: {
+          en: '${move} → ${next}',
+          de: '${move} → ${next}',
+          fr: '${move} → ${next}',
+          ja: '${move} → ${next}',
+          ko: '${move} → ${next}',
+        },
+        fireMove: { en: 'Move', de: 'Bewegen', fr: 'Bouger', ja: '移動', ko: '이동' },
+        fireWait: { en: 'Wait', de: 'Warten', fr: 'Attendre', ja: '待機', ko: '대기' },
       },
     },
     {
@@ -4037,9 +4740,15 @@ const triggerSet: TriggerSet<Data> = {
         return output.combo!({ move: move, magic: magic });
       },
       outputStrings: {
-        combo: { en: '${move} + ${magic}', ko: '${move} + ${magic}' },
-        move: { en: 'Move', ko: '이동' },
-        wait: { en: 'Wait', ko: '대기' },
+        combo: {
+          en: '${move} + ${magic}',
+          de: '${move} + ${magic}',
+          fr: '${move} + ${magic}',
+          ja: '${move} + ${magic}',
+          ko: '${move} + ${magic}',
+        },
+        move: { en: 'Move', de: 'Bewegen', fr: 'Bouger', ja: '移動', ko: '이동' },
+        wait: { en: 'Wait', de: 'Warten', fr: 'Attendre', ja: '待機', ko: '대기' },
         ...dmBlizThunStrings,
       },
     },
@@ -4104,8 +4813,20 @@ const triggerSet: TriggerSet<Data> = {
       alertText: (data, _matches, output) =>
         (data.dmP4Thunder ?? true) ? output.avoid!() : output.step!(),
       outputStrings: {
-        avoid: { en: 'Avoid floor', ko: '바닥 피하기' },
-        step: { en: 'Step on floor', ko: '바닥 밟기' },
+        avoid: {
+          en: 'Avoid floor',
+          de: 'Boden meiden',
+          fr: 'Éviter le sol',
+          ja: '床を避ける',
+          ko: '바닥 피하기',
+        },
+        step: {
+          en: 'Step on floor',
+          de: 'Boden betreten',
+          fr: 'Marcher sur le sol',
+          ja: '床を踏む',
+          ko: '바닥 밟기',
+        },
       },
     },
     {
@@ -4123,8 +4844,20 @@ const triggerSet: TriggerSet<Data> = {
       alertText: (_data, matches, output) =>
         matches.id === 'BA98' ? output.avoid!() : output.step!(),
       outputStrings: {
-        avoid: { en: 'Avoid floor', ko: '바닥 피하기' },
-        step: { en: 'Step on floor', ko: '바닥 밟기' },
+        avoid: {
+          en: 'Avoid floor',
+          de: 'Boden meiden',
+          fr: 'Éviter le sol',
+          ja: '床を避ける',
+          ko: '바닥 피하기',
+        },
+        step: {
+          en: 'Step on floor',
+          de: 'Boden betreten',
+          fr: 'Marcher sur le sol',
+          ja: '床を踏む',
+          ko: '바닥 밟기',
+        },
       },
     },
     {
@@ -4184,7 +4917,13 @@ const triggerSet: TriggerSet<Data> = {
         data.dmOrchCount = (data.dmOrchCount ?? 0) + 1; // 1오케=1 / 2오케=2 (이후 마격 2회/3회 구분)
       },
       outputStrings: {
-        spread: { en: 'Spread to orchestra spots', ko: '오케스트라 산개 자리로' },
+        spread: {
+          en: 'Spread to orchestra spots',
+          de: 'Auf Orchester-Positionen verteilen',
+          fr: 'Disperser aux positions orchestre',
+          ja: 'オーケストラ散開位置へ',
+          ko: '오케스트라 산개 자리로',
+        },
       },
     },
     {
@@ -4222,10 +4961,16 @@ const triggerSet: TriggerSet<Data> = {
         });
       },
       outputStrings: {
-        combo: { en: '${action} (then ${next})', ko: '${action} (이후 ${next})' },
-        aHit: { en: 'Point-blank', ko: '칼끝딜' },
+        combo: {
+          en: '${action} (then ${next})',
+          de: '${action} (dann ${next})',
+          fr: '${action} (puis ${next})',
+          ja: '${action} (次: ${next})',
+          ko: '${action} (이후 ${next})',
+        },
+        aHit: { en: 'Point-blank', de: 'Nahkampf', fr: 'Au contact', ja: '密着', ko: '칼끝딜' },
         aIn: Outputs.in,
-        nSouth: { en: 'S', ko: '남쪽으로' },
+        nSouth: { en: 'S', de: 'Süden', fr: 'Sud', ja: '南へ', ko: '남쪽으로' },
       },
     },
     {
@@ -4243,10 +4988,34 @@ const triggerSet: TriggerSet<Data> = {
         return output.combo!({ action: output.aShare!(), next: next });
       },
       outputStrings: {
-        combo: { en: '${action}, then ${next}', ko: '${action}, 이후 ${next}' },
-        aShare: { en: 'Tank share', ko: '탱커 쉐어' },
-        nHoly: { en: 'Holy (invuln)', ko: '홀리(무적기 처리)' },
-        nFlare: { en: 'Flare (go N)', ko: '북쪽에서 플레어 처리' },
+        combo: {
+          en: '${action}, then ${next}',
+          de: '${action}, dann ${next}',
+          fr: '${action}, puis ${next}',
+          ja: '${action}、次: ${next}',
+          ko: '${action}, 이후 ${next}',
+        },
+        aShare: {
+          en: 'Tank share',
+          de: 'Tank-Sammeln',
+          fr: 'Package tank',
+          ja: 'タンク頭割り',
+          ko: '탱커 쉐어',
+        },
+        nHoly: {
+          en: 'Holy (invuln)',
+          de: 'Sanctus (Unverwundbar)',
+          fr: 'Miracle (invuln)',
+          ja: 'ホーリー(無敵)',
+          ko: '홀리(무적기 처리)',
+        },
+        nFlare: {
+          en: 'Flare (go N)',
+          de: 'Flare (nach N)',
+          fr: 'Brasier (aller N)',
+          ja: '北でフレア処理',
+          ko: '북쪽에서 플레어 처리',
+        },
       },
     },
     {
@@ -4259,9 +5028,21 @@ const triggerSet: TriggerSet<Data> = {
       alertText: (_data, _matches, output) =>
         output.combo!({ main: output.south!(), note: output.dodgeFlare!() }),
       outputStrings: {
-        combo: { en: '${main} (${note})', ko: '${main} (${note})' },
-        south: { en: 'South', ko: '남쪽으로' },
-        dodgeFlare: { en: 'dodge Flare', ko: '플레어 회피' },
+        combo: {
+          en: '${main} (${note})',
+          de: '${main} (${note})',
+          fr: '${main} (${note})',
+          ja: '${main} (${note})',
+          ko: '${main} (${note})',
+        },
+        south: { en: 'South', de: 'Süden', fr: 'Sud', ja: '南へ', ko: '남쪽으로' },
+        dodgeFlare: {
+          en: 'dodge Flare',
+          de: 'Flare meiden',
+          fr: 'Éviter Brasier',
+          ja: 'フレア回避',
+          ko: '플레어 회피',
+        },
       },
     },
     {
@@ -4275,7 +5056,13 @@ const triggerSet: TriggerSet<Data> = {
       suppressSeconds: 5,
       infoText: (data, _matches, output) => output.text!({ n: data.dmOrchCount === 1 ? 2 : 3 }),
       outputStrings: {
-        text: { en: 'Magic Hammer spread x${n}', ko: '마격 산개, ${n}번' },
+        text: {
+          en: 'Magic Hammer spread x${n}',
+          de: 'Magieangriff verteilen x${n}',
+          fr: 'Frappe magique dispersion x${n}',
+          ja: '魔撃散開 x${n}',
+          ko: '마격 산개, ${n}번',
+        },
       },
     },
     {
@@ -4294,7 +5081,13 @@ const triggerSet: TriggerSet<Data> = {
       infoText: (data, _matches, output) =>
         output.text!({ n: data.dmHammerAlteCount === 1 ? 3 : 2 }),
       outputStrings: {
-        text: { en: 'Magic Hammer spread x${n}', ko: '마격 산개, ${n}번' },
+        text: {
+          en: 'Magic Hammer spread x${n}',
+          de: 'Magieangriff verteilen x${n}',
+          fr: 'Frappe magique dispersion x${n}',
+          ja: '魔撃散開 x${n}',
+          ko: '마격 산개, ${n}번',
+        },
       },
     },
     {
@@ -4464,13 +5257,19 @@ const triggerSet: TriggerSet<Data> = {
       },
       // 카운터·활성리셋은 수집기에서, 윈도우 종료는 BB42+30s '종료' 트리거에서 처리(여기선 출력만).
       outputStrings: {
-        text: { en: '${elem} tower: ${dir} ${slot}', ko: '${elem} 탑: ${dir} ${slot} 탑' },
-        fire: { en: 'Fire', ko: '불' },
-        ice: { en: 'Ice', ko: '얼음' },
-        thunder: { en: 'Thunder', ko: '번개' },
-        nw: { en: 'NW', ko: '북서쪽 보고' },
-        ne: { en: 'NE', ko: '북동쪽 보고' },
-        s: { en: 'S', ko: '남쪽 보고' },
+        text: {
+          en: '${elem} tower: ${dir} ${slot}',
+          de: '${elem}-Turm: ${dir} ${slot}',
+          fr: 'Tour ${elem} : ${dir} ${slot}',
+          ja: '${elem}塔: ${dir} ${slot}',
+          ko: '${elem} 탑: ${dir} ${slot} 탑',
+        },
+        fire: { en: 'Fire', de: 'Feuer', fr: 'Feu', ja: '炎', ko: '불' },
+        ice: { en: 'Ice', de: 'Eis', fr: 'Glace', ja: '氷', ko: '얼음' },
+        thunder: { en: 'Thunder', de: 'Blitz', fr: 'Foudre', ja: '雷', ko: '번개' },
+        nw: { en: 'NW', de: 'NW ansehen', fr: 'Regarder NO', ja: '北西を見る', ko: '북서쪽 보고' },
+        ne: { en: 'NE', de: 'NO ansehen', fr: 'Regarder NE', ja: '北東を見る', ko: '북동쪽 보고' },
+        s: { en: 'S', de: 'S ansehen', fr: 'Regarder S', ja: '南を見る', ko: '남쪽 보고' },
         left: Outputs.left,
         mid: Outputs.middle,
         right: Outputs.right,
@@ -4563,9 +5362,15 @@ const triggerSet: TriggerSet<Data> = {
       },
       run: (data) => data.dmFloodOn = false,
       outputStrings: {
-        text: { en: 'From ${start}, ${rot} (${path})', ko: '${start}에서 ${rot} (${path})' },
-        left: { en: 'Left', ko: '왼쪽으로' },
-        right: { en: 'Right', ko: '오른쪽으로' },
+        text: {
+          en: 'From ${start}, ${rot} (${path})',
+          de: 'Von ${start}, ${rot} (${path})',
+          fr: 'De ${start}, ${rot} (${path})',
+          ja: '${start}から${rot} (${path})',
+          ko: '${start}에서 ${rot} (${path})',
+        },
+        left: { en: 'Left', de: 'Links', fr: 'Gauche', ja: '左へ', ko: '왼쪽으로' },
+        right: { en: 'Right', de: 'Rechts', fr: 'Droite', ja: '右へ', ko: '오른쪽으로' },
         n: Outputs.dirN,
         e: Outputs.dirE,
         s: Outputs.dirS,
@@ -4591,8 +5396,20 @@ const triggerSet: TriggerSet<Data> = {
         return output.gather!();
       },
       outputStrings: {
-        gather: { en: 'Gather South', ko: '남쪽에서 행방불명 시작' },
-        gatherSW: { en: 'Gather SW', ko: '남서쪽에서 행방불명 시작' },
+        gather: {
+          en: 'Gather South',
+          de: 'Sammeln S',
+          fr: 'Rassembler S',
+          ja: '南で集合',
+          ko: '남쪽에서 행방불명 시작',
+        },
+        gatherSW: {
+          en: 'Gather SW',
+          de: 'Sammeln SW',
+          fr: 'Rassembler SO',
+          ja: '南西で集合',
+          ko: '남서쪽에서 행방불명 시작',
+        },
       },
     },
     {
@@ -4710,13 +5527,19 @@ const triggerSet: TriggerSet<Data> = {
       },
       run: (data) => data.dmFsknP5Set = (data.dmFsknP5Set ?? 0) + 1,
       outputStrings: {
-        combo: { en: '${dir} ${dist}', ko: '${dir} ${dist}' },
-        left: { en: 'Left', ko: '왼쪽으로' },
-        right: { en: 'Right', ko: '오른쪽으로' },
-        dist1: { en: '1', ko: '1칸' },
-        dist15: { en: '1.5', ko: '1.5칸' },
-        dist2: { en: '2', ko: '2칸' },
-        dist25: { en: '2.5', ko: '2.5칸' },
+        combo: {
+          en: '${dir} ${dist}',
+          de: '${dir} ${dist}',
+          fr: '${dir} ${dist}',
+          ja: '${dir} ${dist}',
+          ko: '${dir} ${dist}',
+        },
+        left: { en: 'Left', de: 'Links', fr: 'Gauche', ja: '左へ', ko: '왼쪽으로' },
+        right: { en: 'Right', de: 'Rechts', fr: 'Droite', ja: '右へ', ko: '오른쪽으로' },
+        dist1: { en: '1', de: '1', fr: '1', ja: '1', ko: '1칸' },
+        dist15: { en: '1.5', de: '1.5', fr: '1.5', ja: '1.5', ko: '1.5칸' },
+        dist2: { en: '2', de: '2', fr: '2', ja: '2', ko: '2칸' },
+        dist25: { en: '2.5', de: '2.5', fr: '2.5', ja: '2.5', ko: '2.5칸' },
       },
     },
     {
@@ -4730,7 +5553,13 @@ const triggerSet: TriggerSet<Data> = {
       durationSeconds: 2.5,
       infoText: (_data, _matches, output) => output.text!(),
       outputStrings: {
-        text: { en: 'Exaflare: Look NW', ko: '엑사플레어: 북서쪽 보기' },
+        text: {
+          en: 'Exaflare: Look NW',
+          de: 'Exaflare: nach NW sehen',
+          fr: 'Exabrasier : regarder NO',
+          ja: 'エクサフレア: 北西を見る',
+          ko: '엑사플레어: 북서쪽 보기',
+        },
       },
     },
     {
@@ -4742,7 +5571,13 @@ const triggerSet: TriggerSet<Data> = {
       durationSeconds: 5,
       infoText: (_data, _matches, output) => output.spread!(),
       outputStrings: {
-        spread: { en: 'Whirlwind: All spread', ko: '와류 전체 산개' },
+        spread: {
+          en: 'Whirlwind: All spread',
+          de: 'Wirbel: Alle verteilen',
+          fr: 'Tourbillon : tous dispersés',
+          ja: '渦: 全員散開',
+          ko: '와류 전체 산개',
+        },
       },
     },
   ],
