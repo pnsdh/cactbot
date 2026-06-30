@@ -1600,6 +1600,11 @@ const triggerSet: TriggerSet<Data> = {
       comment: {
         en:
           'In a 2-caster comp, which caster takes the fake-melee spot. The higher-priority (left) caster is the fake melee.',
+        de:
+          'In einer 2-Caster-Komposition, welcher Caster den Fake-Melee-Platz übernimmt. Der höher priorisierte (linke) Caster ist die Fake-Melee.',
+        fr:
+          'Dans une compo à 2 casters, quel caster prend la place de fausse mêlée. Le caster prioritaire (gauche) est la fausse mêlée.',
+        ja: '2キャスター構成でどちらのキャスターが近接枠を担当するか。優先度の高い(左)キャスターが近接枠。',
         ko: '2캐스터 구성에서 어느 캐스터가 근딜 자리를 맡을지 설정. 우선순위 높은(왼쪽) 캐스터가 근딜 자리',
       },
       type: 'select',
@@ -1680,6 +1685,11 @@ const triggerSet: TriggerSet<Data> = {
       comment: {
         en:
           'How to handle the first Doubt spell. KB-group South = the knockback group stays south; TH left / DPS right = tanks+healers and DPS split left/right.',
+        de:
+          'Wie der erste Zweifelszauber gehandhabt wird. KB-Gruppe Süden = die Rückstoß-Gruppe bleibt im Süden; TH links / DPS rechts = Tanks+Heiler und DPS teilen sich links/rechts.',
+        fr:
+          'Comment gérer le premier sort de doute. Groupe poussée Sud = le groupe poussée reste au sud ; TH gauche / DPS droite = tanks+heals et DPS se séparent gauche/droite.',
+        ja: '最初のなぞなぞマジックの処理方法。ノックバック組 南 = ノックバック組が南固定 / TH左 DPS右 = タンヒラとDPSが左右に分かれる。',
         ko: '알쏭달쏭1의 처리 방식 안내. 넉백 걸린 조가 남쪽 고정인지, 혹은 탱힐/딜러가 좌우 고정하는지 설정',
       },
       type: 'select',
@@ -1889,6 +1899,11 @@ const triggerSet: TriggerSet<Data> = {
       comment: {
         en:
           'Guidance for Slap / As I Am. Final spot = only the absolute direction to go; Kefka position = Kefka position + left/right.',
+        de:
+          'Hinweis für Kolossale Klatsche / Voller Körpereinsatz. Endposition = nur die absolute Richtung zum Gehen; Kefka-Position = Kefka-Position + links/rechts.',
+        fr:
+          'Indication pour Gifle cinglante / Moi au naturel. Position finale = seulement la direction absolue ; Position Kefka = position Kefka + gauche/droite.',
+        ja: 'びんびんビンタ・ありのままのボクの案内方法。最終位置 = 行くべき絶対方位のみ / ケフカ位置 = ケフカ位置 + 左右。',
         ko: '철썩철썩 따귀·있는 그대로의 나 안내 방식. 최종 회피 장소 = 가야 할 절대방위만 / 케프카 위치 = 케프카 위치 + 좌우',
       },
       type: 'select',
@@ -1928,6 +1943,11 @@ const triggerSet: TriggerSet<Data> = {
       comment: {
         en:
           'On spread/Evil Eye calls, list targets by job and show the accel group in parentheses.',
+        de:
+          'Bei Verteilen-/Böses-Auge-Ansagen die Ziele nach Job auflisten und die Beschleunigungs-Gruppe in Klammern anzeigen.',
+        fr:
+          'Lors des annonces dispersion/Œil maléfique, lister les cibles par job et montrer le groupe accélération entre parenthèses.',
+        ja: 'さんかい・魔眼の案内時に対象を職別に列挙し、加速グループを括弧内に表示。',
         ko: '산개, 마안 안내 시 대상자들을 직업별로 나열하고, 가속 그룹을 괄호 안에 표시',
       },
       type: 'checkbox',
