@@ -4744,6 +4744,72 @@ const triggerSet: TriggerSet<Data> = {
       },
     },
   ],
+  // 타임라인 원본은 한국어(source = 한국어 NPC명). 타 언어 클라이언트에서 sync가 맞도록
+  // source명을 각 언어로 치환한다(replaceSync). 표시 텍스트(replaceText)는 한국어 커스텀
+  // 라벨이 많아 번역하지 않으므로 en 외 로케일은 missingTranslations로 둔다.
+  //   '엑스데스'는 '네오 엑스데스'의 부분문자열 → lookbehind로 분리(치환 충돌 방지).
+  //   번역 출처: BNpcName CSV + cactbot o4s/o8s/o9n 기존 표기(독일어 격변화 정규식 포함).
+  timelineReplace: [
+    {
+      locale: 'en',
+      replaceSync: {
+        '케프카': 'Kefka',
+        '(?<!네오 )엑스데스': 'Exdeath',
+        '네오 엑스데스': 'Neo Exdeath',
+        '카오스': 'Chaos',
+        '블랙홀': 'Black Hole',
+        '신들의 상': 'Graven Image',
+      },
+    },
+    {
+      locale: 'de',
+      missingTranslations: true,
+      replaceSync: {
+        '케프카': 'Kefka',
+        '(?<!네오 )엑스데스': 'Exdeath',
+        '네오 엑스데스': 'Neo Exdeath',
+        '카오스': 'Chaos',
+        '블랙홀': 'Schwarzes Loch',
+        '신들의 상': 'heilig(?:e|er|es|en) Statue',
+      },
+    },
+    {
+      locale: 'fr',
+      missingTranslations: true,
+      replaceSync: {
+        '케프카': 'Kefka',
+        '(?<!네오 )엑스데스': 'Exdeath',
+        '네오 엑스데스': 'Néo-Exdeath',
+        '카오스': 'Chaos',
+        '블랙홀': 'Trou noir',
+        '신들의 상': 'Statue divine',
+      },
+    },
+    {
+      locale: 'ja',
+      missingTranslations: true,
+      replaceSync: {
+        '케프카': 'ケフカ',
+        '(?<!네오 )엑스데스': 'エクスデス',
+        '네오 엑스데스': 'ネオエクスデス',
+        '카오스': 'カオス',
+        '블랙홀': 'ブラックホール',
+        '신들의 상': '神々の像',
+      },
+    },
+    {
+      locale: 'cn',
+      missingTranslations: true,
+      replaceSync: {
+        '케프카': '凯夫卡',
+        '(?<!네오 )엑스데스': '艾克斯迪司',
+        '네오 엑스데스': '新生艾克斯迪司',
+        '카오스': '卡奥斯',
+        '블랙홀': '黑洞',
+        '신들의 상': '众神之像',
+      },
+    },
+  ],
 };
 
 export default triggerSet;
