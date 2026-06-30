@@ -568,12 +568,12 @@ const forsakenFmt = {
   // 시계(시만, side는 별도).
   cCenter: Outputs.middle,
   c3: { en: '3:00', ko: '3시' },
-  c4: Outputs.dirESE,
-  c5: Outputs.dirSSE,
+  c4: { en: '4:00', ko: '4시' },
+  c5: { en: '5:00', ko: '5시' },
   c6: { en: '6:00', ko: '6시' },
-  c7: Outputs.dirSSW,
+  c7: { en: '7:00', ko: '7시' },
   c9: { en: '9:00', ko: '9시' },
-  c10: Outputs.dirWNW,
+  c10: { en: '10:00', ko: '10시' },
   c12: { en: '12:00', ko: '12시' },
 } as const;
 
