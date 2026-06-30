@@ -170,9 +170,10 @@ const dmSignNames: { [waymark: string]: string } = {
 };
 
 // =============================================================================
-// Dancing Mad (Ultimate) / 절 요성난무 — 개인용(한글), P1 중심
+// Dancing Mad (Ultimate) / 절 요성난무 — 개인 한글 포크
 // =============================================================================
-// 진행도: P1(케프카) 완성 / P2 행방불명 운동회 구현(인게임 검증 중) / P3 1운동회(크리스탈~회오리) 구현(미검증).
+// 진행도: P1~P5 트리거 구현·실로그 검증 완료. 콜아웃·타임라인·config 다국어화(en/ko/de/fr/ja, cn 제외).
+//   ※ 한국어가 기준 언어 — 타임라인 원본도 한국어. 타 언어는 timelineReplace(파일 끝)·Outputs로 처리.
 //
 // [페이즈 구조]  신들의 상(BCF2) 소환 횟수 = dmStatueCount 로 구분:
 //   1상 = 넉백선 + 파동포 / 2상 = 중력탄·암석탄 + 중력파·박살 / 3상↑ = 성모수마 + 태만·아베
@@ -355,7 +356,7 @@ const dmP4CallerSuffix = (data: Data, early: boolean, output: Output): string =>
     .map((f) => data.party.member(f.target).job ?? f.target)
     .join(', ') || '?';
   // 가속: 이 차수 만료 가속도 전체 정지/이동 일치 → 멈춰/움직여.
-  //   ★섞이면(GC1·GC2 truth 다름) → 마안 그룹 기준 콜. 마안 그룹 2명은 같은 GC라 항상 균일(검증 42/42),
+  //   ★섞이면(GC1·GC2 truth 다름) → 마안 그룹 기준 콜. 마안 그룹 2명은 같은 GC라 항상 균일(검증됨),
   //   비마안은 반대 → '마안만 멈춰/움직여'로 완전 지정. 마안 가속 불명 시만 '각자 봐' 폴백.
   const accels = (data.dmP4AccelAll ?? []).filter((a) => a.early === early);
   let accel: string;
@@ -4098,7 +4099,7 @@ const triggerSet: TriggerSet<Data> = {
     {
       // 줄 라운드 카운터/리셋: 무의 파동(BAFC=라운드당 1웨이브, 폭발 시점) 기준으로 라운드++.
       //   테더는 사망/위치이동에 재형성돼 버스트가 흩어져 과다 카운트됨(검증: 실제 2줄인데 4줄). BAFC는
-      //   라운드당 고정 → 안정. dmTetherRound=(BAFC웨이브 수)+1: 줄1=BAFC 전(C3F7서 1), BAFC#N 후=줄 N+1.
+      //   라운드당 1웨이브 고정 → 안정. dmTetherRound=(BAFC웨이브 수)+1: 줄1=BAFC 전(C3F7서 1), BAFC#N 후=줄 N+1.
       //   preRun(동기)으로 먼저 증가 → 같은 웨이브의 '줄 안내 (무의파동·스왑)'(alertText/infoText 지연)가 새 라운드값을 읽음.
       id: 'DancingMad 줄 라운드 리셋',
       type: 'Ability',
@@ -4107,7 +4108,7 @@ const triggerSet: TriggerSet<Data> = {
         data.dmTetherRound = (data.dmTetherRound ?? 1) + 1;
         // 줄2·10 진입(=직전 줄1·9 해소 직후): leftover 기준 dmFirstRoundDirs를 직전 줄1·9의 **스폰 활성 방위**로
         //   확정(dmSpawnActive 리셋 前 캡처). 스폰 데이터(03 위치 + 272 활성)는 테더 '이동' 무관·항상 존재라
-        //   '고정으로 든 줄'(type35 미발생)도 정확. 전 로그 278/278 BAFC 폭발소스와 일치 확인(구 '줄 해소 수집' 대체).
+        //   '고정으로 든 줄'(type35 미발생)도 정확. 전 로그 BAFC 폭발소스와 일치 확인(구 '줄 해소 수집' 대체).
         if (data.dmTetherRound === 2 || data.dmTetherRound === 10)
           data.dmFirstRoundDirs = dmSpawnActiveDirs(data);
         data.dmRoundDirs = [];
@@ -4118,7 +4119,7 @@ const triggerSet: TriggerSet<Data> = {
     },
     {
       // 줄 안내 (무의파동·남은줄, 줄2·10): 직전 줄1·9가 터지는 BAFC(무의파동) 기점에 leftover(남은 줄) 본 안내.
-      //   테더는 줄2·10에서 '이동'에만 찍혀 거의 미발생(실측 166/167·84/103) → 무의파동(테더 무관·확실)으로 발동.
+      //   테더는 줄2·10에서 '이동'에만 찍혀 거의 미발생(실측) → 무의파동(테더 무관·확실)으로 발동.
       //   바로 앞 '줄 라운드 리셋'(같은 웨이브)이 round++·dmFirstRoundDirs(=직전 줄 스폰활성) 캡처를 끝낸 뒤라
       //   leftover(=dmSetDirs−dmFirstRoundDirs) 확정. 줄2·10은 세트 마지막 줄이라 infoText 선행 없음(본 안내만).
       //   dmLineAnnounced 락(라운드당 1회) → 같은 줄 이중안내 차단.
@@ -4160,8 +4161,8 @@ const triggerSet: TriggerSet<Data> = {
       //      dmHandlesRound가 케프카 시계로 재정렬, 줄1은 활성 1개라 수집 순서 무관.
       //   ② 줄3·6(풀): 내용이 dmSetDirs(스폰 3카디널)+마커+케프카로만 나와 테더 무관 → 세트 3카디널 완비 시 발동.
       //      ★카디널 가드 필수: dmSetDirs는 다음 세트 첫 카디널까지 이전 세트 값(3)이 남음 → 이 라인이 카디널일 때만
-      //      판정(카디널 라인이면 '블랙홀 위치 수집'이 먼저 stale 리셋·재집계 → ===3은 항상 현재 세트). 전 로그 295/295
-      //      완비·round 오검출 0 검증. 줄3·6은 leftover 안 먹이므로 dmRoundDirs/dmFirstRoundDirs는 안 건드림.
+      //      판정(카디널 라인이면 '블랙홀 위치 수집'이 먼저 stale 리셋·재집계 → ===3은 항상 현재 세트). 전 로그
+      //      검증(완비·round 오검출 0). 줄3·6은 leftover 안 먹이므로 dmRoundDirs/dmFirstRoundDirs는 안 건드림.
       //   dmLineAnnounced 락(라운드당 1회, '줄 라운드 리셋'서 해제) → 같은 줄 이중안내 차단.
       id: 'DancingMad 줄 안내 (스폰)',
       type: 'AddedCombatant',
@@ -4426,7 +4427,7 @@ const triggerSet: TriggerSet<Data> = {
     {
       id: 'DancingMad 무의 범람 보라빔 수집',
       // ★StartsUsingExtra(263)로 읽음: 시전(20) 좌표는 드물게 스폰 스냅샷(중앙 100,100)으로 흔들리나
-      //   263은 항상 실제 가장자리 좌표(전수검증 22/22·퇴화0). 263엔 source 이름도 없어 이름 불안정 무관.
+      //   263은 항상 실제 가장자리 좌표(전수검증, 퇴화 0). 263엔 source 이름도 없어 이름 불안정 무관.
       type: 'StartsUsingExtra',
       netRegex: { id: 'C394' }, // 산 자의 암흑광(보라)
       run: (data, matches) =>
@@ -5451,7 +5452,7 @@ const triggerSet: TriggerSet<Data> = {
     {
       // 플러드 안내: 텔레그래프 2개 뜬 직후(C13F+1.5s) 1회. 회전이 일정 90° 스텝이라 첫 2직선으로 확정.
       //   띠 방향 = 분신 near→far 대각선. 시작 = 1·2번 대각선 사이 카디널, 회전 = 1→2 방향(CCW=오른쪽).
-      //   경로 = 시작에서 회전방향 90°씩 외삽(3카디널, 예 "오른쪽 (북 → 서 → 남)"). 전풀 검증: 시작 4/4 일치.
+      //   경로 = 시작에서 회전방향 90°씩 외삽(3카디널, 예 "오른쪽 (북 → 서 → 남)"). 전풀 검증: 시작 일치.
       //   duration 7.5s = 출력(+1.5)~마지막 쉐어(BB4F4, +9.0s).
       id: 'DancingMad P5 플러드',
       type: 'StartsUsing',
