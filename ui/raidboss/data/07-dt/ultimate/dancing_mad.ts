@@ -1210,14 +1210,12 @@ const dmMarkerLabel = (m: string): string => {
   const t = m.startsWith('attack') ? '공격' : m.startsWith('bind') ? '속박' : '금지';
   return t + m.slice(-1);
 };
-// 방위(0북1동2남3서) 공유 outputStrings + 키 헬퍼 (줄 안내 트리거 공용).
-const dmDirOutputs = {
-  n: { en: 'N', de: 'N', fr: 'N', ja: '北', cn: '上', ko: '북쪽' },
-  e: { en: 'E', de: 'O', fr: 'E', ja: '東', cn: '右', ko: '동쪽' },
-  s: { en: 'S', de: 'S', fr: 'S', ja: '南', cn: '下', ko: '남쪽' },
-  w: { en: 'W', de: 'W', fr: 'O', ja: '西', cn: '左', ko: '서쪽' },
-} as const;
+// 방위(0북1동2남3서) → 공통 방향키('n'/'e'/'s'/'w'=Outputs.dir*). 줄 안내 트리거 공용.
 const dmDirKey = (d: number): 'n' | 'e' | 's' | 'w' => (['n', 'e', 's', 'w'] as const)[d] ?? 'n';
+// 방향 렌더: cactbot 공통 방향 + ko만 '쪽' 접미(dirSuffix). 여러 방향을 join하기 전에 방향별로 붙여야
+//   '북쪽 + 동쪽'이 됨(통문자열 끝에 한 번 붙이면 첫 방향의 '쪽'이 빠짐). 다른 언어는 ${dir} 그대로.
+const dmDirStr = (d: number, output: Output): string =>
+  output.dirSuffix!({ dir: output[dmDirKey(d)]!() });
 // 줄(블랙홀) 우선순위 정렬 키: 케프카 기준 위치(8방향 dmKefkaDir)부터 시계방향.
 //   카디널 방위(0북1동2남3서)를 8방향(×2: 북0·동2·남4·서6)으로 환산 후 케프카로부터 시계 오프셋.
 //   케프카 미상이면 0(북)=기존 북→동→남→서. 직전 철썩/있는그대로(BAE6/7·BAEC/ED)가 dmKefkaDir 기록.
@@ -1336,7 +1334,18 @@ const dmSpawnActiveDirs = (data: Data): number[] => {
 };
 // 줄 안내 출력·본문(스폰[03]·무의파동[BAFC]·스왑 안내 공용).
 const dmLineOutputs = {
-  ...dmDirOutputs,
+  n: Outputs.dirN,
+  e: Outputs.dirE,
+  s: Outputs.dirS,
+  w: Outputs.dirW,
+  dirSuffix: {
+    en: '${dir}',
+    de: '${dir}',
+    fr: '${dir}',
+    ja: '${dir}',
+    cn: '${dir}',
+    ko: '${dir}쪽',
+  },
   handle: { en: '${round}: ${dir} tether', ko: '${round}줄: ${dir} 줄 처리' },
   handleBoth: { en: '${round}: ${dir} (both)', ko: '${round}줄: ${dir} 양쪽 처리' },
   handleNext: {
@@ -1358,12 +1367,12 @@ const dmLineHandleText = (data: Data, output: Output): string | undefined => {
   const now = dmHandlesRound(data, round, myMark);
   if (now === undefined)
     return; // 이 줄 비처리(선행은 infoText)
-  const nowStr = now.map((d) => output[dmDirKey(d)]!()).join(' + ');
+  const nowStr = now.map((d) => dmDirStr(d, output)).join(' + ');
   const next = [2, 5, 8, 10].includes(round)
     ? undefined
     : dmHandlesRound(data, round + 1, myMark);
   if (next !== undefined && next.length === 1 && now.length === 1 && next[0] !== now[0])
-    return output.handleNext!({ round: round, dir: nowStr, next: output[dmDirKey(next[0]!)]!() });
+    return output.handleNext!({ round: round, dir: nowStr, next: dmDirStr(next[0]!, output) });
   return now.length >= 2
     ? output.handleBoth!({ round: round, dir: nowStr })
     : output.handle!({ round: round, dir: nowStr });
@@ -1381,7 +1390,7 @@ const dmLinePreviewText = (data: Data, output: Output): string | undefined => {
   const next = dmHandlesRound(data, round + 1, myMark);
   if (next === undefined)
     return; // 다음 줄도 비처리
-  const nextStr = next.map((d) => output[dmDirKey(d)]!()).join(' + ');
+  const nextStr = next.map((d) => dmDirStr(d, output)).join(' + ');
   if (dmTetherSwap[round + 1] !== undefined)
     return output.previewTake!({ dir: nextStr }); // 다음이 스왑=가져오기
   return next.length >= 2
@@ -2835,12 +2844,12 @@ const triggerSet: TriggerSet<Data> = {
           return;
         const idxs = tris.map((c) => dmTrineNearest(c.PosX, c.PosY)).sort((x, y) => x - y);
         const dirs = [
-          output.dirN!(),
-          output.dirNE!(),
-          output.dirSE!(),
-          output.dirS!(),
-          output.dirSW!(),
-          output.dirNW!(),
+          output.dirSuffix!({ dir: output.dirN!() }),
+          output.dirSuffix!({ dir: output.dirNE!() }),
+          output.dirSuffix!({ dir: output.dirSE!() }),
+          output.dirSuffix!({ dir: output.dirS!() }),
+          output.dirSuffix!({ dir: output.dirSW!() }),
+          output.dirSuffix!({ dir: output.dirNW!() }),
         ];
         // 얀: 우선순위로 한 자리만 선점(탱커=남서부터 시계 / 본대=남부터 반시계). 미사용 칸은 미표시.
         if (data.triggerSetConfig.dmTrineMethod === 'yan') {
@@ -2880,12 +2889,20 @@ const triggerSet: TriggerSet<Data> = {
         consecutive: { en: '3-in-row', ko: '3연속' },
         twoOne: { en: '2:1', ko: '2:1' },
         oneEach: { en: '1:1:1', ko: '1:1:1' },
-        dirN: { en: 'N', de: 'N', fr: 'N', ja: '北', cn: '上', ko: '북쪽' },
-        dirNE: { en: 'NE', de: 'NO', fr: 'NE', ja: '北東', cn: '右上', ko: '북동쪽' },
-        dirSE: { en: 'SE', de: 'SO', fr: 'SE', ja: '南東', cn: '右下', ko: '남동쪽' },
-        dirS: { en: 'S', de: 'S', fr: 'S', ja: '南', cn: '下', ko: '남쪽' },
-        dirSW: { en: 'SW', de: 'SW', fr: 'SO', ja: '南西', cn: '左下', ko: '남서쪽' },
-        dirNW: { en: 'NW', de: 'NW', fr: 'NO', ja: '北西', cn: '左上', ko: '북서쪽' },
+        dirN: Outputs.dirN,
+        dirNE: Outputs.dirNE,
+        dirSE: Outputs.dirSE,
+        dirS: Outputs.dirS,
+        dirSW: Outputs.dirSW,
+        dirNW: Outputs.dirNW,
+        dirSuffix: {
+          en: '${dir}',
+          de: '${dir}',
+          fr: '${dir}',
+          ja: '${dir}',
+          cn: '${dir}',
+          ko: '${dir}쪽',
+        },
         relLeft: { en: 'left', ko: '왼쪽' },
         relMid: { en: 'mid', ko: '중간' },
         relRight: { en: 'right', ko: '오른쪽' },
@@ -3489,7 +3506,7 @@ const triggerSet: TriggerSet<Data> = {
           return;
         return output.take!({
           round: round,
-          dir: output[dmDirKey(myDir)]!(),
+          dir: dmDirStr(myDir, output),
           from: dmMarkerLabel(swap.from),
         });
       },
@@ -3699,22 +3716,15 @@ const triggerSet: TriggerSet<Data> = {
       outputStrings: {
         go: {
           en: 'Face ${facing}, ${side} ${color} beam',
-          ko: '${facing}을 보고 ${side} ${color} 빔 맞기',
+          ko: '${facing}쪽을 보고 ${side} ${color} 빔 맞기',
         },
-        colorOnly: { en: 'Face ${facing}, ${color} beam', ko: '${facing}을 보고 ${color} 빔 맞기' },
-        faceOnly: { en: 'Face ${facing} (check beam)', ko: '${facing}을 보고 빔 직접 확인' },
+        colorOnly: { en: 'Face ${facing}, ${color} beam', ko: '${facing}쪽을 보고 ${color} 빔 맞기' },
+        faceOnly: { en: 'Face ${facing} (check beam)', ko: '${facing}쪽을 보고 빔 직접 확인' },
         purple: { en: 'Purple', ko: '보라' },
         blue: { en: 'Blue', ko: '파랑' },
         left: { en: 'left', ko: '왼쪽' },
         right: { en: 'right', ko: '오른쪽' },
-        dirN: { en: 'N', de: 'N', fr: 'N', ja: '北', cn: '上', ko: '북쪽' },
-        dirNE: { en: 'NE', de: 'NO', fr: 'NE', ja: '北東', cn: '右上', ko: '북동쪽' },
-        dirE: { en: 'E', de: 'O', fr: 'E', ja: '東', cn: '右', ko: '동쪽' },
-        dirSE: { en: 'SE', de: 'SO', fr: 'SE', ja: '南東', cn: '右下', ko: '남동쪽' },
-        dirS: { en: 'S', de: 'S', fr: 'S', ja: '南', cn: '下', ko: '남쪽' },
-        dirSW: { en: 'SW', de: 'SW', fr: 'SO', ja: '南西', cn: '左下', ko: '남서쪽' },
-        dirW: { en: 'W', de: 'W', fr: 'O', ja: '西', cn: '左', ko: '서쪽' },
-        dirNW: { en: 'NW', de: 'NW', fr: 'NO', ja: '北西', cn: '左上', ko: '북서쪽' },
+        ...Directions.outputStrings8Dir,
         unknown: { en: '?', ko: '?' },
       },
     },
