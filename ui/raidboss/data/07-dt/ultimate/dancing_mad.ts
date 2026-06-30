@@ -1162,7 +1162,7 @@ const dmLimitCutText = (data: Data, output: Output): string | undefined => {
 //   clockN은 편집 가능한 시계 라벨(기본 'N시로'/'N o'clock'). 사용자가 방위징으로 교체.
 const dmLimitCutOutputs = {
   text: { en: '#${num}: ${clock}', ko: '주사위 ${num}번: ${clock}' },
-  fallback: { en: '#${num} (check Ultima dir)', ko: '주사위 ${num}번' },
+  fallback: { en: '#${num}', ko: '주사위 ${num}번' },
   clock1: { en: '1 o\'clock', ko: '1시로' },
   clock2: { en: '2 o\'clock', ko: '2시로' },
   clock4: { en: '4 o\'clock', ko: '4시로' },
@@ -1436,14 +1436,13 @@ const triggerSet: TriggerSet<Data> = {
       },
       comment: {
         en:
-          'When the party runs 2 casters, which one plays the melee (fake-melee) spot in mechanics that split DPS into melee/ranged sides. The higher-priority caster is the fake melee. The two presets are exact reverses, so any caster pair can pick either side. ' +
-          '(Currently used by P2 Forsaken; kept fight-wide for future use.)',
+          'In a 2-caster comp, which caster takes the fake-melee spot. The higher-priority (left) caster is the fake melee.',
         ko: '2캐스터 구성에서 어느 캐스터가 근딜 자리를 맡을지 설정. 우선순위 높은(왼쪽) 캐스터가 근딜 자리',
       },
       type: 'select',
       options: {
         en: {
-          'RDM > SMN > BLM > PCT': 'fwd',
+          'RDM > SMN > BLM > PCT (default)': 'fwd',
           'PCT > BLM > SMN > RDM': 'rev',
         },
         ko: {
@@ -1460,9 +1459,7 @@ const triggerSet: TriggerSet<Data> = {
         ko: '블리자가 + 선더가 안내',
       },
       comment: {
-        en: 'Blizzard(fan) + Thunder(line) truth/false combo. ' +
-          'Step/Dodge = call which shape to stand on by truth (default): both true → dodge both, blizzard false → step on fan only, thunder false → step on line only, both false → step on both. ' +
-          'Direction + In/Out = call Blizzard safe diagonal + Thunder in/out (previous behavior).',
+        en: 'Whether to show the Blizzard guidance by step/dodge, or by safe direction.',
         ko: '블리자가 안내를 밟기, 안 밟기 기준으로 표시할지, 안전 방향을 안내할지를 설정',
       },
       type: 'select',
@@ -1486,14 +1483,14 @@ const triggerSet: TriggerSet<Data> = {
       },
       comment: {
         en:
-          'How to split into 4 corners for Blizzard + spread/stack + knockback. KB-group South = knockback group takes south corners, non-KB north, W/E by Blizzard safe diagonal (current). TH-left/DPS-right = tanks+healers go west, DPS east, N/S by Blizzard safe; handle the knockback yourself.',
+          'How to handle the first Doubt spell. KB-group South = the knockback group stays south; TH left / DPS right = tanks+healers and DPS split left/right.',
         ko: '알쏭달쏭1의 처리 방식 안내. 넉백 걸린 조가 남쪽 고정인지, 혹은 탱힐/딜러가 좌우 고정하는지 설정',
       },
       type: 'select',
       options: {
         en: {
           'KB-group South': 'kbSouth',
-          'TH left / DPS right': 'roleSide',
+          'TH left / DPS right (default)': 'roleSide',
         },
         ko: {
           '넉백조 남쪽': 'kbSouth',
@@ -1509,15 +1506,14 @@ const triggerSet: TriggerSet<Data> = {
         ko: 'P2 행방불명 처리법',
       },
       comment: {
-        en:
-          'Position strategy for the P2 Forsaken tower phase. A/B group, order, and timing are identical.',
+        en: 'Position guidance for the P2 Forsaken phase, per strategy.',
         ko: '행방불명 공략에 따른 위치 안내 방식 설정',
       },
       type: 'select',
       options: {
         en: {
           'JamJam': 'jamjam',
-          '09STOP': '09stop',
+          '09STOP (default)': '09stop',
         },
         ko: {
           '잼잼': 'jamjam',
@@ -1533,14 +1529,13 @@ const triggerSet: TriggerSet<Data> = {
         ko: 'P2 행방불명 스왑 주체 (09STOP)',
       },
       comment: {
-        en:
-          'When two same markers land on one tower, who moves to the other tower: Lower = relative-south person (default), Upper = relative-north person.',
+        en: 'In 09STOP, when two same markers land on one tower, who moves to the other tower.',
         ko: '09STOP에서 한 탑에 같은 마커 2명이 겹치면 누가 반대 탑으로 넘어가는지 설정',
       },
       type: 'select',
       options: {
         en: {
-          'Lower (rel. south)': 'lower',
+          'Lower (rel. south) (default)': 'lower',
           'Upper (rel. north)': 'upper',
         },
         ko: {
@@ -1557,14 +1552,13 @@ const triggerSet: TriggerSet<Data> = {
         ko: 'P2 트라인 처리법',
       },
       comment: {
-        en: '09STOP = announce T1/T2/body trine spots with left/mid/right labels (current). ' +
-          'Yan = priority assignment: both tanks share one spot (clockwise from SW), the rest one spot (CCW from S); the unused trine spot is not shown.',
+        en: 'Trine guidance, per strategy.',
         ko: '공략에 따른 트라인 안내 방식 설정',
       },
       type: 'select',
       options: {
         en: {
-          '09STOP (current)': '09stop',
+          '09STOP (default)': '09stop',
           'Yan': 'yan',
         },
         ko: {
@@ -1581,16 +1575,13 @@ const triggerSet: TriggerSet<Data> = {
         ko: 'P3 블랙홀 줄 처리법',
       },
       comment: {
-        en: '09STOP (0620) (default): same as Old but line 9 assigns ignore1/2 by ' +
-          'left/right of the V between the two 90°-apart black holes. ' +
-          '09STOP (Old): line 1 = attack2, line 2 = attack1 takes both. ' +
-          'Yan: line 1 = attack1, line 2 = attack1(opposite)/attack2. Lines 3-10 otherwise identical (Yan-style).',
+        en: 'Black hole tether handling, per strategy.',
         ko: '공략에 따른 블랙홀 줄 처리 방식',
       },
       type: 'select',
       options: {
         en: {
-          '09STOP (0620)': '09stop0620',
+          '09STOP (0620) (default)': '09stop0620',
           '09STOP (Old)': '09stop',
           'Yan': 'yan',
         },
@@ -1610,8 +1601,7 @@ const triggerSet: TriggerSet<Data> = {
       },
       comment: {
         en:
-          'Final spot (default): announce your final absolute map direction (Kefka pos = relative N). ' +
-          'Kefka position: current style (Kefka position + left/right).',
+          'Guidance for Slap / As I Am. Final spot = only the absolute direction to go; Kefka position = Kefka position + left/right.',
         ko: '철썩철썩 따귀·있는 그대로의 나 안내 방식. 최종 회피 장소 = 가야 할 절대방위만 / 케프카 위치 = 케프카 위치 + 좌우',
       },
       type: 'select',
@@ -1634,8 +1624,8 @@ const triggerSet: TriggerSet<Data> = {
         ko: 'P4 콜러 (산개/가속 그룹 콜)',
       },
       comment: {
-        en: 'Appends "(Spread: jobs / accel)" after the spread/stack call. ' +
-          'Accel = Stop (all true) / Move (all false) / Mixed.',
+        en:
+          'On spread/Evil Eye calls, list targets by job and show the accel group in parentheses.',
         ko: '산개, 마안 안내 시 대상자들을 직업별로 나열하고, 가속 그룹을 괄호 안에 표시',
       },
       type: 'checkbox',
@@ -1648,19 +1638,16 @@ const triggerSet: TriggerSet<Data> = {
         ko: 'P5 행방불명 이동 공략',
       },
       comment: {
-        en: '09STOP (0621) (default): start SW, then "left 2" every set (4×, no branching). ' +
-          '09STOP (Old): set1/2 left 90°, set3 checks East cardinal floor. ' +
-          'RAID GOSU: set1 left 1 / set2 left 2 / set3 checks North cardinal / set4 checks NW(or NE) temporary floor. ' +
-          'Minimal Movement: same as RAID GOSU but start SW and set2 left 1 (1-1-1-1).',
+        en: 'P5 Forsaken rotation movement.',
         ko: 'P5 행방불명 회전 동선.',
       },
       type: 'select',
       options: {
         en: {
-          '09STOP (2-2-2-2)': '09stop0621',
-          '09STOP (2-2-2.5-1.5)': '09stop',
-          'RAID GOSU (1-2-1-1)': 'raidgosu',
-          'Minimal Movement (1-1-1-1)': 'minimal',
+          '09STOP (2-2-2-2, start SW) (default)': '09stop0621',
+          '09STOP (2-2-2.5-1.5, start S)': '09stop',
+          'RAID GOSU (1-2-1-1, start S)': 'raidgosu',
+          'Minimal Movement (1-1-1-1, start SW)': 'minimal',
         },
         ko: {
           '09STOP (2-2-2-2, 남서쪽 시작) (기본값)': '09stop0621',
@@ -2266,11 +2253,11 @@ const triggerSet: TriggerSet<Data> = {
           : output.goLeft!(),
       outputStrings: {
         goRight: {
-          en: 'Right (Gravity left)',
+          en: 'Right',
           ko: '오른쪽으로',
         },
         goLeft: {
-          en: 'Left (Comet right)',
+          en: 'Left',
           ko: '왼쪽으로',
         },
       },
@@ -2974,7 +2961,7 @@ const triggerSet: TriggerSet<Data> = {
       infoText: (_data, _matches, output) => output.text!(),
       outputStrings: {
         text: {
-          en: 'Proximity Thundaga: away from Exdeath',
+          en: 'Free target + AoE Thundaga',
           ko: '자유 타겟 가능 + 범위 선더가',
         },
       },
@@ -3012,8 +2999,8 @@ const triggerSet: TriggerSet<Data> = {
       infoText: (_data, matches, output) =>
         matches.id === 'BAFD' ? output.leftRight!() : output.frontBack!(),
       outputStrings: {
-        leftRight: { en: 'Left/Right', ko: '카오스 좌우로' },
-        frontBack: { en: 'Front/Back', ko: '카오스 앞뒤로' },
+        leftRight: { en: 'Chaos: Left/Right', ko: '카오스 좌우로' },
+        frontBack: { en: 'Chaos: Front/Back', ko: '카오스 앞뒤로' },
       },
     },
     {
@@ -3538,7 +3525,7 @@ const triggerSet: TriggerSet<Data> = {
       },
       outputStrings: {
         ...Directions.outputStrings8Dir,
-        text: { en: 'Face ${pos} / wait center', ko: '${pos}쪽이 12시, 중앙에서 블리자가 유도' },
+        text: { en: '${pos} = 12:00, bait Blizzard center', ko: '${pos}쪽이 12시, 중앙에서 블리자가 유도' },
         center: { en: 'Wait center', ko: '중앙 대기' },
       },
     },
@@ -3559,8 +3546,8 @@ const triggerSet: TriggerSet<Data> = {
         return markedIsTh === myIsTh ? output.share!() : output.tower!();
       },
       outputStrings: {
-        share: { en: 'Share (center)', ko: '바닥 설치 후 중앙 쉐어' },
-        tower: { en: 'Tower (sides)', ko: '바닥 설치 후 좌우 탑' },
+        share: { en: 'Place floor, then share (center)', ko: '바닥 설치 후 중앙 쉐어' },
+        tower: { en: 'Place floor, then tower (sides)', ko: '바닥 설치 후 좌우 탑' },
       },
     },
     {
@@ -3772,8 +3759,8 @@ const triggerSet: TriggerSet<Data> = {
       infoText: (_data, matches, output) =>
         parseFloat(matches.duration) < 56 ? output.early!() : output.late!(),
       outputStrings: {
-        early: { en: 'Early spread (you)', ko: '빠른 산개' },
-        late: { en: 'Late spread (you)', ko: '늦은 산개' },
+        early: { en: 'Early spread', ko: '빠른 산개' },
+        late: { en: 'Late spread', ko: '늦은 산개' },
       },
     },
     {
@@ -4753,7 +4740,7 @@ const triggerSet: TriggerSet<Data> = {
       durationSeconds: 5,
       infoText: (_data, _matches, output) => output.spread!(),
       outputStrings: {
-        spread: { en: 'Whirlwind: Spread', ko: '와류 전체 산개' },
+        spread: { en: 'Whirlwind: All spread', ko: '와류 전체 산개' },
       },
     },
   ],
