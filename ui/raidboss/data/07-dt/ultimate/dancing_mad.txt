@@ -83,7 +83,7 @@ hideall "--sync--"
 # === P1 종료 → 전멸(BABB) vs P2 진입 분기 ===
 # 케프카 타겟불가(~197.4)=P1 종료 공통. 전멸=심판의 빛(BABB) / 성공=재타겟(~207.7)→종말의 포옹(C24C).
 197.4 "--untargetable--"
-202.4 "심판의 빛 (P1 전멸기)" Ability { id: "BABB", source: "케프카" }
+202.4 "심판의 빛 (전멸기)" Ability { id: "BABB", source: "케프카" }
 207.7 "--targetable--"
 
 
