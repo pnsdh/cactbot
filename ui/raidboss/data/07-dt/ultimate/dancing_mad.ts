@@ -1608,6 +1608,18 @@ const triggerSet: TriggerSet<Data> = {
           'RDM > SMN > BLM > PCT (default)': 'fwd',
           'PCT > BLM > SMN > RDM': 'rev',
         },
+        de: {
+          'RDM > SMN > BLM > PCT (Standard)': 'fwd',
+          'PCT > BLM > SMN > RDM': 'rev',
+        },
+        fr: {
+          'RDM > SMN > BLM > PCT (défaut)': 'fwd',
+          'PCT > BLM > SMN > RDM': 'rev',
+        },
+        ja: {
+          'RDM > SMN > BLM > PCT (デフォルト)': 'fwd',
+          'PCT > BLM > SMN > RDM': 'rev',
+        },
         ko: {
           '적마 > 소환 > 흑마 > 픽토 (기본값)': 'fwd',
           '픽토 > 흑마 > 소환 > 적마': 'rev',
@@ -1637,6 +1649,18 @@ const triggerSet: TriggerSet<Data> = {
           'Step / Dodge (default)': 'stepDodge',
           'Direction + In/Out': 'dir',
         },
+        de: {
+          'Betreten / Meiden (Standard)': 'stepDodge',
+          'Richtung + Rein/Raus': 'dir',
+        },
+        fr: {
+          'Marcher / Éviter (défaut)': 'stepDodge',
+          'Direction + Dedans/Dehors': 'dir',
+        },
+        ja: {
+          '踏む / 避ける (デフォルト)': 'stepDodge',
+          '方向 + 中/外': 'dir',
+        },
         ko: {
           '블리자가 안밖 + 선더가 안밖 (기본값)': 'stepDodge',
           '블리자가 방향 + 선더가 안밖': 'dir',
@@ -1663,6 +1687,18 @@ const triggerSet: TriggerSet<Data> = {
         en: {
           'KB-group South': 'kbSouth',
           'TH left / DPS right (default)': 'roleSide',
+        },
+        de: {
+          'Rückstoß-Gruppe Süden': 'kbSouth',
+          'TH links / DPS rechts (Standard)': 'roleSide',
+        },
+        fr: {
+          'Groupe poussée Sud': 'kbSouth',
+          'TH gauche / DPS droite (défaut)': 'roleSide',
+        },
+        ja: {
+          'ノックバック組 南': 'kbSouth',
+          'TH左 / DPS右 (デフォルト)': 'roleSide',
         },
         ko: {
           '넉백조 남쪽': 'kbSouth',
@@ -1692,6 +1728,18 @@ const triggerSet: TriggerSet<Data> = {
         en: {
           'JamJam': 'jamjam',
           '09STOP (default)': '09stop',
+        },
+        de: {
+          'JamJam': 'jamjam',
+          '09STOP (Standard)': '09stop',
+        },
+        fr: {
+          'JamJam': 'jamjam',
+          '09STOP (défaut)': '09stop',
+        },
+        ja: {
+          'JamJam': 'jamjam',
+          '09STOP (デフォルト)': '09stop',
         },
         ko: {
           '잼잼': 'jamjam',
@@ -1723,6 +1771,18 @@ const triggerSet: TriggerSet<Data> = {
           'Lower (rel. south) (default)': 'lower',
           'Upper (rel. north)': 'upper',
         },
+        de: {
+          'Unterer (rel. Süden) (Standard)': 'lower',
+          'Oberer (rel. Norden)': 'upper',
+        },
+        fr: {
+          'Inférieur (rel. sud) (défaut)': 'lower',
+          'Supérieur (rel. nord)': 'upper',
+        },
+        ja: {
+          '下側 (相対南) (デフォルト)': 'lower',
+          '上側 (相対北)': 'upper',
+        },
         ko: {
           '아랫사람 (기본값)': 'lower',
           '윗사람': 'upper',
@@ -1750,6 +1810,18 @@ const triggerSet: TriggerSet<Data> = {
       options: {
         en: {
           '09STOP (default)': '09stop',
+          'Yan': 'yan',
+        },
+        de: {
+          '09STOP (Standard)': '09stop',
+          'Yan': 'yan',
+        },
+        fr: {
+          '09STOP (défaut)': '09stop',
+          'Yan': 'yan',
+        },
+        ja: {
+          '09STOP (デフォルト)': '09stop',
           'Yan': 'yan',
         },
         ko: {
@@ -1782,6 +1854,21 @@ const triggerSet: TriggerSet<Data> = {
           '09STOP (Old)': '09stop',
           'Yan': 'yan',
         },
+        de: {
+          '09STOP (0620) (Standard)': '09stop0620',
+          '09STOP (Old)': '09stop',
+          'Yan': 'yan',
+        },
+        fr: {
+          '09STOP (0620) (défaut)': '09stop0620',
+          '09STOP (Old)': '09stop',
+          'Yan': 'yan',
+        },
+        ja: {
+          '09STOP (0620) (デフォルト)': '09stop0620',
+          '09STOP (Old)': '09stop',
+          'Yan': 'yan',
+        },
         ko: {
           '09STOP (0620) (기본값)': '09stop0620',
           '09STOP (Old)': '09stop',
@@ -1809,6 +1896,18 @@ const triggerSet: TriggerSet<Data> = {
         en: {
           'Final spot': 'finalSpot',
           'Kefka position + L/R (default)': 'position',
+        },
+        de: {
+          'Endposition': 'finalSpot',
+          'Kefka-Position + L/R (Standard)': 'position',
+        },
+        fr: {
+          'Position finale': 'finalSpot',
+          'Position Kefka + G/D (défaut)': 'position',
+        },
+        ja: {
+          '最終位置': 'finalSpot',
+          'ケフカ位置 + 左右 (デフォルト)': 'position',
         },
         ko: {
           '최종 회피 장소': 'finalSpot',
@@ -1857,6 +1956,24 @@ const triggerSet: TriggerSet<Data> = {
           '09STOP (2-2-2.5-1.5, start S)': '09stop',
           'RAID GOSU (1-2-1-1, start S)': 'raidgosu',
           'Minimal Movement (1-1-1-1, start SW)': 'minimal',
+        },
+        de: {
+          '09STOP (2-2-2-2, Start SW) (Standard)': '09stop0621',
+          '09STOP (2-2-2.5-1.5, Start S)': '09stop',
+          'RAID GOSU (1-2-1-1, Start S)': 'raidgosu',
+          'Minimale Bewegung (1-1-1-1, Start SW)': 'minimal',
+        },
+        fr: {
+          '09STOP (2-2-2-2, départ SO) (défaut)': '09stop0621',
+          '09STOP (2-2-2.5-1.5, départ S)': '09stop',
+          'RAID GOSU (1-2-1-1, départ S)': 'raidgosu',
+          'Mouvement minimal (1-1-1-1, départ SO)': 'minimal',
+        },
+        ja: {
+          '09STOP (2-2-2-2, 南西開始) (デフォルト)': '09stop0621',
+          '09STOP (2-2-2.5-1.5, 南開始)': '09stop',
+          'RAID GOSU (1-2-1-1, 南開始)': 'raidgosu',
+          '最小移動 (1-1-1-1, 南西開始)': 'minimal',
         },
         ko: {
           '09STOP (2-2-2-2, 남서쪽 시작) (기본값)': '09stop0621',
