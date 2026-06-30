@@ -4381,13 +4381,17 @@ const triggerSet: TriggerSet<Data> = {
       },
       condition: (data) => data.dmStarOn === true,
       run: (data, matches) => {
-        // 새 세트(활성 타임스탬프 변화) → 세트 카운터 증가 + 활성 리셋. 수집기는 매 활성 발화(suppress 없음)라
-        //   안내가 어느 세트에서 누락돼도 카운터가 어긋나지 않음.
-        if (matches.timestamp !== data.dmStarSetTime) {
-          data.dmStarSetTime = matches.timestamp;
+        // 새 세트 판정: 활성 점등은 세트마다 ~6s 간격. ★단 한 세트의 4탑이 1ms 갈려(예 .551/.552) 도착할 수 있어
+        //   정확 타임스탬프 비교(!==)는 **거짓 세트증가**를 유발 → 회전식(myTower.zone+120°*set)이 한 세트 더 돌아
+        //   방위·속성 오안내(0630로그 set3: 불/북서여야 하나 번개/북동 출력). → **시간 갭(>2s)으로 세트 경계만 판정**
+        //   전 P5 로그 점검: 진짜 탑 gap은 양봉(세트 내 0~1ms / 세트 간 ≥4002ms)이라 안전대(1ms,4002ms)의 중간값 2s 사용.
+        const t = Date.parse(matches.timestamp);
+        const prev = data.dmStarSetTime !== undefined ? Date.parse(data.dmStarSetTime) : -Infinity;
+        if (t - prev > 2000) {
           data.dmStarSet = (data.dmStarSet ?? 0) + 1;
           data.dmStarActive = [];
         }
+        data.dmStarSetTime = matches.timestamp; // 같은 세트 내 .551→.552도 최신으로(다음 갭 비교 기준)
         (data.dmStarActive ??= []).push(matches.id.toUpperCase());
       },
     },
