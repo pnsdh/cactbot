@@ -566,14 +566,14 @@ const forsakenFmt = {
   nonSoakStack: { en: 'share stack', ko: '쉐어 맞기' },
   nonSoakCone: { en: 'bait cone', ko: '부채꼴 유도' },
   // 시계(시만, side는 별도).
-  cCenter: { en: 'center', ko: '중앙' },
+  cCenter: Outputs.middle,
   c3: { en: '3:00', ko: '3시' },
-  c4: { en: '4:00', ko: '4시' },
-  c5: { en: '5:00', ko: '5시' },
+  c4: Outputs.dirESE,
+  c5: Outputs.dirSSE,
   c6: { en: '6:00', ko: '6시' },
-  c7: { en: '7:00', ko: '7시' },
+  c7: Outputs.dirSSW,
   c9: { en: '9:00', ko: '9시' },
-  c10: { en: '10:00', ko: '10시' },
+  c10: Outputs.dirWNW,
   c12: { en: '12:00', ko: '12시' },
 } as const;
 
@@ -2203,10 +2203,7 @@ const triggerSet: TriggerSet<Data> = {
           return output.spread!();
       },
       outputStrings: {
-        center: {
-          en: 'Center',
-          ko: '중앙으로',
-        },
+        center: Outputs.goIntoMiddle,
         spread: Outputs.spread,
       },
     },
@@ -2469,10 +2466,7 @@ const triggerSet: TriggerSet<Data> = {
       // 탱커 포함 모두 초록색(info)
       infoText: (_data, _matches, output) => output.text!(),
       outputStrings: {
-        text: {
-          en: 'Shared Tankbuster',
-          ko: '쉐어 탱버',
-        },
+        text: Outputs.sharedTankbuster,
       },
     },
     {
@@ -2903,9 +2897,9 @@ const triggerSet: TriggerSet<Data> = {
           cn: '${dir}',
           ko: '${dir}쪽',
         },
-        relLeft: { en: 'left', ko: '왼쪽' },
+        relLeft: Outputs.left,
         relMid: { en: 'mid', ko: '중간' },
-        relRight: { en: 'right', ko: '오른쪽' },
+        relRight: Outputs.right,
         relOne: { en: '1 away', ko: '1칸' },
         tank: { en: 'Then ${type} - ${left} + ${right}', ko: '이후 ${type} - ${left} + ${right}' },
         body: { en: 'Then ${type} - ${spot}', ko: '이후 ${type} - ${spot}' },
@@ -3722,8 +3716,8 @@ const triggerSet: TriggerSet<Data> = {
         faceOnly: { en: 'Face ${facing} (check beam)', ko: '${facing}쪽을 보고 빔 직접 확인' },
         purple: { en: 'Purple', ko: '보라' },
         blue: { en: 'Blue', ko: '파랑' },
-        left: { en: 'left', ko: '왼쪽' },
-        right: { en: 'right', ko: '오른쪽' },
+        left: Outputs.left,
+        right: Outputs.right,
         ...Directions.outputStrings8Dir,
         unknown: { en: '?', ko: '?' },
       },
@@ -4477,9 +4471,9 @@ const triggerSet: TriggerSet<Data> = {
         nw: { en: 'NW', ko: '북서쪽 보고' },
         ne: { en: 'NE', ko: '북동쪽 보고' },
         s: { en: 'S', ko: '남쪽 보고' },
-        left: { en: 'left', ko: '왼쪽' },
-        mid: { en: 'center', ko: '중앙' },
-        right: { en: 'right', ko: '오른쪽' },
+        left: Outputs.left,
+        mid: Outputs.middle,
+        right: Outputs.right,
       },
     },
     {
