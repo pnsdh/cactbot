@@ -273,12 +273,13 @@ const dmP4AtResolution = (
   return times.some((x) => x !== undefined && Math.abs(t - x) < tolMs);
 };
 
-// 타임스탬프 근접 비교/그룹핑(공용). ★한 사건의 여러 라인이 1ms 갈려(패킷 경계 지터, 예 .551/.552) 도착해도
-//   '정확 일치(===)'면 다른 사건으로 오인 → 드롭/오집계. 사건 내(~1ms) vs 사건 간(≥수백ms)이 100배+라 허용오차로 흡수.
-const dmTsClose = (a: string, b: string, tolMs = 25): boolean =>
+// 타임스탬프 근접 비교/그룹핑(공용). ★한 사건의 여러 라인이 패킷 경계 지터로 갈려 도착해도(실측 최대 44ms,
+//   플러드 분신 .308/.352) '정확 일치(===)'면 다른 사건으로 오인 → 드롭/오집계. tol 250ms = 관측 지터의 ~5배이자
+//   가장 좁은 사건 간격(플러드 웨이브 ~1000ms)의 1/4 → 사건 내는 흡수, 사건 간은 안 병합. (세개의별 6s·장판 8s는 여유 큼.)
+const dmTsClose = (a: string, b: string, tolMs = 250): boolean =>
   Math.abs(Date.parse(a) - Date.parse(b)) <= tolMs;
 // 항목들을 타임스탬프 근접으로 클러스터(정렬 후 직전과 tolMs 이내면 같은 그룹). exact-키 그룹핑(byT[e.t]) 대체.
-const dmGroupByTime = <T>(items: readonly T[], getT: (x: T) => string, tolMs = 25): T[][] => {
+const dmGroupByTime = <T>(items: readonly T[], getT: (x: T) => string, tolMs = 250): T[][] => {
   const sorted = [...items].sort((a, b) => Date.parse(getT(a)) - Date.parse(getT(b)));
   const groups: T[][] = [];
   for (const it of sorted) {
@@ -5463,8 +5464,9 @@ const triggerSet: TriggerSet<Data> = {
       alertText: (data, _matches, output) => {
         const d2r = Math.PI / 180;
         const r2 = (c: { x: number; y: number }) => (c.x - 100) ** 2 + (c.y - 100) ** 2;
-        // 웨이브별 그룹(각 2분신) → 첫 2웨이브 대각선 bearing(near→far). ★타임스탬프 근접 클러스터(dmGroupByTime):
-        //   2분신이 1ms 갈리면 exact-키 그룹핑(byT[e.t])은 둘 다 cl.length<2로 드롭→그 웨이브 손실→미발동(실측 발생).
+        // 웨이브별 그룹(각 2분신) → 첫 2웨이브 대각선 bearing(near→far). ★타임스탬프 근접 클러스터(dmGroupByTime, tol 250ms):
+        //   2분신이 갈려 도착하면(실측 44ms: 0701 00:36 트라이 .308/.352) exact-키/좁은 tol(25ms)은 둘 다 cl.length<2로
+        //   드롭→그 웨이브 손실→미발동(실측 발생). 250ms로 흡수(웨이브 간격 ~1000ms이라 인접 웨이브 병합 없음).
         const diags: number[] = [];
         for (const cl of dmGroupByTime(data.dmFloodTele ?? [], (e) => e.t)) {
           if (cl.length < 2)
