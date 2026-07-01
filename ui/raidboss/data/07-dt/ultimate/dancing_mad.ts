@@ -41,6 +41,7 @@ export interface Data extends RaidbossData {
     dmTetherMethod: '09stop0620' | '09stop' | 'yan';
     dmKefkaDodge: 'finalSpot' | 'position';
     dmForsakenP5Method: '09stop0621' | '09stop' | 'raidgosu' | 'minimal';
+    dmStarMethod: 'relative' | 'absolute';
     dmP4Caller: boolean;
   };
   phase: Phase | 'unknown';
@@ -55,7 +56,9 @@ export interface Data extends RaidbossData {
   dmStarOn?: boolean; // 세 개의 별 진행 윈도우(019D 오인 방지)
   dmStarSet?: number; // 처리 세트 0~3
   dmStarMyElem?: DmStarElem; // 내 저항감소[강] 속성(B56불/B57얼음/BB6선더). undefined=무징
-  dmStarTowers?: { [id: string]: { elem: DmStarElem; zone: DmStarZone; slot: number } }; // id(대문자hex)→탑정보. slot 0=왼/1=중/2=오(외향 기준)
+  dmStarTowers?: {
+    [id: string]: { elem: DmStarElem; zone: DmStarZone; slot: number; x: number; y: number };
+  }; // id(대문자hex)→탑정보. slot 0=왼/1=중/2=오(외향 기준), x/y=절대 시계 안내용
   dmStarRaw?: { id: string; elem: DmStarElem; x: number; y: number }[]; // 261서 수집한 탑 원본(맵 구축 전)
   dmStarActive?: string[]; // 이번 세트 활성 탑 id들 (273 019D 10|20 수집, 세트마다 리셋)
   dmStarSetTime?: string; // 직전 세트 활성 타임스탬프(세트 경계 감지용 — 카운터를 항상발화 수집기에서 증가)
@@ -429,6 +432,13 @@ const dmStarBearingZone = (deg: number): DmStarZone => {
 const dmStarLateral = (x: number, y: number, zone: DmStarZone): number => {
   const lb = (dmStarZoneBearing[zone] - 90) * Math.PI / 180;
   return (x - 100) * Math.sin(lb) + (y - 100) * -Math.cos(lb);
+};
+// 탑 좌표(중심 100,100; 12시=북) → 시계 시각 1~12. 절대 위치 안내(맵 기준)용. 실측: 9탑이 정확히
+//   북서 9·10·11 / 북동 1·2·3 / 남 5·6·7시에 떨어짐(12·4·8 없음). round(bearing/30)으로 최근접 시각.
+const dmStarClock = (x: number, y: number): number => {
+  const deg = ((Math.atan2(x - 100, -(y - 100)) * 180 / Math.PI) % 360 + 360) % 360;
+  const h = Math.round(deg / 30) % 12;
+  return h === 0 ? 12 : h;
 };
 
 // ───── 행방불명(P2) 공통 ─────
@@ -2005,6 +2015,51 @@ const triggerSet: TriggerSet<Data> = {
         },
       },
       default: '09stop0621',
+    },
+    {
+      id: 'dmStarMethod',
+      name: {
+        en: 'P5 Three Stars callout',
+        de: 'P5 Drei Sterne Ansage',
+        fr: 'P5 annonce Trois étoiles',
+        ja: 'P5 三つの星 コール',
+        ko: 'P5 세 개의 별 안내',
+      },
+      comment: {
+        en:
+          'How to call your target tower. Relative = cluster direction + left/mid/right; Absolute = map clock position (e.g. "Thunder tower: 10 o\'clock"). The tower to soak is identical either way.',
+        de:
+          'Wie der Zielturm angesagt wird. Relativ = Cluster-Richtung + links/mitte/rechts; Absolut = Uhrzeit auf der Karte (z.B. "Blitz-Turm: 10 Uhr"). Der zu besetzende Turm ist in beiden Fällen gleich.',
+        fr:
+          'Comment annoncer votre tour cible. Relatif = direction du groupe + gauche/milieu/droite ; Absolu = position horloge sur la carte (ex. "Tour Foudre : 10h"). La tour à prendre est identique dans les deux cas.',
+        ja: '担当塔の伝え方。相対 = クラスター方向 + 左/中/右 ; 絶対 = マップ基準の時計方向 (例「雷塔: 10時」)。踏む塔自体はどちらも同じ。',
+        ko:
+          '담당 탑을 안내하는 방식. 상대 = 클러스터 방향 + 좌/중/우 ; 절대 = 맵 기준 시계 방향 (예 "번개 탑: 10시"). 처리할 탑 자체는 두 방식 모두 동일.',
+      },
+      type: 'select',
+      options: {
+        en: {
+          'Relative (direction + left/mid/right) (default)': 'relative',
+          'Absolute (map clock position)': 'absolute',
+        },
+        de: {
+          'Relativ (Richtung + links/mitte/rechts) (Standard)': 'relative',
+          'Absolut (Uhrzeit auf der Karte)': 'absolute',
+        },
+        fr: {
+          'Relatif (direction + gauche/milieu/droite) (défaut)': 'relative',
+          'Absolu (position horloge sur la carte)': 'absolute',
+        },
+        ja: {
+          '相対 (方向 + 左/中/右) (デフォルト)': 'relative',
+          '絶対 (マップ基準の時計方向)': 'absolute',
+        },
+        ko: {
+          '상대 위치 안내 (방향 + 좌중우) (기본값)': 'relative',
+          '절대 위치 안내 (맵 기준 시계 방향)': 'absolute',
+        },
+      },
+      default: 'relative',
     },
   ],
   timelineFile: 'dancing_mad.txt',
@@ -5291,7 +5346,9 @@ const triggerSet: TriggerSet<Data> = {
           const inZone = uniq
             .filter((t) => dmStarZoneOf(t.x, t.y) === zone)
             .sort((a, b) => dmStarLateral(b.x, b.y, zone) - dmStarLateral(a.x, a.y, zone));
-          inZone.forEach((t, i) => map[t.id] = { elem: t.elem, zone: zone, slot: i });
+          inZone.forEach((t, i) =>
+            map[t.id] = { elem: t.elem, zone: zone, slot: i, x: t.x, y: t.y }
+          );
         }
         data.dmStarTowers = map;
       },
@@ -5334,6 +5391,7 @@ const triggerSet: TriggerSet<Data> = {
     {
       // 세 개의 별 안내: 점등 +0.5s(4탑 수집 후) 1회. 회전=자기 금지 클러스터에서 시계 +120°/세트
       //   (3세트=금지 복귀, 만료라 진입 가능). 무징=더블(2활성) 클러스터. 클러스터내 디버프=왼/무징=오 우선.
+      //   가야 할 탑 선정 로직은 dmStarMethod 무관 동일. 표시만 분기: relative(기본)=방향+좌중우 / absolute=맵 시계(dmStarClock).
       id: 'DancingMad P5 세 개의 별',
       type: 'ActorControlExtra',
       netRegex: {
@@ -5385,9 +5443,17 @@ const triggerSet: TriggerSet<Data> = {
         const chosen = pickRight ? inTarget[inTarget.length - 1] : inTarget[0];
         if (chosen === undefined)
           return;
+        const elemOut = { fire: output.fire!(), ice: output.ice!(), thunder: output.thunder!() };
+        // 절대 위치 안내: 가야 할 탑 로직은 동일하고, 표시만 맵 기준 시계 시각(예 '번개 탑: 10시').
+        if (data.triggerSetConfig.dmStarMethod === 'absolute') {
+          return output.textClock!({
+            elem: elemOut[chosen.elem],
+            clock: output.clock!({ n: dmStarClock(chosen.x, chosen.y) }),
+          });
+        }
+        // 상대 위치 안내(기본): 클러스터 방향 + 클러스터내 좌/중/우.
         const dirOut = { NW: output.nw!(), NE: output.ne!(), S: output.s!() };
         const slotOut = [output.left!(), output.mid!(), output.right!()];
-        const elemOut = { fire: output.fire!(), ice: output.ice!(), thunder: output.thunder!() };
         return output.text!({
           elem: elemOut[chosen.elem],
           dir: dirOut[targetZone],
@@ -5402,6 +5468,20 @@ const triggerSet: TriggerSet<Data> = {
           fr: 'Tour ${elem} : ${dir} ${slot}',
           ja: '${elem}塔: ${dir} ${slot}',
           ko: '${elem} 탑: ${dir} ${slot} 탑',
+        },
+        textClock: {
+          en: '${elem} tower: ${clock}',
+          de: '${elem}-Turm: ${clock}',
+          fr: 'Tour ${elem} : ${clock}',
+          ja: '${elem}塔: ${clock}',
+          ko: '${elem} 탑: ${clock}',
+        },
+        clock: {
+          en: '${n} o\'clock',
+          de: '${n} Uhr',
+          fr: '${n}h',
+          ja: '${n}時',
+          ko: '${n}시',
         },
         fire: { en: 'Fire', de: 'Feuer', fr: 'Feu', ja: '炎', ko: '불' },
         ice: { en: 'Ice', de: 'Eis', fr: 'Glace', ja: '氷', ko: '얼음' },
