@@ -5354,15 +5354,54 @@ const triggerSet: TriggerSet<Data> = {
       },
     },
     {
-      // 내 저항감소[강](B56불/B57얼음/BB6선더) 수집 → 회전 시작 기준. 미부여=무징.
+      // 내 저항감소[강](B56불/B57얼음/BB6선더) 수집 + 본인 디버프 안내(2트리거 중 디버프자용). 회전 시작 기준.
       //   ★디버프는 매 세트 재부여돼 3종이 순차로 붙음(회전하며 다음 클러스터 회피용) → 회전 시작은 첫(set1)
       //   디버프뿐. set1 디버프는 첫 활성(dmStarSet 0→1) 전 ~5s에 오므로 dmStarSet===0일 때만 잡아 덮어쓰기 방지.
-      //   (무징=set1엔 디버프 없음 → 이후 재부여돼도 게이팅돼 undefined 유지.)
+      //   부여 즉시(BB42+~5.0s) infoText 표시 → 지터 무관 정확. 무징자는 아래 별도 트리거. [[dmu-spawned-actor-data-unreliable]]
       id: 'DancingMad P5 세 개의 별 디버프',
       type: 'GainsEffect',
       netRegex: { effectId: ['B56', 'B57', 'BB6'] },
       condition: (data, matches) => matches.target === data.me && (data.dmStarSet ?? 0) === 0,
+      durationSeconds: 3.8, // 부여(BB42+4.99s)~참사(BB42+9.18s) 직전(≈+8.8s)
+      infoText: (_data, matches, output) => {
+        const map = { fire: output.fire!(), ice: output.ice!(), thunder: output.thunder!() };
+        const e = dmStarStatusElem(matches.effectId);
+        return e === undefined ? undefined : map[e];
+      },
       run: (data, matches) => data.dmStarMyElem = dmStarStatusElem(matches.effectId),
+      outputStrings: {
+        fire: { en: 'Fire Debuff', de: 'Feuer-Debuff', fr: 'Debuff Feu', ja: '炎デバフ', ko: '불 디버프' },
+        ice: { en: 'Ice Debuff', de: 'Eis-Debuff', fr: 'Debuff Glace', ja: '氷デバフ', ko: '얼음 디버프' },
+        thunder: {
+          en: 'Thunder Debuff',
+          de: 'Blitz-Debuff',
+          fr: 'Debuff Foudre',
+          ja: '雷デバフ',
+          ko: '번개 디버프',
+        },
+      },
+    },
+    {
+      // 무징 안내(2트리거 중 무징자용): 디버프 이벤트가 없어 개별 앵커 불가 → BB42+5.3s(디버프 부여 +4.99s 직후)에
+      //   ★undefined 판정을 infoText(딜레이 후 평가)에 둠. condition은 딜레이 전 평가라 이 시점(BB42=초기화로 리셋
+      //   직후)엔 전원 undefined → 조건에 두면 디버프자에게도 오발. infoText서 읽으면 디버프자는 이미 set이라 미표시.
+      id: 'DancingMad P5 세 개의 별 무징 안내',
+      type: 'StartsUsing',
+      netRegex: { id: 'BB42', source: '케프카', capture: false },
+      condition: (data) => data.phase === 'p5',
+      delaySeconds: 5.3,
+      durationSeconds: 3.5, // 참사(BB42+9.18s) 직전(≈+8.8s)까지
+      infoText: (data, _matches, output) =>
+        data.dmStarMyElem === undefined ? output.none!() : undefined,
+      outputStrings: {
+        none: {
+          en: 'No Debuff',
+          de: 'Kein Debuff',
+          fr: 'Aucun debuff',
+          ja: 'デバフなし',
+          ko: '무징 (디버프 없음)',
+        },
+      },
     },
     {
       // 세트별 활성 4탑 수집: 273 ActorControlExtra 019D 점등(param 10|20)이 폭발 ~6s 전 신호. 4탑 동시 도착.
