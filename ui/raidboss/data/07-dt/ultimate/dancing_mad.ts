@@ -5484,10 +5484,12 @@ const triggerSet: TriggerSet<Data> = {
           return;
         const elemOut = { fire: output.fire!(), ice: output.ice!(), thunder: output.thunder!() };
         // 절대 위치 안내: 가야 할 탑 로직은 동일하고, 표시만 맵 기준 시계 시각(예 '번개 탑: 10시').
+        //   시계 값(1·2·3·5·6·7·9·10·11시)을 각각 outputStrings 키(clockN)로 빼서 편집 UI에 노출 →
+        //   사용자가 '10시' 대신 자기 콜/방위징을 직접 입력 가능(리미트컷 dmLimitCutOutputs와 동일 패턴).
         if (data.triggerSetConfig.dmStarMethod === 'absolute') {
           return output.textClock!({
             elem: elemOut[chosen.elem],
-            clock: output.clock!({ n: dmStarClock(chosen.x, chosen.y) }),
+            clock: output[`clock${dmStarClock(chosen.x, chosen.y)}`]!(),
           });
         }
         // 상대 위치 안내(기본): 클러스터 방향 + 클러스터내 좌/중/우.
@@ -5515,13 +5517,17 @@ const triggerSet: TriggerSet<Data> = {
           ja: '${elem}塔: ${clock}',
           ko: '${elem} 탑: ${clock}',
         },
-        clock: {
-          en: '${n} o\'clock',
-          de: '${n} Uhr',
-          fr: '${n}h',
-          ja: '${n}時',
-          ko: '${n}시',
-        },
+        // clockN = 편집 가능한 시계 라벨(기본 'N시'/'N o'clock'). 사용자가 방위징/콜로 교체 가능. 9탑 배치상
+        //   4·8·12시는 안 나옴(북서9·10·11 / 북동1·2·3 / 남5·6·7). [[dancing-mad-p5-kefka]]
+        clock1: { en: '1 o\'clock', de: '1 Uhr', fr: '1h', ja: '1時', ko: '1시' },
+        clock2: { en: '2 o\'clock', de: '2 Uhr', fr: '2h', ja: '2時', ko: '2시' },
+        clock3: { en: '3 o\'clock', de: '3 Uhr', fr: '3h', ja: '3時', ko: '3시' },
+        clock5: { en: '5 o\'clock', de: '5 Uhr', fr: '5h', ja: '5時', ko: '5시' },
+        clock6: { en: '6 o\'clock', de: '6 Uhr', fr: '6h', ja: '6時', ko: '6시' },
+        clock7: { en: '7 o\'clock', de: '7 Uhr', fr: '7h', ja: '7時', ko: '7시' },
+        clock9: { en: '9 o\'clock', de: '9 Uhr', fr: '9h', ja: '9時', ko: '9시' },
+        clock10: { en: '10 o\'clock', de: '10 Uhr', fr: '10h', ja: '10時', ko: '10시' },
+        clock11: { en: '11 o\'clock', de: '11 Uhr', fr: '11h', ja: '11時', ko: '11시' },
         fire: { en: 'Fire', de: 'Feuer', fr: 'Feu', ja: '炎', ko: '불' },
         ice: { en: 'Ice', de: 'Eis', fr: 'Glace', ja: '氷', ko: '얼음' },
         thunder: { en: 'Thunder', de: 'Blitz', fr: 'Foudre', ja: '雷', ko: '번개' },
