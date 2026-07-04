@@ -84,6 +84,8 @@ export interface Data extends RaidbossData {
   dmTeleIds?: { purple: string[]; yellow: string[]; eye: string[]; fakeEye: string[] };
   dmMarch?: { id: string; dur: number }[]; // 성큼성큼 강제이동 본인 2개 (effectId + 만료초)
   dmTrapMine?: boolean; // 줄줄이 함정(13D6) 이번 부여에 본인 포함 (일반 타이머 중복 억제용)
+  dmTrineTris?: { x: number; y: number }[]; // 트라인 삼각형(BNpcID 1EBFB2/B3) 261 Add 수집 위치. 웨이브1 첫 3개 사용
+  dmTrineShown?: boolean; // 트라인 배치 안내 1회 발동 플래그(웨이브2·3 무시)
   dmForsakenSet?: number; // 행방불명 탑 세트 번호 1~8 (행방불명=1, 빛의 파동마다 ++)
   dmForsakenMarks?: { [name: string]: ForsakenRole }; // 현 세트 위험한 주문 마커 수집 {이름→역할}
   dmForsakenGroup?: 'A' | 'B'; // 1238/4567: A=1·2·3·8탑 처리 / B=4·5·6·7탑 처리
@@ -3428,33 +3430,41 @@ const triggerSet: TriggerSet<Data> = {
       },
     },
     {
-      id: 'DancingMad 트라인 배치',
+      // 트라인 초기화(BADF): 삼각형 수집 리셋. 이후 삼각형이 261 Add로 스폰됨.
+      id: 'DancingMad 트라인 초기화',
       type: 'Ability',
-      // 트라인(BADF) + delay → getCombatants로 첫 3개 삼각형 위치 읽어 배정. '이후 ~' 초록 안내.
-      //   탱커=T1+T2 두 자리(순서구분X), 그 외(딜힐)=본진 1자리. 1번째 날개 회피와 동시(날개=노랑/배치=초록).
       netRegex: { id: 'BADF', source: '케프카', capture: false },
-      delaySeconds: 1.5,
-      durationSeconds: 11, // 1트라인 폭발(이동 안내)까지 유지
-      promise: async (data) => {
-        data.combatantData = (await callOverlayHandler({ call: 'getCombatants' })).combatants;
+      run: (data) => {
+        data.dmTrineTris = [];
+        data.dmTrineShown = false;
       },
-      infoText: (data, _matches, output) => {
-        const all = data.combatantData ?? [];
-        // 삼각형 = 주인 없는 NPC(BNpcID 있음·OwnerID 없음) & 육각 6칸 정확 좌표 위(반경<1.5).
-        //   플레이어(BNpcID 없음)·펫/분신(OwnerID 있음, 영웅의 환영 등)은 칸 위에 서 있어도 제외.
-        //   중앙·칸 밖 마커는 반경으로 제외. 조회 시점(BADF+1.5s)엔 1차 3개만 칸 위(2·3차 미스폰).
-        //   BNpcNameID는 에뮬서 깨져 미사용. BNpcID/OwnerID는 정상.
-        const tris = all.filter((c) => {
-          if (c.BNpcID === undefined || c.OwnerID !== undefined)
-            return false;
-          const i = dmTrineNearest(c.PosX, c.PosY);
-          const dx = c.PosX - dmTrineSpots[i]!.x;
-          const dy = c.PosY - dmTrineSpots[i]!.y;
-          return (dx * dx + dy * dy) < 2.25;
+    },
+    {
+      // 트라인 배치: 삼각형(BNpcID 1EBFB2/1EBFB3)이 261 CombatantMemory 'Add'로 칸 위에 스폰(웨이브 3·1·3, 각 ~2s
+      //   간격). ★getCombatants 대신 261 pair 캡처 → 라이브 OwnerID:0 함정 회피(에뮬·라이브 동일, 세개의별 탑과
+      //   동형). Add 스폰 좌표=칸 좌표 그대로(중앙 퇴화 없음). '이후 ~' 초록 안내. 탱커=T1+T2 두 자리(순서구분X),
+      //   그 외(딜힐)=본진 1자리. 1번째 날개 회피와 동시(날개=노랑/배치=초록).
+      //   ★최속 발동: 웨이브1 3개가 다 모이는 순간(≈BADF+0.7s) 1회 → 고정 delay 없음. preRun(동기)으로 순서대로
+      //   수집하고 개수로 판정(타임스탬프 그룹핑 안 함 → 1ms 분할에도 안전, 세개의별 세트경계 버그류 회피).
+      //   dmTrineShown로 웨이브2·3 무시. (수집·판정 로그검증: 4풀 웨이브1=3개 일관.)
+      id: 'DancingMad 트라인 배치',
+      type: 'CombatantMemory',
+      netRegex: { change: 'Add', pair: [{ key: 'BNpcID', value: ['1EBFB2', '1EBFB3'] }] },
+      preRun: (data, matches) => {
+        if (data.dmTrineShown === true)
+          return; // 웨이브1 안내 후 = 웨이브2·3 무시(수집 중단)
+        (data.dmTrineTris ??= []).push({
+          x: parseFloat(matches.pairPosX ?? '0'),
+          y: parseFloat(matches.pairPosY ?? '0'),
         });
-        if (tris.length !== 3) // 칸 위 3개 미수집(타이밍/불완전 풀) → 생략
-          return;
-        const idxs = tris.map((c) => dmTrineNearest(c.PosX, c.PosY)).sort((x, y) => x - y);
+      },
+      durationSeconds: 11, // 1트라인 폭발(이동 안내)까지 유지
+      infoText: (data, _matches, output) => {
+        const tris = data.dmTrineTris ?? [];
+        if (data.dmTrineShown === true || tris.length < 3)
+          return; // 웨이브1 3개 다 모이기 전 / 이미 안내함 → 대기(3번째 Add에서 발동)
+        data.dmTrineShown = true;
+        const idxs = tris.slice(0, 3).map((c) => dmTrineNearest(c.x, c.y)).sort((x, y) => x - y);
         const dirs = [
           output.dirSuffix!({ dir: output.dirN!() }),
           output.dirSuffix!({ dir: output.dirNE!() }),
