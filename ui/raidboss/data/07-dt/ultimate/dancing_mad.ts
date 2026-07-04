@@ -5368,10 +5368,13 @@ const triggerSet: TriggerSet<Data> = {
       //   ★디버프는 매 세트 재부여돼 3종이 순차로 붙음(회전하며 다음 클러스터 회피용) → 회전 시작은 첫(set1)
       //   디버프뿐. set1 디버프는 첫 활성(dmStarSet 0→1) 전 ~5s에 오므로 dmStarSet===0일 때만 잡아 덮어쓰기 방지.
       //   부여 즉시(BB42+~5.0s) infoText 표시 → 지터 무관 정확. 무징자는 아래 별도 트리거. [[dmu-spawned-actor-data-unreliable]]
+      //   ★dmStarOn 윈도우 게이트 필수: P3 선더가(BB09/BB0C 엑스데스)도 탱커에 BB6(번개 저항감소[강])를 부여 →
+      //   게이트 없으면 세개의별 밖에서 '번개 디버프' 오발(dmStarSet=0이라 통과). BB42~+30s만 dmStarOn=true.
       id: 'DancingMad P5 세 개의 별 디버프',
       type: 'GainsEffect',
       netRegex: { effectId: ['B56', 'B57', 'BB6'] },
-      condition: (data, matches) => matches.target === data.me && (data.dmStarSet ?? 0) === 0,
+      condition: (data, matches) =>
+        data.dmStarOn === true && matches.target === data.me && (data.dmStarSet ?? 0) === 0,
       durationSeconds: 3.8, // 부여(BB42+4.99s)~참사(BB42+9.18s) 직전(≈+8.8s)
       infoText: (_data, matches, output) => {
         const map = { fire: output.fire!(), ice: output.ice!(), thunder: output.thunder!() };
