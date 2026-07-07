@@ -99,6 +99,7 @@ export interface Data extends RaidbossData {
   dmImplosionStrike?: number; // P3 내파 충격파(BAFF) 타격 카운트(2번째=디버프 자리). 내파 시전에 리셋
   dmImplosionCount?: number; // P3 내파 시퀀스 횟수. 디버프 자리는 1번째 내파에만 발동
   dmAfterImplosion?: boolean; // P3 내파 후=true. 2번째 디버프(혼돈물/불) 만료 판정용(만료 시 그림자 유도)
+  dmShadowExpiry?: number; // P3 640/641(혼돈 불/물) nominal 만료 절대시각(ms). 그림자 유도 자연만료 게이트/절대-delay용
   dmKnockbackFace?: 'look' | 'away'; // P3 진공파 넉백: 혼돈의 바람(642)=보지않기 / 역풍(643)=바라보기 / 없음
   dmUltimaCloneIds?: string[]; // 알테마 블래스터 분신 ID(시전 순서). getCombatants 메모리 위치로 방위 산출(ability 좌표 ~29% stale 회피)
   dmUltimaCombatants?: PluginCombatantState[]; // 위 분신들의 getCombatants 결과(깨끗한 메모리 위치)
@@ -287,6 +288,11 @@ const dmP4AtResolution = (
   const t = Date.parse(matches.timestamp);
   return times.some((x) => x !== undefined && Math.abs(t - x) < tolMs);
 };
+// P4 캐스케이드 게이트 tol(ms). 자연 만료 지터 실측 최대 46ms(로그44개 4364표본)의 ~5배 여유.
+//   ★P4 디버프는 전원(물불 8/8) 또는 웨이브 홀더가 즉발 처리 → 홀더 전멸=공대 전멸=대응 불가 & 마력방출은
+//   BAA5 폴백이 처리 → "해소 직전 사망도 발동" 마진은 시체용이라 불필요, 좁게. (그림자는 BB00 고정시전이라
+//   생존자 유도 필요 → 별도 3000ms 유지, 이 상수 안 씀.) [[dancing-mad-p4-debuff]]
+const dmP4ResolutionTol = 250;
 
 // 타임스탬프 근접 비교/그룹핑(공용). ★한 사건의 여러 라인이 패킷 경계 지터로 갈려 도착해도(실측 최대 44ms,
 //   플러드 분신 .308/.352) '정확 일치(===)'면 다른 사건으로 오인 → 드롭/오집계. tol 250ms = 관측 지터의 ~5배이자
@@ -2095,6 +2101,7 @@ const triggerSet: TriggerSet<Data> = {
       infoText: (_data, _matches, output) => output.text!(),
       run: (data) => {
         data.dmAfterImplosion = false; // 내파 플래그
+        data.dmShadowExpiry = undefined; // 640/641 nominal 만료(그림자 유도 게이트)
         data.dmImplosionCount = 0; // 내파 시퀀스 횟수(디버프 자리=1번째만)
         data.dmKnockbackFace = undefined; // 넉백 시선 디버프
         data.dmUltimaCloneIds = []; // 알테마 분신 ID(시전 순서)
@@ -3774,12 +3781,29 @@ const triggerSet: TriggerSet<Data> = {
       },
     },
     {
+      // 640/641(혼돈 불/물) 부여 → nominal 만료(부여+지속)를 저장. 그림자 유도의 '자연 만료' 게이트/절대-delay 기준.
+      //   2라운드(내파 후 만료=긴쪽)가 가장 늦게 만료 → max로 자동 선택(1라운드·이전 사이클은 항상 더 이름).
+      id: 'DancingMad 혼돈 불물 만료 수집',
+      type: 'GainsEffect',
+      netRegex: { effectId: ['640', '641'] },
+      run: (data, matches) =>
+        data.dmShadowExpiry = Math.max(data.dmShadowExpiry ?? 0, dmExpiryMs(matches)),
+    },
+    {
       // 2번째 디버프(혼돈의 물/불 중 긴쪽) 만료 직후 → 유격대에 그림자 타격(BB00) 유도. 유격 없으면 전원.
       //   '내파 후(dmAfterImplosion)' 만료만 = 2번째 디버프(1번째는 내파 전 만료라 제외). BB00 시전까지 유지.
       id: 'DancingMad 그림자 타격 유도',
       type: 'LosesEffect',
-      netRegex: { effectId: ['640', '641'], capture: false }, // 640=혼돈의 불 / 641=혼돈의 물
-      condition: (data) => data.dmAfterImplosion === true,
+      netRegex: { effectId: ['640', '641'] }, // 640=혼돈의 불 / 641=혼돈의 물
+      // 게이트: 자연 만료(nominal±3s)만 발동 → 조기 사망에 의한 디버프 즉시소실은 차단(조기 오발 + 진짜 만료 락아웃 방지).
+      //   dmShadowExpiry 미수집(비정상) 시엔 폴백으로 그대로 발동해 기존 동작 보존.
+      //   ★tol=3000 의도적(dmP4ResolutionTol 250 안 씀): BB00은 내파+20.16s 고정 보스시전(실측357회)이라
+      //   홀더(불2/물2) 조기사망해도 생존자가 유도해야 함 → 넓은 마진+abs-delay로 nominal 큐 유지가 정답.
+      condition: (data, matches) =>
+        data.dmAfterImplosion === true &&
+        (data.dmShadowExpiry === undefined || dmP4AtResolution(matches, 3000, data.dmShadowExpiry)),
+      // 절대-delay: 조기 loss가 트리거해도 항상 nominal 만료 시각에 착지(정상 풀은 loss≈nominal → ~0, 동작 불변).
+      delaySeconds: (data, matches) => dmP4AbsDelay(matches, data.dmShadowExpiry),
       // 2번째 디버프 만료(loss)~그림자 타격 BB00 '시전 시작'=10.4초(실측 18.887→29.284). 시전 완료 아님.
       durationSeconds: 10.4,
       suppressSeconds: 30,
@@ -4768,7 +4792,8 @@ const triggerSet: TriggerSet<Data> = {
       type: 'LosesEffect',
       netRegex: { effectId: ['15A8', '15A9'] },
       // 자연 만료(=E1/E2)에만 발동. 전멸·조기사망 시 일괄 조기제거는 시각이 어긋나 차단.
-      condition: (data, matches) => dmP4AtResolution(matches, 3000, data.dmP4PosE1, data.dmP4PosE2),
+      condition: (data, matches) =>
+        dmP4AtResolution(matches, dmP4ResolutionTol, data.dmP4PosE1, data.dmP4PosE2),
       // 절대-delay: positioning 만료(E1/E2) 시각에 착지. 조기소실이 트리거해도 항상 nominal 시점.
       delaySeconds: (data, matches) =>
         dmP4AbsDelay(
@@ -4846,7 +4871,8 @@ const triggerSet: TriggerSet<Data> = {
       id: 'DancingMad P4 혼돈 불물 중앙 (캐스케이드)',
       type: 'LosesEffect',
       netRegex: { effectId: ['15A8', '15A9'] },
-      condition: (data, matches) => dmP4AtResolution(matches, 3000, data.dmP4PosE1, data.dmP4PosE2),
+      condition: (data, matches) =>
+        dmP4AtResolution(matches, dmP4ResolutionTol, data.dmP4PosE1, data.dmP4PosE2),
       // 절대-delay: 마안(curse) 만료 시각에 착지(=BAA5 뒤). 조기소실이 트리거해도 항상 nominal → 마력방출 데이터
       //   확정 후 발동(상대 delay면 조기소실만큼 앞당겨져 데이터 전 발동→오안내, 0706 반파 실측).
       delaySeconds: (data, matches) =>
@@ -4903,7 +4929,7 @@ const triggerSet: TriggerSet<Data> = {
       id: 'DancingMad P4 혼돈불 처리 (캐스케이드)',
       type: 'LosesEffect',
       netRegex: { effectId: '15AB' },
-      condition: (data, matches) => dmP4AtResolution(matches, 3000, data.dmP4Fire),
+      condition: (data, matches) => dmP4AtResolution(matches, dmP4ResolutionTol, data.dmP4Fire),
       delaySeconds: (data, matches) => dmP4AbsDelay(matches, data.dmP4Fire), // 불 만료 시각에 착지(조기소실 무관)
       durationSeconds: 5.1, // 만료~장판 발동(+5.08s)
       suppressSeconds: 5,
@@ -4934,7 +4960,7 @@ const triggerSet: TriggerSet<Data> = {
       id: 'DancingMad P4 산개쉐어 2차',
       type: 'LosesEffect',
       netRegex: { effectId: '15AB' },
-      condition: (data, matches) => dmP4AtResolution(matches, 3000, data.dmP4Fire),
+      condition: (data, matches) => dmP4AtResolution(matches, dmP4ResolutionTol, data.dmP4Fire),
       // 절대-delay: 불 만료+5.1s(장판 처리 후)에 착지. 조기소실이 트리거해도 항상 nominal 시점.
       delaySeconds: (data, matches) => dmP4AbsDelay(matches, data.dmP4Fire, 5.1),
       durationSeconds: (data, matches) =>
@@ -4961,7 +4987,7 @@ const triggerSet: TriggerSet<Data> = {
       id: 'DancingMad P4 혼돈물 처리 (캐스케이드)',
       type: 'LosesEffect',
       netRegex: { effectId: '15AC' },
-      condition: (data, matches) => dmP4AtResolution(matches, 3000, data.dmP4Water),
+      condition: (data, matches) => dmP4AtResolution(matches, dmP4ResolutionTol, data.dmP4Water),
       delaySeconds: (data, matches) => dmP4AbsDelay(matches, data.dmP4Water), // 물 만료 시각에 착지(조기소실 무관)
       durationSeconds: 5.8,
       suppressSeconds: 5,
