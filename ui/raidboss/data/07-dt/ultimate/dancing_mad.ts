@@ -135,6 +135,7 @@ export interface Data extends RaidbossData {
   dmP4Curse2?: number; // 마안 2차(늦은 그룹) 만료
   dmP4Fire?: number; // 혼돈의 불 만료
   dmP4Water?: number; // 혼돈의 물 만료
+  dmP4WaterActive?: number; // 현재 15AC(물) 보유자 수(gain++/lose--). 0=전부 조기소진→#8 미발동→마력방출 폴백 판정용
   // P4 콜러(dmP4Caller) — 전원 산개/가속/마안 수집(그룹 콜용, 옵션 ON일 때만)
   dmP4ForkAll?: { target: string; spread: boolean; early: boolean }[]; // 전원 positioning
   dmP4AccelAll?: { target: string; stop: boolean; early: boolean }[]; // 전원 가속도
@@ -260,6 +261,15 @@ const dmExpiryWarnDelay = (matches: { duration: string }): number =>
 //   각 안내는 '직전 기믹 해소'에 앵커되고 자기 만료까지 떠 있음 → duration을 동적으로 계산.
 const dmP4Dur = (matches: { timestamp: string }, targetMs: number | undefined, delay = 0): number =>
   Math.max(((targetMs ?? 0) - Date.parse(matches.timestamp)) / 1000 - delay, 1);
+
+// P4 캐스케이드 절대 delay(초): loss 앵커에서 "목표 절대시각(+extra)"까지. ★loss가 사망으로 조기여도 항상 목표
+//   시각에 착지 → 상대 delay면 조기소실만큼 앞당겨져 잘못된 타이밍(마력방출 데이터 확정 전 등) 발동. 정상 풀은
+//   loss≈목표앵커라 상대와 결과 동일. 게이트(dmP4AtResolution)는 유지 → 전멸 시 미발동. [[dancing-mad-p4-debuff]]
+const dmP4AbsDelay = (
+  matches: { timestamp: string },
+  targetMs: number | undefined,
+  extra = 0,
+): number => Math.max(((targetMs ?? 0) - Date.parse(matches.timestamp)) / 1000 + extra, 0);
 
 // P4 캐스케이드 차수 판정: 앵커(loss) 타임스탬프가 1차(t1) vs 2차(t2) 발동 중 어디에 가까운가(카운터 불필요).
 const dmP4IsWave1 = (matches: { timestamp: string }, t1?: number, t2?: number): boolean => {
@@ -4460,6 +4470,7 @@ const triggerSet: TriggerSet<Data> = {
         data.dmP4Curse2 = undefined;
         data.dmP4Fire = undefined;
         data.dmP4Water = undefined;
+        data.dmP4WaterActive = 0;
         data.dmP4ForkAll = undefined;
         data.dmP4AccelAll = undefined;
         data.dmP4CurseAll = undefined;
@@ -4722,6 +4733,7 @@ const triggerSet: TriggerSet<Data> = {
             break;
           case '15AC':
             data.dmP4Water = ex;
+            data.dmP4WaterActive = (data.dmP4WaterActive ?? 0) + 1; // 물 보유자 수(8명)
             break;
         }
       },
@@ -4757,11 +4769,17 @@ const triggerSet: TriggerSet<Data> = {
       netRegex: { effectId: ['15A8', '15A9'] },
       // 자연 만료(=E1/E2)에만 발동. 전멸·조기사망 시 일괄 조기제거는 시각이 어긋나 차단.
       condition: (data, matches) => dmP4AtResolution(matches, 3000, data.dmP4PosE1, data.dmP4PosE2),
-      durationSeconds: (data, matches) =>
-        dmP4Dur(
+      // 절대-delay: positioning 만료(E1/E2) 시각에 착지. 조기소실이 트리거해도 항상 nominal 시점.
+      delaySeconds: (data, matches) =>
+        dmP4AbsDelay(
           matches,
-          dmP4IsWave1(matches, data.dmP4PosE1, data.dmP4PosE2) ? data.dmP4Curse1 : data.dmP4Curse2,
+          dmP4IsWave1(matches, data.dmP4PosE1, data.dmP4PosE2) ? data.dmP4PosE1 : data.dmP4PosE2,
         ),
+      durationSeconds: (data, matches) => {
+        const w1 = dmP4IsWave1(matches, data.dmP4PosE1, data.dmP4PosE2);
+        const pos = w1 ? data.dmP4PosE1 : data.dmP4PosE2;
+        return dmP4Dur(matches, w1 ? data.dmP4Curse1 : data.dmP4Curse2, dmP4AbsDelay(matches, pos));
+      },
       suppressSeconds: 10, // 차수당 1회(E1/E2 ~25s 간격)
       infoText: (data, matches, output) => {
         const wave1 = dmP4IsWave1(matches, data.dmP4PosE1, data.dmP4PosE2);
@@ -4829,26 +4847,26 @@ const triggerSet: TriggerSet<Data> = {
       type: 'LosesEffect',
       netRegex: { effectId: ['15A8', '15A9'] },
       condition: (data, matches) => dmP4AtResolution(matches, 3000, data.dmP4PosE1, data.dmP4PosE2),
-      delaySeconds: (data, matches) => {
-        // E1/E2(positioning 만료) → 마안1/2 시각까지(=마안 만료에 표시). 미수집 시 0(즉시).
-        const w1 = dmP4IsWave1(matches, data.dmP4PosE1, data.dmP4PosE2);
-        const curse = w1 ? data.dmP4Curse1 : data.dmP4Curse2;
-        const pos = w1 ? data.dmP4PosE1 : data.dmP4PosE2;
-        return Math.max(((curse ?? 0) - (pos ?? 0)) / 1000, 0);
-      },
+      // 절대-delay: 마안(curse) 만료 시각에 착지(=BAA5 뒤). 조기소실이 트리거해도 항상 nominal → 마력방출 데이터
+      //   확정 후 발동(상대 delay면 조기소실만큼 앞당겨져 데이터 전 발동→오안내, 0706 반파 실측).
+      delaySeconds: (data, matches) =>
+        dmP4AbsDelay(
+          matches,
+          dmP4IsWave1(matches, data.dmP4PosE1, data.dmP4PosE2) ? data.dmP4Curse1 : data.dmP4Curse2,
+        ),
       durationSeconds: (data, matches) => {
         const w1 = dmP4IsWave1(matches, data.dmP4PosE1, data.dmP4PosE2);
-        const pos = w1 ? data.dmP4PosE1 : data.dmP4PosE2;
-        const delay = Math.max(
-          (((w1 ? data.dmP4Curse1 : data.dmP4Curse2) ?? 0) - (pos ?? 0)) / 1000,
-          0,
-        );
+        const delay = dmP4AbsDelay(matches, w1 ? data.dmP4Curse1 : data.dmP4Curse2);
         return dmP4Dur(matches, w1 ? data.dmP4Fire : data.dmP4Water, delay); // 마안~불/물
       },
       suppressSeconds: 10,
       infoText: (data, matches, output) => {
         const w1 = dmP4IsWave1(matches, data.dmP4PosE1, data.dmP4PosE2);
         const id = w1 ? '15AB' : '15AC'; // 1번째 처리=불(15AB) / 2번째=물(15AC) 고정
+        // 2차(물)에서 물 보유자 전부 조기소진(전멸)이면 물 처리 무의미 → skip. 마력방출은 폴백(BAA5)이 정확히
+        //   안내하므로 중복 방지(점1: 대상자 전멸 시 미발동). 생존자 있으면 이 시점(마안2)엔 물 아직 활성.
+        if (!w1 && (data.dmP4WaterActive ?? 0) === 0)
+          return;
         const next = (data.dmChaosMove?.[id] ?? false) ? output.move!() : output.wait!();
         // 2차(물)는 마력방출과 거의 동시 발동 → stepDodge면 마력방출 바닥 안내(진실값=시전시작에 확정)를 미리 합침.
         //   ※ dir 모드는 마력방출 방향이 전조 구슬(이후 시전)로만 결정 → 미포함, '마력 방출 방향(전조)' 트리거가 별도 안내.
@@ -4886,6 +4904,7 @@ const triggerSet: TriggerSet<Data> = {
       type: 'LosesEffect',
       netRegex: { effectId: '15AB' },
       condition: (data, matches) => dmP4AtResolution(matches, 3000, data.dmP4Fire),
+      delaySeconds: (data, matches) => dmP4AbsDelay(matches, data.dmP4Fire), // 불 만료 시각에 착지(조기소실 무관)
       durationSeconds: 5.1, // 만료~장판 발동(+5.08s)
       suppressSeconds: 5,
       infoText: (data, _matches, output) => {
@@ -4916,12 +4935,23 @@ const triggerSet: TriggerSet<Data> = {
       type: 'LosesEffect',
       netRegex: { effectId: '15AB' },
       condition: (data, matches) => dmP4AtResolution(matches, 3000, data.dmP4Fire),
-      delaySeconds: 5.1, // 혼돈불 장판 처리 후
-      durationSeconds: (data, matches) => dmP4Dur(matches, data.dmP4PosE2, 5.1),
+      // 절대-delay: 불 만료+5.1s(장판 처리 후)에 착지. 조기소실이 트리거해도 항상 nominal 시점.
+      delaySeconds: (data, matches) => dmP4AbsDelay(matches, data.dmP4Fire, 5.1),
+      durationSeconds: (data, matches) =>
+        dmP4Dur(matches, data.dmP4PosE2, dmP4AbsDelay(matches, data.dmP4Fire, 5.1)),
       suppressSeconds: 5,
       infoText: (data, _matches, output) =>
         dmP4PosText(data, false, output) + dmP4CallerSuffix(data, false, output),
       outputStrings: { ...dmP4PosOutputs, ...dmP4CallerOutputs },
+    },
+    {
+      // 물(15AC) 보유자 수 추적: 소실마다 −1. 0=8명 전부 조기소진(전멸)→#8 미발동 확정 → 마력방출 폴백(BAA5)용.
+      //   #8과 달리 게이트 없이 모든 소실 집계(자연/사망 무관). [[dancing-mad-p4-debuff]]
+      id: 'DancingMad P4 혼돈물 카운터',
+      type: 'LosesEffect',
+      netRegex: { effectId: '15AC', capture: false },
+      condition: (data) => data.phase === 'p4',
+      run: (data) => data.dmP4WaterActive = Math.max((data.dmP4WaterActive ?? 0) - 1, 0),
     },
     {
       // [캐스케이드 #8] 혼돈물 만료(15AC Loses) → '이동/대기'(물 처리). stepDodge면 마력방출 바닥 안내도 통합(거의 동시).
@@ -4932,6 +4962,7 @@ const triggerSet: TriggerSet<Data> = {
       type: 'LosesEffect',
       netRegex: { effectId: '15AC' },
       condition: (data, matches) => dmP4AtResolution(matches, 3000, data.dmP4Water),
+      delaySeconds: (data, matches) => dmP4AbsDelay(matches, data.dmP4Water), // 물 만료 시각에 착지(조기소실 무관)
       durationSeconds: 5.8,
       suppressSeconds: 5,
       alertText: (data, _matches, output) => {
@@ -5066,17 +5097,32 @@ const triggerSet: TriggerSet<Data> = {
     },
     {
       // 마력 방출: 최종 = 독립(찌릿/널리널리) XNOR 마력방출 고리. 진실값(피하기/밟기·안밖)은 시전시작 고리로 확정.
-      //   바닥 안내 출력은 '혼돈물 처리(#8)'에 통합(stepDodge, 물 만료=마력방출 ~0.4s 차). 여기선 고리 스냅샷 + 전조 대기 플래그만.
+      //   바닥 안내 출력은 평소 '혼돈물 처리(#8)'에 통합(stepDodge, 물 자연만료 시점). 여기선 고리 스냅샷 + 전조 대기 플래그.
       //   ★dir 방향은 #8 시점엔 전조 구슬이 아직 안 나와 알 수 없음 → dmP4MagicPending으로 전조 대기('마력 방출 방향(전조)').
+      //   ★전멸 폴백(stepDodge): 8명 물 전부 조기소진(dmP4WaterActive===0)이면 #8이 자연만료가 없어 미발동 → 마력방출이
+      //   딸려 사라짐. 그 경우에만 여기서 마력방출 단독 안내(BAA5=마력방출 자기 시전이라 사망 무관 항상 발동, 값도 확정).
+      //   물이 1명이라도 살아있으면(>0) #8이 자연만료에 물+마력방출로 묶어 안내하므로 침묵(중복 방지). 실측: 정상 순서
+      //   마력방출→물(6~7s 뒤)이라 이 시점 카운터>0=아직 살아있음 판정 정확.
       id: 'DancingMad P4 마력 방출',
       type: 'StartsUsing',
       netRegex: { id: 'BAA5', source: '케프카', capture: false },
       condition: (data) => data.phase === 'p4',
+      durationSeconds: 7, // 폴백 출력 시 마력방출 회피(시전~+7s)까지
+      alertText: (data, _matches, output) => {
+        if (data.triggerSetConfig.dmBlizzardThunder !== 'stepDodge')
+          return; // dir 모드는 '마력 방출 방향(전조)'가 별도
+        if ((data.dmP4WaterActive ?? 0) > 0)
+          return; // 물 생존자 있음 → #8이 묶어서 안내(중복 방지)
+        const blizzard = (data.dmP4StdBlizzard ?? true) === (data.dmP4Blizzard ?? true);
+        const thunder = (data.dmP4StdThunder ?? true) === (data.dmP4Thunder ?? true);
+        return dmBlizThunText(data, blizzard, thunder, undefined, output);
+      },
       run: (data) => {
         data.dmP4MagicBlizzard = data.dmP4Blizzard ?? true;
         data.dmP4MagicThunder = data.dmP4Thunder ?? true;
         data.dmP4MagicPending = true; // 직후 첫 전조 블리자가 = 마력방출 방향
       },
+      outputStrings: dmBlizThunStrings,
     },
     {
       // 마력 방출 방향(전조, dir 옵션 전용): 마력방출 직후 시전되는 전조 블리자가 구슬의 실제 heading으로 방향 확정.
