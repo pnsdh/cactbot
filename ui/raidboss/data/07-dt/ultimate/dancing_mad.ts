@@ -4823,7 +4823,7 @@ const triggerSet: TriggerSet<Data> = {
           de: 'Ich ${dir}',
           fr: 'Moi ${dir}',
           ja: '自分 ${dir}',
-          ko: '내가 ${dir}',
+          ko: '내가 마안, ${dir}',
         },
         notMine: { en: '${dir}', de: '${dir}', fr: '${dir}', ja: '${dir}', ko: '${dir}' },
         away: {
@@ -4945,11 +4945,11 @@ const triggerSet: TriggerSet<Data> = {
         ...dmP4PosOutputs, // 이후 안내(산개/쉐어+가속도) 재사용
         ...dmP4CallerOutputs, // 콜러 ON 시 미리보기에도 그룹 콜
         combo: {
-          en: '${move} → ${next}',
-          de: '${move} → ${next}',
-          fr: '${move} → ${next}',
-          ja: '${move} → ${next}',
-          ko: '${move} → ${next}',
+          en: '${move} (then ${next})',
+          de: '${move} (dann ${next})',
+          fr: '${move} (puis ${next})',
+          ja: '${move} (次: ${next})',
+          ko: '${move} (이후 ${next})',
         },
         fireMove: { en: 'Move', de: 'Bewegen', fr: 'Bouger', ja: '移動', ko: '이동' },
         fireWait: { en: 'Wait', de: 'Warten', fr: 'Attendre', ja: '待機', ko: '대기' },
