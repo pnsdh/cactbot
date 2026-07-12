@@ -43,6 +43,7 @@ export interface Data extends RaidbossData {
     dmForsakenP5Method: '09stop0621' | '09stop' | 'raidgosu' | 'minimal';
     dmStarMethod: 'relative' | 'absolute';
     dmP4Caller: boolean;
+    dmP4Only: boolean; // 켜면 phase!=='p4' 동안 모든 트리거 출력(알람) 억제 → P4 트리거만
   };
   phase: Phase | 'unknown';
   combatantData?: PluginCombatantState[];
@@ -293,6 +294,40 @@ const dmP4AtResolution = (
 //   BAA5 폴백이 처리 → "해소 직전 사망도 발동" 마진은 시체용이라 불필요, 좁게. (그림자는 BB00 고정시전이라
 //   생존자 유도 필요 → 별도 3000ms 유지, 이 상수 안 씀.) [[dancing-mad-p4-debuff]]
 const dmP4ResolutionTol = 250;
+
+// 옵션 dmP4Only 적용: 출력 필드(alarmText/alertText/infoText/response)를 '제자리 교체'해, dmP4Only가 켜졌고
+//   phase!=='p4'면 undefined 반환(=출력 없음, response는 cactbot이 falsy→{}로 무시). condition/run/수집·페이즈
+//   추적은 손대지 않아 상태머신 100% 유지 → P4 진입(phase='p4')·수집 정상, P4 구간 알람만 남음. OFF면 원본 그대로.
+//   ★래퍼는 게이트만 하는 '투명 프록시': test_data_files가 트리거 함수의 toString()으로 matches↔capture 일치·
+//   빌트인 response 마커·outputStrings를 검사하므로, toString을 원본에 위임해 검증은 원본을 보게 함(런타임만 게이트).
+//   ★triggerSet 정의 후 파일 맨 아래에서 1회 호출.
+const dmApplyP4OnlyGate = (triggers: readonly unknown[] | undefined): void => {
+  type DmT = {
+    alarmText?: unknown;
+    alertText?: unknown;
+    infoText?: unknown;
+    response?: unknown;
+  };
+  const outKeys = ['alarmText', 'alertText', 'infoText', 'response'] as const;
+  for (const trigger of (triggers ?? []) as unknown as DmT[]) {
+    for (const key of outKeys) {
+      const orig = trigger[key];
+      if (orig === undefined)
+        continue;
+      const wrapper = (data: Data, matches: unknown, output: Output): unknown =>
+        (data.triggerSetConfig.dmP4Only === true && data.phase !== 'p4')
+          ? undefined
+          : (typeof orig === 'function'
+            ? (orig as (d: Data, m: unknown, o: Output) => unknown)(data, matches, output)
+            : orig);
+      if (typeof orig === 'function') {
+        const src = (orig as { toString: () => string }).toString();
+        (wrapper as unknown as { toString: () => string }).toString = () => src;
+      }
+      trigger[key] = wrapper;
+    }
+  }
+};
 
 // 타임스탬프 근접 비교/그룹핑(공용). ★한 사건의 여러 라인이 패킷 경계 지터로 갈려 도착해도(실측 최대 44ms,
 //   플러드 분신 .308/.352) '정확 일치(===)'면 다른 사건으로 오인 → 드롭/오집계. tol 250ms = 관측 지터의 ~5배이자
@@ -1984,6 +2019,28 @@ const triggerSet: TriggerSet<Data> = {
       default: false,
     },
     {
+      id: 'dmP4Only',
+      name: {
+        en: 'P4 triggers only (mute other phases)',
+        de: 'Nur P4-Trigger (andere Phasen stumm)',
+        fr: 'Seulement P4 (couper les autres phases)',
+        ja: 'P4トリガーのみ (他フェーズを消音)',
+        ko: 'P4 트리거만 (다른 페이즈 알람 끄기)',
+      },
+      comment: {
+        en:
+          'When enabled, only Phase 4 triggers fire; all alarms from other phases (P1/P2/P3/P5) are muted. Timeline is not affected.',
+        de:
+          'Wenn aktiviert, werden nur Phase-4-Trigger ausgelöst; alle Ansagen anderer Phasen (P1/P2/P3/P5) sind stumm. Timeline ist nicht betroffen.',
+        fr:
+          'Si activé, seuls les déclencheurs de la Phase 4 se déclenchent ; toutes les alarmes des autres phases (P1/P2/P3/P5) sont coupées. La timeline n\'est pas affectée.',
+        ja: '有効にすると P4 のトリガーのみ発動し、他フェーズ(P1/P2/P3/P5)の案内は消音されます。タイムラインは対象外。',
+        ko: '켜면 4페이즈 트리거만 발동하고, 나머지 페이즈(P1/P2/P3/P5)의 모든 알람이 꺼집니다. 타임라인은 영향받지 않습니다.',
+      },
+      type: 'checkbox',
+      default: false,
+    },
+    {
       id: 'dmForsakenP5Method',
       name: {
         en: 'P5 Forsaken movement',
@@ -2088,8 +2145,11 @@ const triggerSet: TriggerSet<Data> = {
       id: 'DancingMad Phase Tracker',
       type: 'StartsUsing',
       // 종말의 포옹(C24C)=P2 / 갈기갈기 에어로가(C3F7)=P3 / 꼭두각시 영혼(C2DC)=P4 / 연속 알테마(BB40)=P5 진입 시점에 data.phase 갱신.
+      //   ★preRun(동기): 전이 마커와 같은 라인의 출력 트리거(예 BB40 연속알테마=P5)가 dmP4Only 래퍼에서 '갱신된'
+      //   phase를 보도록(run이면 deferred라 그 틱엔 아직 이전 phase→P5 알람이 P4틱에 샘). 동일 라인 전이 트리거들은
+      //   phase를 안 읽으므로 일반 모드 동작 불변(트래커가 배열상 먼저라 preRun이 먼저 실행). [[dancing-mad-ultimate]]
       netRegex: { id: Object.keys(phases) },
-      run: (data, matches) => data.phase = phases[matches.id] ?? 'unknown',
+      preRun: (data, matches) => data.phase = phases[matches.id] ?? 'unknown',
     },
     {
       // P2→P3 전환: 갈기갈기 에어로가(C3F7) = 저항불가 넉백(보스 밑으로). 시전 2.7s 동안 초록 안내.
@@ -6498,5 +6558,8 @@ const triggerSet: TriggerSet<Data> = {
     },
   ],
 };
+
+// dmP4Only(P4 트리거만) 옵션 적용 — 정의는 상단 dmApplyP4OnlyGate. triggerSet 완성 후 1회 래핑.
+dmApplyP4OnlyGate(triggerSet.triggers);
 
 export default triggerSet;
