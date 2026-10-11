@@ -67,7 +67,11 @@ const missingOutputFileNames = {
 };
 
 const basePath = () => path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const baseUrl = 'https://github.com/OverlayPlugin/cactbot/blob/main';
+// Fork: releases, pull requests and file links of the repository this runs in (CI), so a
+// fork's coverage page lists its own.
+const [repoOwner = 'OverlayPlugin', repoName = 'cactbot'] =
+  (process.env.GITHUB_REPOSITORY ?? 'OverlayPlugin/cactbot').split('/');
+const baseUrl = `https://github.com/${repoOwner}/${repoName}/blob/main`;
 
 const emptyCoverage = (): CoverageEntry => {
   return {
@@ -630,8 +634,8 @@ const extractTagsAndPulls = async (git: SimpleGit) => {
   const octokit = new (Octokit.plugin(paginateRest))({ auth: process.env.GITHUB_TOKEN });
 
   const releases = await octokit.paginate('GET /repos/{owner}/{repo}/releases', {
-    owner: 'OverlayPlugin',
-    repo: 'cactbot',
+    owner: repoOwner,
+    repo: repoName,
   });
 
   for (const release of releases) {
@@ -646,8 +650,8 @@ const extractTagsAndPulls = async (git: SimpleGit) => {
   const pulls: Pulls = [];
 
   const openPulls = await octokit.paginate('GET /repos/{owner}/{repo}/pulls', {
-    owner: 'OverlayPlugin',
-    repo: 'cactbot',
+    owner: repoOwner,
+    repo: repoName,
     state: 'open',
   });
 
@@ -655,8 +659,8 @@ const extractTagsAndPulls = async (git: SimpleGit) => {
     const pullFiles = await octokit.paginate(
       'GET /repos/{owner}/{repo}/pulls/{pull_number}/files',
       {
-        owner: 'OverlayPlugin',
-        repo: 'cactbot',
+        owner: repoOwner,
+        repo: repoName,
         // eslint-disable-next-line camelcase
         pull_number: openPull.number,
       },

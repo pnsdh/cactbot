@@ -1110,7 +1110,7 @@ aria-expanded="${
       ? translate(miscStrings.none, lang)
       : allTags
         .map((tag) =>
-          `<div><a target="_blank" href="https://github.com/OverlayPlugin/cactbot/releases/tag/${tag.tagName}">${tag.tagName} - ${
+          `<div><a target="_blank" href="https://github.com/pnsdh/cactbot/releases/tag/${tag.tagName}">${tag.tagName} - ${
             new Date(tag.tagDate).toDateString()
           }${
             tag.tagTitle === undefined
