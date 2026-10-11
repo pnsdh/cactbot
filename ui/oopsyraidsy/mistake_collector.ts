@@ -9,6 +9,10 @@ const broadcastSource = 'oopsyraidsy';
 const msgSyncRequestType = 'SyncRequest';
 const msgSyncResponseType = 'SyncResponse';
 
+// Fork: the events kept for the summary, so a long session doesn't grow without bound (death
+// reports carry the log lines before each death).  The oldest whole encounters are dropped.
+const kMaxEvents = 3000;
+
 // MistakeForwarder forwards observer calls to all observers.
 // It also collects all events in case a broadcast sync is requested.
 export class MistakeCollector implements MistakeObserver {
@@ -125,6 +129,12 @@ export class MistakeCollector implements MistakeObserver {
 
   OnEvent(event: ViewEvent): void {
     this.events.push(event);
+    if (this.events.length <= kMaxEvents)
+      return;
+    // Start at the first encounter or zone boundary within the limit.
+    const first = this.events.length - kMaxEvents;
+    const cut = this.events.findIndex((e, i) => i >= first && e.type !== 'Mistake');
+    this.events = this.events.slice(cut > 0 ? cut : first);
   }
 
   OnSyncEvents(events: ViewEvent[]): void {
