@@ -1008,7 +1008,8 @@ class RaidbossConfigurator {
         if (p0 !== undefined && p1 !== undefined && p2 !== undefined) {
           const div = document.createElement('div');
           div.classList.add('option-input-container', 'trigger-source');
-          const baseUrl = 'https://github.com/OverlayPlugin/cactbot/blob/triggers';
+          // Fork: this fork's compiled triggers (see update-triggers-branch.yml).
+          const baseUrl = 'https://github.com/pnsdh/cactbot/blob/triggers';
           let urlFilepath;
           if (path.length === 3) {
             // 00-misc/general.js
@@ -2003,16 +2004,16 @@ const templateOptions: OptionsTemplate = {
       type: 'html',
       html: {
         // TODO: it'd be nice if OverlayPlugin could open links on the system outside of ACT.
-        en: makeLink('https://overlayplugin.github.io/cactbot/util/coverage/coverage.html?lang=en'),
-        de: makeLink('https://overlayplugin.github.io/cactbot/util/coverage/coverage.html?lang=de'),
-        fr: makeLink('https://overlayplugin.github.io/cactbot/util/coverage/coverage.html?lang=fr'),
-        ja: makeLink('https://overlayplugin.github.io/cactbot/util/coverage/coverage.html?lang=ja'),
-        cn: makeLink('https://overlayplugin.github.io/cactbot/util/coverage/coverage.html?lang=cn'),
-        ko: makeLink('https://overlayplugin.github.io/cactbot/util/coverage/coverage.html?lang=ko'),
-        tc: makeLink('https://overlayplugin.github.io/cactbot/util/coverage/coverage.html?lang=tc'),
+        en: makeLink('https://pnsdh.github.io/cactbot/util/coverage/coverage.html?lang=en'),
+        de: makeLink('https://pnsdh.github.io/cactbot/util/coverage/coverage.html?lang=de'),
+        fr: makeLink('https://pnsdh.github.io/cactbot/util/coverage/coverage.html?lang=fr'),
+        ja: makeLink('https://pnsdh.github.io/cactbot/util/coverage/coverage.html?lang=ja'),
+        cn: makeLink('https://pnsdh.github.io/cactbot/util/coverage/coverage.html?lang=cn'),
+        ko: makeLink('https://pnsdh.github.io/cactbot/util/coverage/coverage.html?lang=ko'),
+        tc: makeLink('https://pnsdh.github.io/cactbot/util/coverage/coverage.html?lang=tc'),
       },
       default: makeLink(
-        'https://overlayplugin.github.io/cactbot/util/coverage/coverage.html?lang=en',
+        'https://pnsdh.github.io/cactbot/util/coverage/coverage.html?lang=en',
       ),
     },
     {
