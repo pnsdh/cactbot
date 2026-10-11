@@ -85,7 +85,9 @@ export type ActiveBar = {
   bar: TimerBar;
   soonTimeout?: number;
   expiredTimeout?: number;
-  // Date.now() based time at which this bar reaches 0, used to find the next bar.
+  // Timeline order and Date.now() based time at which this bar reaches 0, used to find the
+  // next bar.
+  sortKey?: number;
   endTime?: number;
 };
 
@@ -193,8 +195,8 @@ export class HTMLTimelineUI extends TimelineUI {
     const div = document.createElement('div');
     const bar = TimerBar.create();
     div.classList.add('timer-bar');
-    // Hooks for user css/skins: .channeling, .soon, .expired and .next (the bar that ends
-    // first; see updateNextBar), and [data-text] to target specific abilities,
+    // Hooks for user css/skins: .channeling, .soon, .expired and .next (the first bar in
+    // timeline order; see updateNextBar), and [data-text] to target specific abilities,
     // e.g. `.timer-bar[data-text*="Ultima"]`.
     if (channeling)
       div.classList.add('channeling');
@@ -253,25 +255,30 @@ export class HTMLTimelineUI extends TimelineUI {
       bar: bar,
       soonTimeout: soonTimeout,
       expiredTimeout: expiredTimeout,
+      sortKey: e.sortKey,
       endTime: Date.now() + (e.time - fightNow) * 1000,
     };
     this.updateNextBar();
   }
 
-  // Marks the bar that will reach 0 first with .next.  An expired bar stays next while it is
-  // still shown (KeepExpiredTimerBarsForSeconds); bars being removed are skipped and keep their
-  // class, so a skin can animate them out at the same size.
+  // Marks the first bar in timeline order (the one the list shows first, e.g. an ongoing
+  // cast before later abilities) with .next; bars without a sortKey fall back to the time they
+  // reach 0.  An expired bar stays next while it is still shown
+  // (KeepExpiredTimerBarsForSeconds); bars being removed are skipped and keep their class, so a
+  // skin can animate them out at the same size.
   private updateNextBar(): void {
     const isDone = (div: HTMLElement) => div.classList.contains('animate-timer-bar-removed');
+    const rank = (b: ActiveBar): [number, number] => [b.sortKey ?? Infinity, b.endTime ?? Infinity];
     let next: HTMLElement | undefined;
-    let nextEnd = Infinity;
+    let nextRank: [number, number] = [Infinity, Infinity];
     for (const activeBar of Object.values(this.activeBars)) {
       const div = activeBar.bar.parentElement;
       if (!div || isDone(div))
         continue;
-      if (activeBar.endTime !== undefined && activeBar.endTime < nextEnd) {
+      const [key, end] = rank(activeBar);
+      if (key < nextRank[0] || (key === nextRank[0] && end < nextRank[1])) {
         next = div;
-        nextEnd = activeBar.endTime;
+        nextRank = [key, end];
       }
     }
     for (const activeBar of Object.values(this.activeBars)) {
