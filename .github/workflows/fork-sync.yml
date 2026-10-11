@@ -98,8 +98,10 @@ jobs:
           UPSTREAM_SHA: ${{ steps.merge.outputs.upstream_sha }}
         run: |
           if [ "$STATUS" = "conflict" ]; then
-            body="Merge conflict with upstream \`$UPSTREAM_SHA\`. Conflicting files:"
-            body+=$'\n\n'"$(sed 's/^/- `/; s/$/`/' "$RUNNER_TEMP/conflicts.txt")"
+            body="Merge conflict with upstream \`$UPSTREAM_SHA\`. Conflicting files:"$'\n'
+            while read -r f; do
+              body+=$'\n'"- \`$f\`"
+            done < "$RUNNER_TEMP/conflicts.txt"
             body+=$'\n\n'"Resolve locally, then push:"
             body+=" \`git fetch upstream && git merge upstream/main\`"
           else
