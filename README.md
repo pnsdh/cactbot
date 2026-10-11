@@ -32,17 +32,19 @@ ACT, FFXIV ACT Plugin, OverlayPlugin이 이미 설치되어 있어야 합니다.
 ### 1. 기존 cactbot 제거
 
 cactbot이 두 개 설치되어 있으면 충돌하므로, 기존 cactbot을 먼저 제거합니다.
-cactbot 설정은 지워지지 않습니다. ([설정은 어떻게 유지되나요?](#설정은-어떻게-유지되나요))
+트리거 옵션 등 cactbot 설정은 지워지지 않습니다. ([설정은 어떻게 유지되나요?](#설정은-어떻게-유지되나요))
 
-* **해루봇 사용자:** 해루봇의 플러그인 목록에서 **Cactbot을 삭제**합니다.
-* **해루봇을 쓰지 않는 경우:** ACT의 `Plugins` 탭 → `Plugin Listing`에서 `CactbotOverlay.dll` 항목의 체크를 끄고 오른쪽의 **X** 버튼으로 목록에서 제거합니다.
+> ⛔ **해루봇의 Cactbot 삭제 버튼은 절대 누르지 마세요.**
+> 해루봇은 cactbot을 삭제할 때 **`FileResources\user` 폴더(개인 파일)까지 함께 영구 삭제**하고(휴지통에도 남지 않음),
+> 나중에 누르면 이 포크도 ACT 플러그인 목록에서 지워 버립니다.
 
-> 제거하기 전에 **사용자 폴더 위치**를 한 번 확인하세요.
-> ACT의 `Plugins` 탭 → `OverlayPlugin.dll` 탭 → `Cactbot Config` → `GENERAL`에서 사용자 디렉토리(`Cactbot user directory`) 경로를 봅니다.
->
-> * `...\FileResources\user`처럼 **기존 cactbot 폴더 밖**이면(해루봇 기본값) 그대로 두면 됩니다.
-> * `...\Plugins\cactbot\user`처럼 **기존 cactbot 폴더 안**이면, 제거할 때 그 안의 개인 파일(`raidboss.js` 등)도 지워집니다.
->   제거하기 전에 그 `user` 폴더를 다른 곳(예: `...\Advanced Combat Tracker\FileResources\user`)에 복사하고, 사용자 디렉토리 경로를 복사한 곳으로 바꿔 주세요.
+1. **사용자 폴더를 백업합니다.**
+   ACT의 `Plugins` 탭 → `OverlayPlugin.dll` 탭 → `Cactbot Config` → `GENERAL`에서 사용자 디렉토리(`Cactbot user directory`) 경로를 확인하고,
+   그 폴더(해루봇 기본값은 `...\Advanced Combat Tracker\FileResources\user`)를 통째로 바탕화면 등에 복사해 둡니다.
+   `raidboss.js` 같은 개인 파일이 여기에 있습니다.
+1. ACT의 `Plugins` 탭 → `Plugin Listing`에서 `CactbotOverlay.dll` 항목의 체크를 끄고, 오른쪽의 **X** 버튼으로 목록에서 제거합니다.
+1. ACT를 종료하고, 기존 cactbot 폴더(`...\Advanced Combat Tracker\Plugins\cactbot`)를 **직접** 삭제합니다.
+    * 사용자 디렉토리가 이 폴더 안(`...\Plugins\cactbot\user`)이었다면, 1번에서 복사한 폴더를 `...\Advanced Combat Tracker\FileResources\user`에 넣고, 설치가 끝난 뒤 사용자 디렉토리 경로를 그곳으로 바꿔 주세요.
 
 ### 2. 내려받기
 
@@ -89,7 +91,9 @@ cactbot 설정은 지워지지 않습니다. ([설정은 어떻게 유지되나�
 
 해루봇으로 ACT를 켜도 괜찮습니다. 다만 다음은 지켜 주세요.
 
-* 해루봇에서 **Cactbot 플러그인을 설치·업데이트하지 마세요.** 업데이트는 이 포크가 직접 합니다([업데이트](#업데이트) 참고).
+* 해루봇에서 **Cactbot 플러그인을 삭제·설치·업데이트하지 마세요.**
+  삭제는 `FileResources\user`(개인 파일)를 영구 삭제하고 이 포크를 ACT 목록에서 지웁니다.
+  업데이트는 이 포크가 직접 합니다([업데이트](#업데이트) 참고).
 * 해루봇의 cactbot 오버레이(Raidboss, Oopsyraidsy) **연결하기/연결 해제 버튼을 누르지 마세요.**
   연결하기는 본가 웹 주소로 오버레이를 하나 더 만들고, 연결 해제는 직접 만든 오버레이까지 지울 수 있습니다.
   오버레이는 위 [오버레이 추가하기](#오버레이-추가하기)처럼 OverlayPlugin에서 직접 관리합니다.
@@ -97,15 +101,14 @@ cactbot 설정은 지워지지 않습니다. ([설정은 어떻게 유지되나�
 
 ### 왜 폴더 이름이 cbkr인가요?
 
-해루봇은 실행될 때 오버레이 주소에 `/cactbot/ui/`가 들어 있으면 공식 웹 주소로 바꿔 버리고,
-cactbot을 삭제할 때 경로에 `cactbot`이 들어간 플러그인을 모두 ACT 목록에서 지웁니다.
-폴더 이름에 `cactbot`이 없으면 해루봇이 이 포크를 건드리지 않습니다.
+해루봇은 실행될 때 오버레이 주소에 `/cactbot/ui/`가 들어 있으면 공식 웹 주소로 바꿔 버립니다.
+폴더 이름에 `cactbot`이 없으면 이 포크의 오버레이 주소는 그대로 유지됩니다.
 
 ## 설정은 어떻게 유지되나요?
 
 cactbot 설정(트리거 옵션, 알람 설정, 표시 언어 등)은 cactbot 폴더가 아니라 **OverlayPlugin 설정 파일**에 저장됩니다.
 그래서 cactbot 폴더를 지우고 `cbkr`로 새로 설치해도, 오버레이를 새로 만들어도 설정은 그대로 이어집니다.
-`raidboss.js` 같은 개인 파일은 사용자 폴더에 있으므로, 위 [1. 기존 cactbot 제거](#1-기존-cactbot-제거)에서 안내한 확인만 하면 됩니다.
+`raidboss.js` 같은 개인 파일은 사용자 폴더에 있으므로, 위 [1. 기존 cactbot 제거](#1-기존-cactbot-제거)에서 안내한 대로 백업해 두세요.
 
 ## 업데이트
 
