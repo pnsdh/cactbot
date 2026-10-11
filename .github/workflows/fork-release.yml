@@ -116,17 +116,21 @@ jobs:
           ./util/publish.sh
         shell: bash
 
+      # Folder is "cbkr" (no "cactbot" in the name): Haerubot rewrites file:// overlay URLs
+      # containing "/cactbot/ui/" to the official site and matches ACT plugins by "cactbot".
+      # The updater strips the top 2 dirs (strippedDirs = 2), so the names don't affect updates.
       - name: Create Release Artifact
         run: |
-          mkdir cactbot
-          mv publish/cactbot-release/cactbot/ cactbot
-          compress-archive cactbot cactbot-${env:VERSION}.zip
+          mkdir cbkr
+          mv publish/cactbot-release/cactbot/ cbkr/cbkr
+          compress-archive cbkr cactbot-${env:VERSION}.zip
         shell: pwsh
 
       - name: Create Release
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.SYNC_TOKEN }}
+          README_URL: ${{ github.server_url }}/${{ github.repository }}#readme
         run: |
           notes_args=()
           if [ -n "$PREV" ]; then
@@ -135,5 +139,5 @@ jobs:
           gh release create "v${VERSION}" "cactbot-${VERSION}.zip" \
             --target "$SHA" \
             --title "$VERSION" \
-            --notes "Based on upstream v${BASE}." \
+            --notes "본가 v${BASE} 기반. 설치·업데이트 방법: ${README_URL}" \
             --generate-notes "${notes_args[@]}"
