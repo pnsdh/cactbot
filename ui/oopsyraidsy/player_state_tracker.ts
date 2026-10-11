@@ -631,8 +631,7 @@ export class PlayerStateTracker {
   private PruneTrackedEvents(timestamp: number) {
     // Remove any tracked events that occurred prior to `timestamp`.
     const idx = this.trackedEvents.findIndex((event) => event.timestamp >= timestamp);
-    if (idx === -1)
-      return;
-    this.trackedEvents = this.trackedEvents.slice(idx);
+    // Fork: no event is recent enough, so all of them go (this used to keep them all).
+    this.trackedEvents = idx === -1 ? [] : this.trackedEvents.slice(idx);
   }
 }

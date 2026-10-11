@@ -655,6 +655,8 @@ export class DamageTracker {
     this.Reset();
 
     this.triggers = [];
+    // Fork: only this zone's initData (this list used to keep every zone's of the session).
+    this.dataInitializers = [];
 
     this.ignoreZone = this.options.IgnoreContentTypes.includes(this.contentType) ||
       this.options.IgnoreZoneIds.includes(this.zoneId);
@@ -730,6 +732,9 @@ export class DamageTracker {
 
       this.playerStateTracker.PushTriggerSet(set);
     }
+
+    // Fork: Reset() above ran before this zone's initData was known.
+    this.data = this.GetDataObject();
   }
 
   ProcessTrigger(trigger: OopsyTrigger<OopsyData>, set?: ProcessedOopsyTriggerSet): void {
