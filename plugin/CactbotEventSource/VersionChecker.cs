@@ -10,7 +10,8 @@ namespace Cactbot {
   class VersionChecker {
     private ILogger logger_ = null;
 
-    public const string kRepo = "OverlayPlugin/cactbot";
+    // Fork: updates come from this fork's GitHub releases (see .github/workflows/fork-release.yml).
+    public const string kRepo = "pnsdh/cactbot";
     public const string kDownloadUrl = "https://github.com/{REPO}/releases/download/v{VERSION}/cactbot-{VERSION}.zip";
 
     public VersionChecker(ILogger logger) {
@@ -127,7 +128,9 @@ namespace Cactbot {
         repo = kRepo,
         downloadUrl = kDownloadUrl,
         strippedDirs = 2,
-        actPluginId = 97,
+        // Fork: 0 disables the ACT plugin index lookup (id 97 reports upstream's version),
+        // so the remote version comes from kRepo's latest release tag instead.
+        actPluginId = 0,
       };
 
       await Updater.RunAutoUpdater(options);

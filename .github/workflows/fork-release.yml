@@ -1,0 +1,136 @@
+# Fork-only: builds the plugin zip and publishes a GitHub release of this fork, which the
+# in-ACT auto updater picks up (see kRepo in plugin/CactbotEventSource/VersionChecker.cs).
+# Version = upstream package.json version + fork revision (0.37.5 -> v0.37.5.1, v0.37.5.2, ...).
+# package.json/AssemblyInfo stay identical to upstream; AssemblyInfo is rewritten only in CI.
+name: Fork Release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: fork-release
+    outputs:
+      skip: ${{ steps.version.outputs.skip }}
+      sha: ${{ steps.version.outputs.sha }}
+      base: ${{ steps.version.outputs.base }}
+      version: ${{ steps.version.outputs.version }}
+      prev: ${{ steps.version.outputs.prev }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Compute Fork Version
+        id: version
+        shell: bash
+        run: |
+          sha=$(git rev-parse HEAD)
+          base=$(node -p "require('./package.json').version")
+          prev=$(git tag -l 'v*.*.*.*' --sort=-v:refname | head -n 1)
+          if [ -n "$prev" ] && [ "$(git rev-list -n 1 "$prev")" = "$sha" ]; then
+            echo "::notice::main is already released as $prev. Skipping."
+            echo "skip=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          last=$(git tag -l "v${base}.*" | sed "s/^v${base}\.//" | sort -n | tail -n 1)
+          version="${base}.$(( ${last:-0} + 1 ))"
+          echo "::notice::Releasing $version (upstream $base, previous ${prev:-none})"
+          {
+            echo "skip=false"
+            echo "sha=$sha"
+            echo "base=$base"
+            echo "version=$version"
+            echo "prev=$prev"
+          } >> $GITHUB_OUTPUT
+
+  release:
+    runs-on: windows-latest
+    needs: prepare
+    if: needs.prepare.outputs.skip != 'true'
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      SHA: ${{ needs.prepare.outputs.sha }}
+      BASE: ${{ needs.prepare.outputs.base }}
+      VERSION: ${{ needs.prepare.outputs.version }}
+      PREV: ${{ needs.prepare.outputs.prev }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+
+      - name: Set up msbuild
+        uses: microsoft/setup-msbuild@v3
+
+      - uses: ./.github/actions/setup-js-env
+
+      - name: Check dependencies cache
+        id: cache-dependencies
+        uses: actions/cache@v5
+        with:
+          path: ./plugin/ThirdParty
+          key: |
+            ${{ runner.os }}-cactbot-${{ hashFiles('./util/fetch_deps.ts',
+            './util/DEPS.json5') }}
+          restore-keys: |
+            ${{ runner.os }}-cactbot-
+
+      - name: Fetch Dependencies
+        if: steps.cache-dependencies.outputs.cache-hit != 'true'
+        run: |
+          npm run fetch-deps
+        shell: bash
+
+      - name: Set Fork Assembly Versions
+        shell: bash
+        run: |
+          npm run validate-versions
+          sed -i -E "s/(Assembly(File)?Version\(\")[^\"]*/\1${VERSION}/" \
+            plugin/*/Properties/AssemblyInfo.cs
+          grep -h "Version(" plugin/*/Properties/AssemblyInfo.cs
+          count=$(grep -ho "Version(\"${VERSION}\")" plugin/*/Properties/AssemblyInfo.cs | wc -l)
+          if [ "$count" -ne 4 ]; then
+            echo "::error::Expected 4 assembly versions set to ${VERSION}, found ${count}"
+            exit 1
+          fi
+
+      - name: Build Cactbot Plugin
+        shell: cmd
+        run: |
+          msbuild /p:Configuration=Release /p:Platform=x64 plugin/Cactbot.sln
+
+      - name: Build JavaScript UI Module Bundles
+        run: |
+          npm run build
+
+      - name: Setup Staging Directory
+        run: |
+          ./util/publish.sh
+        shell: bash
+
+      - name: Create Release Artifact
+        run: |
+          mkdir cactbot
+          mv publish/cactbot-release/cactbot/ cactbot
+          compress-archive cactbot cactbot-${env:VERSION}.zip
+        shell: pwsh
+
+      - name: Create Release
+        shell: bash
+        run: |
+          notes_args=()
+          if [ -n "$PREV" ]; then
+            notes_args=(--notes-start-tag "$PREV")
+          fi
+          gh release create "v${VERSION}" "cactbot-${VERSION}.zip" \
+            --target "$SHA" \
+            --title "$VERSION" \
+            --notes "Based on upstream v${BASE}." \
+            --generate-notes "${notes_args[@]}"
