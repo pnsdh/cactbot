@@ -30,7 +30,7 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
-          token: ${{ secrets.SYNC_TOKEN }}
+          persist-credentials: false
 
       - name: Merge Upstream
         id: merge
@@ -69,8 +69,11 @@ jobs:
 
       - name: Push
         if: steps.merge.outputs.status == 'merged'
+        env:
+          SYNC_TOKEN: ${{ secrets.SYNC_TOKEN }}
         run: |
-          git push origin HEAD:main
+          remote="https://x-access-token:${SYNC_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push "$remote" HEAD:main
 
       - name: Trigger Release If Needed
         shell: bash

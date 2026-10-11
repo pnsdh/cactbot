@@ -2,6 +2,8 @@
 # in-ACT auto updater picks up (see kRepo in plugin/CactbotEventSource/VersionChecker.cs).
 # Version = upstream package.json version + fork revision (0.37.5 -> v0.37.5.1, v0.37.5.2, ...).
 # package.json/AssemblyInfo stay identical to upstream; AssemblyInfo is rewritten only in CI.
+# Uses secret SYNC_TOKEN to create the release: tagging a commit that contains workflow files
+# needs the Workflows permission, which GITHUB_TOKEN never has (403).
 name: Fork Release
 
 on:
@@ -53,9 +55,8 @@ jobs:
     needs: prepare
     if: needs.prepare.outputs.skip != 'true'
     permissions:
-      contents: write
+      contents: read
     env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       SHA: ${{ needs.prepare.outputs.sha }}
       BASE: ${{ needs.prepare.outputs.base }}
       VERSION: ${{ needs.prepare.outputs.version }}
@@ -124,6 +125,8 @@ jobs:
 
       - name: Create Release
         shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.SYNC_TOKEN }}
         run: |
           notes_args=()
           if [ -n "$PREV" ]; then
