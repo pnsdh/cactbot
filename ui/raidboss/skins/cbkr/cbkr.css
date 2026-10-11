@@ -1,0 +1,618 @@
+/*
+ * cbkr: a modern raidboss skin.
+ *
+ * Timeline: each bar is a lane on which a diamond travels toward a "now" line next to the time
+ * column, landing on it at 0.  The bar that ends first (.next) is larger.  When it lands, a ring
+ * bursts out and a band of light runs across the time column.
+ * Alerts: no backing plates (nothing hides the game behind them); outlined text that stacks
+ * without overlapping when many show at once.
+ *
+ * Fonts (SIL Open Font License 1.1, see the LICENSE files in this folder):
+ *   Pretendard Variable for text; Oxanium (digits only) for the remaining time.
+ * Requires the customization hooks in resources/timerbar.ts and ui/raidboss/*.ts
+ * (see docs/ko-KR/RaidbossCSS.md).
+ */
+
+/* Bar states (next, soon, channeling, ended) intentionally layer by specificity. */
+/* stylelint-disable no-descending-specificity */
+
+@font-face {
+  font-family: "Pretendard Variable";
+  font-weight: 45 920;
+  font-style: normal;
+  font-display: swap;
+  src:
+    local("Pretendard Variable"),
+    url("PretendardVariable.woff2") format("woff2-variations"),
+    url("PretendardVariable.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "cbkr Oxanium";
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+  src:
+    url("Oxanium-digits.woff2") format("woff2-variations"),
+    url("Oxanium-digits.woff2") format("woff2");
+  unicode-range: U+002D-002E, U+0030-003A, U+0073;
+}
+
+@property --cbkr-d {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 6.5px;
+}
+
+@property --cbkr-glow-r {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 26px;
+}
+
+@property --cbkr-ring {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0;
+}
+
+@property --cbkr-ring-a {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+@property --cbkr-sx {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0;
+}
+
+@property --cbkr-sa {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+@property --cbkr-fa {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+:root {
+  --raidboss-font-family: "Pretendard Variable", "Pretendard", "Malgun Gothic", sans-serif;
+  --cbkr-num-font: "cbkr Oxanium", "Pretendard Variable", sans-serif;
+  --timeline-width: 360px;
+  --timeline-height: 100%;
+  --timeline-font-size: 20px;
+  --timeline-bar-height: 32px;
+  --timeline-bar-gap: 6px;
+  --info-text-color: #74e8bd;
+  --alert-text-color: #fdd166;
+  --alarm-text-color: #ff6b6b;
+  --info-text-font-size: 150%;
+  --alert-text-font-size: 178%;
+  --alarm-text-font-size: 220%;
+
+  /* Palette as "r g b" channels so alpha can vary per use. */
+  --cbkr-accent: 186 204 255;
+  --cbkr-head: 240 245 255;
+  --cbkr-soon: 255 132 104;
+  --cbkr-soon-head: 255 216 200;
+  --cbkr-cast: 255 186 92;
+  --cbkr-track: 20 21 24;
+
+  /* Time column width.  Fixed (not em) so the now line lines up across rows even though the
+     next bar uses larger text; sized for "29.9s" at that size. */
+  --cbkr-time-w: 88px;
+}
+
+/* ===== Layout ===== */
+
+/* A timeline-only overlay fills its window; in the combined overlay the timeline keeps a fixed
+   width on the left and the alerts use the space to its right. */
+.hide-alerts #timeline-container {
+  --timeline-width: 100%;
+}
+
+#container:not(.hide-alerts, .hide-timeline) #popup-text-container {
+  left: calc(var(--timeline-width) + 16px);
+  width: calc(100% - var(--timeline-width) - 16px);
+}
+
+/* ===== Timeline bars ===== */
+.timer-bar {
+  --cbkr-c: var(--cbkr-accent);
+  --cbkr-h: var(--cbkr-head);
+
+  width: 100%;
+  animation: cbkr-bar-in 360ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition: height 320ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.timer-bar.soon {
+  --cbkr-c: var(--cbkr-soon);
+  --cbkr-h: var(--cbkr-soon-head);
+}
+
+.timer-bar timer-bar {
+  --cbkr-d: 6.5px;
+  --timerbar-font-family: var(--raidboss-font-family);
+  --timerbar-font-weight: 600;
+  --timerbar-text-color: rgb(238 241 247);
+
+  /* A dark halo keeps the letters readable when the marker or its glow passes under them. */
+  --timerbar-text-shadow:
+    0 0 2px rgb(var(--cbkr-track)),
+    0 0 6px rgb(var(--cbkr-track) / 95%),
+    0 0 12px rgb(var(--cbkr-track) / 80%),
+    0 1px 2px rgb(0 0 0 / 70%);
+  --timerbar-border: none;
+  --timerbar-border-radius: 6px;
+  --timerbar-overflow: hidden;
+  --timerbar-bg-opacity: 1;
+
+  font-size: 0.9em;
+  /* stylelint-disable-next-line custom-property-no-missing-var-function */
+  transition: font-size 320ms cubic-bezier(0.16, 1, 0.3, 1), --cbkr-d 180ms ease-out;
+}
+
+/* The bar that ends first is taller with larger, heavier text.  It grows only once the previous
+   one has wiped out (250ms), over the time that row collapses, so rows below move up smoothly. */
+.timer-bar.next {
+  --timeline-bar-height: 54px;
+
+  transition: height 210ms cubic-bezier(0.4, 0, 0.2, 1) 250ms;
+}
+
+.timer-bar.next timer-bar {
+  --cbkr-d: 12px;
+
+  font-size: 1.35em;
+  /* stylelint-disable-next-line custom-property-no-missing-var-function */
+  transition: font-size 210ms cubic-bezier(0.4, 0, 0.2, 1) 250ms, --cbkr-d 180ms ease-out;
+}
+
+/* Text: centered vertically, name on the left, time in its own column on the right. */
+.timer-bar timer-bar::part(text-container) {
+  top: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.timer-bar timer-bar::part(text) {
+  top: 0;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0 0.7em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -0.01em;
+}
+
+.timer-bar timer-bar::part(timerbar-lefttext) {
+  padding-right: calc(var(--cbkr-time-w) + 0.4em);
+}
+
+.timer-bar.next timer-bar::part(timerbar-lefttext) {
+  font-weight: 750;
+}
+
+.timer-bar timer-bar::part(timerbar-righttext) {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: var(--cbkr-time-w);
+  height: 100%;
+  padding: 0;
+  line-height: var(--timeline-bar-height);
+  text-align: center;
+  font-family: var(--cbkr-num-font);
+
+  /* Oxanium digits are 0.69em tall vs Pretendard's 0.727em; scale to match the name. */
+  font-size: 1.05em;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+
+.timer-bar.next timer-bar::part(timerbar-righttext) {
+  font-weight: 650;
+}
+
+.timer-bar.soon timer-bar::part(timerbar-righttext) {
+  color: rgb(var(--cbkr-soon-head));
+}
+
+.timer-bar timer-bar::part(timerbar-righttext)::after {
+  content: "s";
+  margin-left: 0.06em;
+  font-size: 0.7em;
+  font-weight: 500;
+  opacity: 0.55;
+}
+
+/* timer-bar[ended] is set in the frame the time reaches 0 (cactbot empties the text then). */
+.timer-bar timer-bar[ended]::part(timerbar-righttext)::after {
+  content: none;
+}
+
+/* ===== Panel ===== */
+.timer-bar timer-bar::part(timerbar-root) {
+  background-color: rgb(var(--cbkr-track) / 82%);
+  background-image: var(--cbkr-end-fx, none), var(--cbkr-panel-tint, none);
+  background-repeat: no-repeat;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 8%);
+}
+
+.timer-bar.next timer-bar::part(timerbar-root) {
+  --cbkr-panel-tint: linear-gradient(90deg, rgb(var(--cbkr-c) / 12%), transparent 65%);
+
+  background-color: rgb(32 34 41 / 88%);
+  box-shadow: inset 0 0 0 1px rgb(var(--cbkr-c) / 32%);
+  animation: cbkr-promote 650ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.timer-bar.soon timer-bar::part(timerbar-root) {
+  animation: cbkr-blink 0.9s ease-in-out infinite;
+}
+
+.timer-bar.next.soon timer-bar::part(timerbar-root) {
+  animation: cbkr-promote 650ms cubic-bezier(0.16, 1, 0.3, 1), cbkr-blink 0.9s ease-in-out infinite;
+}
+
+/* ===== Lane and marker ===== */
+.timer-bar timer-bar::part(timerbar-bg),
+.timer-bar timer-bar::part(timerbar-fg) {
+  /* The now line is the boundary with the time column.  These parts span the whole bar so the
+     marker can stop centered on the line and its glow fades out naturally over the time column;
+     lane details stop at the line.  The marker path runs from 12px to the line. */
+  --cbkr-x: calc(12px + var(--timerbar-progress, 1) * (100% - 12px - var(--cbkr-time-w)));
+  --cbkr-line: calc(100% - var(--cbkr-time-w));
+
+  left: 0 !important;
+  right: auto !important;
+  width: 100%;
+}
+
+/* Lane: impact ring (only once ended), glow, trail, now line, 10s ticks, center line. */
+.timer-bar timer-bar::part(timerbar-bg) {
+  opacity: 1;
+  background:
+    radial-gradient(
+      circle at var(--cbkr-x) 50%,
+      transparent calc(var(--cbkr-ring) - 2px),
+      rgb(var(--cbkr-h) / var(--cbkr-ring-a)) var(--cbkr-ring),
+      transparent calc(var(--cbkr-ring) + 2px)
+    ),
+    radial-gradient(
+      circle at var(--cbkr-x) 50%,
+      rgb(var(--cbkr-c) / 45%) 0,
+      rgb(var(--cbkr-c) / 0%) var(--cbkr-glow-r)
+    ),
+    linear-gradient(
+      90deg,
+      transparent calc(var(--cbkr-x) - 150px),
+      rgb(var(--cbkr-c) / 20%) var(--cbkr-x),
+      transparent var(--cbkr-x)
+    ),
+    linear-gradient(90deg, rgb(var(--cbkr-h) / 70%) 0 0)
+    right calc(var(--cbkr-time-w) - 1px) top 0 / 2px 100% no-repeat,
+    repeating-linear-gradient(90deg, rgb(255 255 255 / 5%) 0 1px, transparent 1px calc(100% / 3))
+    left 12px top 0 / calc(var(--cbkr-line) - 11px) 100% no-repeat,
+    linear-gradient(
+      180deg,
+      transparent calc(50% - 0.5px),
+      rgb(255 255 255 / 8%) calc(50% - 0.5px) calc(50% + 0.5px),
+      transparent calc(50% + 0.5px)
+    ) 0 0 / var(--cbkr-line) 100% no-repeat;
+}
+
+.timer-bar.next timer-bar::part(timerbar-bg) {
+  animation: cbkr-breathe 1.6s ease-in-out infinite;
+}
+
+/* Diamond marker. */
+.timer-bar timer-bar::part(timerbar-fg) {
+  transform: none !important;
+  background: linear-gradient(135deg, rgb(var(--cbkr-h)), rgb(var(--cbkr-c)));
+  clip-path:
+    polygon(
+      calc(var(--cbkr-x) - var(--cbkr-d)) 50%,
+      var(--cbkr-x) calc(50% - var(--cbkr-d)),
+      calc(var(--cbkr-x) + var(--cbkr-d)) 50%,
+      var(--cbkr-x) calc(50% + var(--cbkr-d))
+    );
+}
+
+/* ===== Casting bars ===== */
+
+/* They replace their ability's bar in the same row: fade in place instead of sliding in, and
+   don't blink (cactbot marks them soon for their whole duration).  Effects stay on inner parts
+   so cactbot's removal animation on .timer-bar is never overridden. */
+.timer-bar.channeling {
+  animation: none;
+}
+
+.timer-bar.channeling timer-bar::part(timerbar-root),
+.timer-bar.channeling.soon timer-bar::part(timerbar-root),
+.timer-bar.next.channeling.soon timer-bar::part(timerbar-root) {
+  animation: cbkr-cast-in 260ms ease-out;
+}
+
+.timer-bar.channeling timer-bar::part(timerbar-bg) {
+  background: none;
+}
+
+/* Flowing stripes that end at the now line and empty toward it. */
+.timer-bar.channeling timer-bar::part(timerbar-fg) {
+  clip-path: inset(0 var(--cbkr-time-w) 0 calc((100% - var(--cbkr-time-w)) * (1 - var(--timerbar-progress, 1))));
+  background: repeating-linear-gradient(-45deg, rgb(var(--cbkr-cast) / 30%) 0 4px, rgb(var(--cbkr-cast) / 13%) 4px 8px);
+  background-size: 11.31px 100%;
+  animation: cbkr-stripes 1.6s linear infinite;
+}
+
+/* ===== Landing ===== */
+
+/* From the frame the marker reaches the now line (shown for KeepExpiredTimerBarsForSeconds):
+   the diamond grows, a ring bursts out, the glow flares and settles, the panel flashes and a
+   band of light runs across the emptied time column.  #timeline makes these win. */
+#timeline .timer-bar timer-bar[ended] {
+  --cbkr-d: 13px;
+}
+
+#timeline .timer-bar timer-bar[ended]::part(timerbar-bg) {
+  animation: cbkr-ring 650ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+#timeline .timer-bar timer-bar[ended]::part(timerbar-root) {
+  --cbkr-line: calc(100% - var(--cbkr-time-w));
+  --cbkr-end-fx:
+    linear-gradient(
+      90deg,
+      transparent calc(var(--cbkr-line) + var(--cbkr-sx) - 26px),
+      rgb(var(--cbkr-h) / var(--cbkr-sa)) calc(var(--cbkr-line) + var(--cbkr-sx)),
+      transparent calc(var(--cbkr-line) + var(--cbkr-sx) + 4px)
+    ),
+    linear-gradient(90deg, transparent var(--cbkr-line), rgb(var(--cbkr-c) / var(--cbkr-fa)) var(--cbkr-line));
+
+  animation: cbkr-impact 700ms ease-out forwards, cbkr-sweep 480ms cubic-bezier(0.3, 0.6, 0.3, 1) forwards;
+}
+
+/* ===== Removal ===== */
+
+/* After cactbot's KeepExpiredTimerBarsForSeconds the bar wipes into the now line, then its row
+   collapses.  #timeline so no class rule can override it: cactbot waits for this to end. */
+#timeline .timer-bar.animate-timer-bar-removed {
+  animation: cbkr-bar-exit 460ms forwards;
+}
+
+/* ===== Timeline keyframes ===== */
+@keyframes cbkr-bar-in {
+  0% {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes cbkr-bar-exit {
+  0% {
+    clip-path: inset(0);
+    opacity: 1;
+    animation-timing-function: cubic-bezier(0.55, 0, 0.75, 0.3);
+  }
+
+  55% {
+    clip-path: inset(0 0 0 100%);
+    opacity: 0.6;
+    height: var(--timeline-bar-height);
+    margin-bottom: var(--timeline-bar-gap);
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  100% {
+    clip-path: inset(0 0 0 100%);
+    opacity: 0;
+    height: 0;
+    margin-bottom: 0;
+  }
+}
+
+@keyframes cbkr-cast-in {
+  0% { opacity: 0.3; }
+  100% { opacity: 1; }
+}
+
+@keyframes cbkr-promote {
+  0% {
+    transform: scale(1);
+    box-shadow: inset 0 0 0 1px rgb(var(--cbkr-h) / 0%);
+  }
+
+  30% {
+    transform: scale(1.025);
+    box-shadow: inset 0 0 0 2px rgb(var(--cbkr-h) / 95%), 0 0 16px rgb(var(--cbkr-c) / 45%);
+  }
+  100% { transform: scale(1); }
+}
+
+@keyframes cbkr-blink {
+  0%,
+  100% { box-shadow: inset 0 0 0 1px rgb(var(--cbkr-soon) / 25%); }
+  50% { box-shadow: inset 0 0 0 1px rgb(var(--cbkr-soon) / 85%); }
+}
+
+@keyframes cbkr-breathe {
+  0%,
+  100% { --cbkr-glow-r: 22px; }
+  50% { --cbkr-glow-r: 34px; }
+}
+
+@keyframes cbkr-stripes {
+  0% { background-position: 0 0; }
+  100% { background-position: 11.31px 0; }
+}
+
+@keyframes cbkr-ring {
+  0% {
+    --cbkr-ring: 6px;
+    --cbkr-ring-a: 0.95;
+    --cbkr-glow-r: 44px;
+  }
+
+  100% {
+    --cbkr-ring: 46px;
+    --cbkr-ring-a: 0;
+    --cbkr-glow-r: 24px;
+  }
+}
+
+@keyframes cbkr-impact {
+  0% { box-shadow: inset 0 0 0 2px rgb(var(--cbkr-h) / 95%), inset 0 0 22px rgb(var(--cbkr-c) / 45%); }
+  100% { box-shadow: inset 0 0 0 1px rgb(var(--cbkr-c) / 40%), inset 0 0 0 rgb(var(--cbkr-c) / 0%); }
+}
+
+@keyframes cbkr-sweep {
+  0% {
+    --cbkr-sx: 0;
+    --cbkr-sa: 0.95;
+    --cbkr-fa: 0.4;
+  }
+
+  100% {
+    --cbkr-sx: 110px;
+    --cbkr-sa: 0;
+    --cbkr-fa: 0;
+  }
+}
+
+/* ===== Alerts ===== */
+
+/* The three levels stack (reserving two rows each) instead of sitting at fixed offsets, so many
+   alerts at once, or long wrapped lines, push down instead of overlapping. */
+#popup-text-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+#popup-text-alarm,
+#popup-text-alert,
+#popup-text-info {
+  position: relative;
+  top: 0;
+}
+
+/* Two rows per level: 16px base * font size * 1.2 line height * 2. */
+#popup-text-alarm {
+  min-height: 86px;
+}
+
+#popup-text-alert {
+  min-height: 70px;
+}
+
+#popup-text-info {
+  min-height: 58px;
+}
+
+#popup-text-alarm .holder,
+#popup-text-alert .holder,
+#popup-text-info .holder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+#popup-text-container .holder > div {
+  --cbkr-outline:
+    0 0 1px rgb(0 0 0),
+    0 0 1px rgb(0 0 0),
+    0 1px 0 rgb(0 0 0 / 92%),
+    0 -1px 0 rgb(0 0 0 / 92%),
+    1px 0 0 rgb(0 0 0 / 92%),
+    -1px 0 0 rgb(0 0 0 / 92%),
+    1px 1px 0 rgb(0 0 0 / 70%),
+    -1px 1px 0 rgb(0 0 0 / 70%),
+    1px -1px 0 rgb(0 0 0 / 70%),
+    -1px -1px 0 rgb(0 0 0 / 70%),
+    0 0 8px rgb(0 0 0 / 75%);
+
+  max-width: 96%;
+  font-weight: 760;
+  letter-spacing: -0.018em;
+  line-height: 1.2;
+  text-shadow: var(--cbkr-outline), 0 0 16px var(--cbkr-glow-soft), 0 3px 16px rgb(0 0 0 / 45%);
+  transition: opacity 250ms, transform 250ms;
+}
+
+/* With two alerts on a level, the older one steps back slightly. */
+#popup-text-container .holder > div:not(:last-child) {
+  opacity: 0.8;
+  transform: scale(0.93);
+}
+
+.info-text {
+  --cbkr-glow: rgb(80 240 170 / 95%);
+  --cbkr-glow-soft: rgb(80 240 170 / 20%);
+}
+
+.alert-text {
+  --cbkr-glow: rgb(255 205 80 / 95%);
+  --cbkr-glow-soft: rgb(255 205 80 / 20%);
+}
+
+.alarm-text {
+  --cbkr-glow: rgb(255 90 105 / 100%);
+  --cbkr-glow-soft: rgb(255 90 105 / 28%);
+}
+
+.countdown {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.82em;
+}
+
+.animate-text {
+  animation: cbkr-alert-in 460ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.alarm-text.animate-text {
+  animation:
+    cbkr-alert-in 460ms cubic-bezier(0.16, 1, 0.3, 1),
+    cbkr-alarm-pulse 520ms ease-in-out 460ms 2;
+}
+
+@keyframes cbkr-alert-in {
+  0% {
+    opacity: 0;
+    letter-spacing: 0.22em;
+    transform: translateY(10px) scale(0.96);
+    text-shadow: var(--cbkr-outline), 0 0 28px var(--cbkr-glow), 0 3px 16px rgb(0 0 0 / 0%);
+  }
+
+  45% {
+    opacity: 1;
+    text-shadow: var(--cbkr-outline), 0 0 20px var(--cbkr-glow), 0 3px 16px rgb(0 0 0 / 45%);
+  }
+
+  100% {
+    letter-spacing: -0.018em;
+    transform: none;
+    text-shadow: var(--cbkr-outline), 0 0 16px var(--cbkr-glow-soft), 0 3px 16px rgb(0 0 0 / 45%);
+  }
+}
+
+@keyframes cbkr-alarm-pulse {
+  0%,
+  100% { transform: none; }
+  50% { transform: scale(1.05); }
+}
