@@ -84,6 +84,9 @@ const computeBackgroundFrom = (element: HTMLElement, classList: string): string 
 export type ActiveBar = {
   bar: TimerBar;
   soonTimeout?: number;
+  expiredTimeout?: number;
+  // Date.now() based time at which this bar reaches 0, used to find the next bar.
+  endTime?: number;
 };
 
 export class HTMLTimelineUI extends TimelineUI {
@@ -190,8 +193,9 @@ export class HTMLTimelineUI extends TimelineUI {
     const div = document.createElement('div');
     const bar = TimerBar.create();
     div.classList.add('timer-bar');
-    // Hooks for user css/skins: .channeling, .soon (added below), and [data-text] to target
-    // specific abilities, e.g. `.timer-bar[data-text*="Ultima"]`.
+    // Hooks for user css/skins: .channeling, .soon, .expired and .next (the bar that ends
+    // first; see updateNextBar), and [data-text] to target specific abilities,
+    // e.g. `.timer-bar[data-text*="Ultima"]`.
     if (channeling)
       div.classList.add('channeling');
     div.dataset.text = e.text;
@@ -216,6 +220,7 @@ export class HTMLTimelineUI extends TimelineUI {
         window.clearTimeout(activeBar.soonTimeout);
         activeBar.soonTimeout = undefined;
       }
+      window.clearTimeout(activeBar.expiredTimeout);
     }
 
     const setSoon = () => {
@@ -233,6 +238,12 @@ export class HTMLTimelineUI extends TimelineUI {
       setSoon();
     }
 
+    // The bar reaches 0 here; it may stay visible a bit longer (KeepExpiredTimerBarsForSeconds).
+    const expiredTimeout = window.setTimeout(
+      () => div.classList.add('expired'),
+      Math.max(e.time - fightNow, 0) * 1000,
+    );
+
     if (e.sortKey) {
       // Invert the order if the timer bars should "grow" in the reverse direction
       div.style.order = ((this.options.ReverseTimeline ? -1 : 1) * e.sortKey).toString();
@@ -241,7 +252,33 @@ export class HTMLTimelineUI extends TimelineUI {
     this.activeBars[e.id] = {
       bar: bar,
       soonTimeout: soonTimeout,
+      expiredTimeout: expiredTimeout,
+      endTime: Date.now() + (e.time - fightNow) * 1000,
     };
+    this.updateNextBar();
+  }
+
+  // Marks the bar that will reach 0 first with .next.  An expired bar stays next while it is
+  // still shown (KeepExpiredTimerBarsForSeconds); bars being removed are skipped and keep their
+  // class, so a skin can animate them out at the same size.
+  private updateNextBar(): void {
+    const isDone = (div: HTMLElement) => div.classList.contains('animate-timer-bar-removed');
+    let next: HTMLElement | undefined;
+    let nextEnd = Infinity;
+    for (const activeBar of Object.values(this.activeBars)) {
+      const div = activeBar.bar.parentElement;
+      if (!div || isDone(div))
+        continue;
+      if (activeBar.endTime !== undefined && activeBar.endTime < nextEnd) {
+        next = div;
+        nextEnd = activeBar.endTime;
+      }
+    }
+    for (const activeBar of Object.values(this.activeBars)) {
+      const div = activeBar.bar.parentElement;
+      if (div && !isDone(div))
+        div.classList.toggle('next', div === next);
+    }
   }
 
   public override OnRemoveTimer(e: Event, force: boolean): void {
@@ -253,16 +290,30 @@ export class HTMLTimelineUI extends TimelineUI {
     if (!(div instanceof HTMLElement))
       throw new UnreachableCode();
 
+    window.clearTimeout(activeBar.expiredTimeout);
     const removeBar = () => {
       div?.parentNode?.removeChild(div);
-      delete this.activeBars[e.id];
+      // A new bar with the same id may have replaced this one in the meantime.
+      if (this.activeBars[e.id]?.bar === activeBar.bar)
+        delete this.activeBars[e.id];
     };
 
-    if (!force)
-      div.classList.add('animate-timer-bar-removed');
+    // Forced removals skip animations; otherwise a skin animating .timer-bar (e.g. on entry)
+    // would leave a stale animationName and the bar would wait forever.
+    if (force) {
+      removeBar();
+      this.updateNextBar();
+      return;
+    }
+    div.classList.add('animate-timer-bar-removed');
+    this.updateNextBar();
     if (window.getComputedStyle(div).animationName !== 'none') {
-      // Wait for animation to finish
-      div.addEventListener('animationend', removeBar);
+      // Wait for animation to finish, with a fallback in case user css never ends it.
+      div.addEventListener('animationend', (ev) => {
+        if (ev.target === div)
+          removeBar();
+      });
+      window.setTimeout(removeBar, 3000);
     } else {
       removeBar();
     }

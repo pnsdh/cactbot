@@ -301,6 +301,7 @@ export default class TimerBar extends HTMLElement {
     // The --timerbar-* custom properties let user css and skins restyle the bar from outside
     // the shadow root; the fallbacks are the original defaults. --timerbar-bg/--timerbar-fg
     // override the bg/fg attribute colors, which layout() passes in via --timerbar-*-attr.
+    // draw() also sets --timerbar-progress (0-1, the filled fraction) on the root part.
     root.innerHTML = `
       <style>
         .timerbar-root {
@@ -516,6 +517,15 @@ export default class TimerBar extends HTMLElement {
     if (this._fill)
       percent = 1.0 - percent;
     this.foregroundElement.style.transform = `scaleX(${percent.toFixed(3)})`;
+    // Exposed for user css/skins (inherited by every part), e.g. revealing a fixed gradient with
+    // clip-path instead of the default scaleX (which stretches it), or placing effects at the
+    // fill edge.
+    this.rootElement.style.setProperty('--timerbar-progress', percent.toFixed(4));
+    // `ended` is set in the same frame the remaining time hits 0 (and the "remain" text goes
+    // empty), so css can replace it without a gap, e.g. `timer-bar[ended]::part(...)`.
+    const ended = remainSec <= 0;
+    if (ended !== this.hasAttribute('ended'))
+      this.toggleAttribute('ended', ended);
     if (this._leftText !== '') {
       if (this._leftText === 'remain')
         this.leftTextElement.innerText = displayRemain;
