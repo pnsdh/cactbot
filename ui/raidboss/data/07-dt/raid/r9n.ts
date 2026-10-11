@@ -352,7 +352,7 @@ const triggerSet: TriggerSet<Data> = {
           endAngle -= Math.PI * 2;
 
         data.bats[dLen].push(
-          Directions.output16Dir[Directions.hdgTo16DirNum(endAngle)] ?? 'unknown',
+          Directions.outputFrom16DirNum(Directions.hdgTo16DirNum(endAngle)),
         );
       },
     },
@@ -560,7 +560,6 @@ const triggerSet: TriggerSet<Data> = {
     },
     {
       'locale': 'fr',
-      'missingTranslations': true,
       'replaceSync': {
         'Coffinmaker': 'torture fatale',
         'Fatal Flail': 'fléau fatal',
@@ -568,6 +567,9 @@ const triggerSet: TriggerSet<Data> = {
         'Vampette Fatale': 'chauve-souris fatale',
       },
       'replaceText': {
+        '--Coffinmaker targetable--': '--torture fatale ciblable--',
+        '--Vamp Fatale untargetable--': '--Vamp Fatale non ciblable--',
+        '--Flail targetable--': '--fléau ciblable--',
         'Aetherletting': 'Libération d\'éther',
         'Blast Beat': 'Vague de résonance',
         'Brutal Rain': 'Pluie brutale',

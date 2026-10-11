@@ -101,8 +101,10 @@ const triggerSet: TriggerSet<Data> = {
         text: {
           en: 'Ice: Stack + don\'t move',
           de: 'Eis: Sammeln + nicht bewegen',
+          fr: 'Glace : Package + ne bougez pas',
           cn: '冰: 集合 + 不要动',
           ko: '얼음: 모이기 + 이동 멈추기',
+          tc: '冰: 集合 + 不要動',
         },
       },
     },
@@ -606,7 +608,6 @@ const triggerSet: TriggerSet<Data> = {
     },
     {
       'locale': 'fr',
-      'missingTranslations': true,
       'replaceSync': {
         'Hakkinryu': 'Hakkinryu',
         'Icicle': 'stalactite',
@@ -765,7 +766,6 @@ const triggerSet: TriggerSet<Data> = {
     },
     {
       'locale': 'tc',
-      'missingTranslations': true,
       'replaceSync': {
         'Cocoon': '光繭',
         'Icicle': '冰柱',

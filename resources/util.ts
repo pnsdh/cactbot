@@ -56,6 +56,7 @@ const nameToJobEnum: Record<Job, number> = {
   SGE: 40,
   VPR: 41,
   PCT: 42,
+  BST: 43,
 };
 
 export const allJobs = Object.keys(nameToJobEnum) as Job[];
@@ -63,20 +64,31 @@ const allRoles = ['tank', 'healer', 'dps', 'crafter', 'gatherer', 'none'] as Rol
 
 export const tankJobs: Job[] = ['GLA', 'PLD', 'MRD', 'WAR', 'DRK', 'GNB'];
 export const healerJobs: Job[] = ['CNJ', 'WHM', 'SCH', 'AST', 'SGE'];
-export const meleeDpsJobs: Job[] = ['PGL', 'MNK', 'LNC', 'DRG', 'ROG', 'NIN', 'SAM', 'RPR', 'VPR'];
+export const meleeDpsJobs: Job[] = [
+  'PGL',
+  'MNK',
+  'LNC',
+  'DRG',
+  'ROG',
+  'NIN',
+  'SAM',
+  'RPR',
+  'VPR',
+  'BST',
+];
 export const rangedDpsJobs: Job[] = ['ARC', 'BRD', 'DNC', 'MCH'];
 export const casterDpsJobs: Job[] = ['BLU', 'RDM', 'BLM', 'SMN', 'ACN', 'THM', 'PCT'];
 export const dpsJobs: Job[] = [...meleeDpsJobs, ...rangedDpsJobs, ...casterDpsJobs];
 export const craftingJobs: Job[] = ['CRP', 'BSM', 'ARM', 'GSM', 'LTW', 'WVR', 'ALC', 'CUL'];
 export const gatheringJobs: Job[] = ['MIN', 'BTN', 'FSH'];
-export const limitedJobs: Job[] = ['BLU'];
+export const limitedJobs: Job[] = ['BLU', 'BST'];
 
 const stunJobs: Job[] = ['BLU', ...tankJobs, ...meleeDpsJobs];
-const silenceJobs: Job[] = ['BLU', ...tankJobs, ...rangedDpsJobs];
-const sleepJobs: Job[] = [...casterDpsJobs, ...healerJobs];
-const feintJobs: Job[] = [...meleeDpsJobs];
+const silenceJobs: Job[] = ['BLU', 'BST', ...tankJobs, ...rangedDpsJobs];
+const sleepJobs: Job[] = ['BST', ...casterDpsJobs, ...healerJobs];
+const feintJobs: Job[] = meleeDpsJobs.filter((job) => job !== 'BST');
 const addleJobs: Job[] = [...casterDpsJobs];
-const cleanseJobs: Job[] = ['BLU', 'BRD', ...healerJobs];
+const cleanseJobs: Job[] = ['BLU', 'BRD', 'BST', ...healerJobs];
 
 const jobToRoleMap: Map<Job, Role> = (() => {
   const addToMap = (map: Map<Job, Role>, jobs: Job[], role: Role) => {
@@ -377,6 +389,10 @@ const hdgTo4DirNum = (heading: number): number => {
   return (Math.round(2 - heading * 2 / Math.PI) % 4 + 4) % 4;
 };
 
+const outputFrom16DirNum = (dirNum: number): DirectionOutput16 => {
+  return output16Dir[dirNum] ?? 'unknown';
+};
+
 const outputFrom8DirNum = (dirNum: number): DirectionOutput8 => {
   return output8Dir[dirNum] ?? 'unknown';
 };
@@ -489,8 +505,10 @@ export const Directions = {
   hdgTo16DirNum: hdgTo16DirNum,
   hdgTo8DirNum: hdgTo8DirNum,
   hdgTo4DirNum: hdgTo4DirNum,
+  outputFrom16DirNum: outputFrom16DirNum,
   outputFrom8DirNum: outputFrom8DirNum,
   outputFromCardinalNum: outputFromCardinalNum,
+  outputFromIntercardNum: outputFromIntercardNum,
   combatantStatePosTo8Dir: (
     combatant: PluginCombatantState,
     centerX: number,
@@ -540,6 +558,10 @@ export const Directions = {
     const heading = parseFloat(combatant.heading);
     const dirNum = hdgTo8DirNum(heading);
     return outputFrom8DirNum(dirNum);
+  },
+  xyTo16DirOutput: (x: number, y: number, centerX: number, centerY: number): DirectionOutput16 => {
+    const dirNum = xyTo16DirNum(x, y, centerX, centerY);
+    return outputFrom16DirNum(dirNum);
   },
   xyTo8DirOutput: (x: number, y: number, centerX: number, centerY: number): DirectionOutput8 => {
     const dirNum = xyTo8DirNum(x, y, centerX, centerY);

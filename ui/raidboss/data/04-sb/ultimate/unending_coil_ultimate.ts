@@ -1810,7 +1810,7 @@ const triggerSet: TriggerSet<Data> = {
         const towerDir = towersMap[(wantedIdx + naelIdx) % 8];
 
         const myTowerDir = towerDir !== undefined
-          ? Directions.output16Dir[towerDir] ?? 'unknown'
+          ? Directions.outputFrom16DirNum(towerDir)
           : 'unknown';
 
         return output.tower!({
@@ -2450,7 +2450,7 @@ const triggerSet: TriggerSet<Data> = {
         'Fang Of Light': '光牙',
         'Firehorn': '火角',
         'Iceclaw': '冰爪',
-        'Nael Deus Darnus': '奈爾·神·達納斯',
+        'Nael Deus Darnus': '奈爾・神・達納斯',
         'Nael Geminus': '奈爾雙生子',
         'Ragnarok': '諸神黃昏',
         'Tail Of Darkness': '暗尾',

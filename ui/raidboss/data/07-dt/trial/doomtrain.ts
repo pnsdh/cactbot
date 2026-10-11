@@ -249,7 +249,7 @@ const triggerSet: TriggerSet<Data> = {
 
         const dirNum = Directions.hdgTo16DirNum(addCleaveDir);
         const addTrainDir = dirNum !== undefined
-          ? Directions.output16Dir[dirNum] ?? 'unknown'
+          ? Directions.outputFrom16DirNum(dirNum)
           : 'unknown';
 
         return output.text!({
@@ -501,7 +501,6 @@ const triggerSet: TriggerSet<Data> = {
     },
     {
       'locale': 'fr',
-      'missingTranslations': true,
       'replaceSync': {
         'Aether': 'sphère éthérée',
         'Doomtrain': 'Glasya-Labolas',
