@@ -1613,6 +1613,7 @@ export class PopupText {
         ((triggerHelper.adjustedDelay ?? 0) * 1000) +
         (triggerHelper.countdown * 1000);
       const span = document.createElement('span');
+      span.classList.add('countdown');
 
       // if the localized output string contains the {{CD}} substitution marker,
       // insert the countdown timer there; otherwise, append it.
@@ -1700,10 +1701,14 @@ export class PopupText {
     }
   }
 
-  _makeTextElement(_triggerHelper: TriggerHelper, text: string, className: string): HTMLElement {
+  _makeTextElement(triggerHelper: TriggerHelper, text: string, className: string): HTMLElement {
     const div = document.createElement('div');
     div.classList.add(className);
     div.classList.add('animate-text');
+    // Lets user css/skins target a specific trigger, e.g. `[data-trigger-id="..."]`.
+    const triggerId = triggerHelper.trigger.id;
+    if (triggerId !== undefined)
+      div.dataset.triggerId = triggerId;
     div.innerText = text;
     return div;
   }

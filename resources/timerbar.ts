@@ -298,31 +298,38 @@ export default class TimerBar extends HTMLElement {
   }
 
   init(root: ShadowRoot): void {
+    // The --timerbar-* custom properties let user css and skins restyle the bar from outside
+    // the shadow root; the fallbacks are the original defaults. --timerbar-bg/--timerbar-fg
+    // override the bg/fg attribute colors, which layout() passes in via --timerbar-*-attr.
     root.innerHTML = `
       <style>
         .timerbar-root {
           position: relative;
-          border: 1px solid black;
+          border: var(--timerbar-border, 1px solid black);
+          border-radius: var(--timerbar-border-radius, 0);
+          overflow: var(--timerbar-overflow, visible);
           box-sizing: border-box;
         }
         .timerbar-bg {
           position: absolute;
           width: 100%;
           height: 100%;
-          opacity: 0.8;
+          background: var(--timerbar-bg, var(--timerbar-bg-attr));
+          opacity: var(--timerbar-bg-opacity, 0.8);
         }
         .timerbar-fg {
           position: absolute;
           width: 100%;
           height: 100%;
-          opacity: 1.0;
+          background: var(--timerbar-fg, var(--timerbar-fg-attr));
+          opacity: var(--timerbar-fg-opacity, 1.0);
         }
         .text {
           position: absolute;
-          font-family: arial;
-          font-weight: bold;
-          color: white;
-          text-shadow: -1px 0 3px black, 0 1px 3px black, 1px 0 3px black, 0 -1px 3px black;
+          font-family: var(--timerbar-font-family, arial);
+          font-weight: var(--timerbar-font-weight, bold);
+          color: var(--timerbar-text-color, white);
+          text-shadow: var(--timerbar-text-shadow, -1px 0 3px black, 0 1px 3px black, 1px 0 3px black, 0 -1px 3px black);
           will-change: content;
         }
         .text-container {
@@ -465,8 +472,9 @@ export default class TimerBar extends HTMLElement {
     if (!this._connected)
       return;
 
-    this.backgroundElement.style.background = this._bg;
-    this.foregroundElement.style.background = this._fg;
+    // Not inline backgrounds, so that --timerbar-bg/--timerbar-fg and ::part() can override them.
+    this.backgroundElement.style.setProperty('--timerbar-bg-attr', this._bg);
+    this.foregroundElement.style.setProperty('--timerbar-fg-attr', this._fg);
     this.rootElement.style.width = this._width;
     this.rootElement.style.height = this._height;
 

@@ -146,6 +146,9 @@ ACT -> Plugins -> OverlayPlugin.dll -> 원하는 오버레이 -> 개발자 도�
 만약 수정이 불가능한 타임라인 막대에 대해 원하는 수정 사항이 있다면,
 얼마든지 [Github Issue](https://github.com/OverlayPlugin/cactbot/issues/new/choose)에 글을 작성해주세요.
 
+이 포크에서는 타임라인 막대와 알람을 CSS 변수, 클래스, `::part`로 꾸밀 수 있습니다.
+자세한 내용은 [Raidboss CSS 커스터마이징](RaidbossCSS.md)을 참고하세요.
+
 **경고**: cactbot은 CSS 하위 호환 유지를 보장하지 않습니다.
 나중에 cactbot에서 요소들을 재배열 할 수도 있고,
 요소 이름과 클래스를 변경할 수도 있고.

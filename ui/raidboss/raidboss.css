@@ -1,5 +1,23 @@
 :root {
   --transition-time: 500ms;
+
+  /*
+   * Customization hooks for user css and skins. Fallbacks in the rules below keep the
+   * original look (including per-language sizes) when these are not set:
+   *   --raidboss-font-family
+   *   --popup-text-shadow
+   *   --info-text-color, --info-text-font-size, --popup-text-info-top
+   *   --alert-text-color, --alert-text-font-size, --popup-text-alert-top
+   *   --alarm-text-color, --alarm-text-font-size, --popup-text-alarm-top
+   *   --timeline-width, --timeline-height, --timeline-font-size
+   *   --timeline-bar-height, --timeline-bar-gap
+   *   --timeline-bar-color, --timeline-bar-soon-color
+   * Timer bar internals use --timerbar-* (see resources/timerbar.ts) and ::part().
+   */
+}
+
+#container {
+  font-family: var(--raidboss-font-family);
 }
 
 #popup-text-container {
@@ -16,9 +34,9 @@
   position: absolute;
   top: 0;
   left: 0;
-  width: 220px;
-  height: 100%;
-  font-size: 14px;
+  width: var(--timeline-width, 220px);
+  height: var(--timeline-height, 100%);
+  font-size: var(--timeline-font-size, 14px);
 }
 
 .hide-timeline #timeline-container {
@@ -26,58 +44,58 @@
 }
 
 #timeline-container:lang(fr) {
-  width: 300px;
+  width: var(--timeline-width, 300px);
 }
 
 #timeline-container:lang(de) {
-  width: 300px;
+  width: var(--timeline-width, 300px);
 }
 
 #timeline-container:lang(ko) {
-  font-size: 15px;
-  width: 250px;
-  height: 140px;
+  font-size: var(--timeline-font-size, 15px);
+  width: var(--timeline-width, 250px);
+  height: var(--timeline-height, 140px);
 }
 
 /* Relative to popup-text-container */
 #popup-text-info {
   position: absolute;
   width: 100%;
-  top: 155px;
+  top: var(--popup-text-info-top, 155px);
 }
 
 /* Relative to popup-text-container */
 #popup-text-alert {
   position: absolute;
   width: 100%;
-  top: 90px;
+  top: var(--popup-text-alert-top, 90px);
 }
 
 /* Relative to popup-text-container */
 #popup-text-alarm {
   position: absolute;
   width: 100%;
-  top: 0;
+  top: var(--popup-text-alarm-top, 0);
 }
 
 .info-text {
-  color: #2b2;
-  font-size: 140%;
-  text-shadow: -2px 0 4px black, 0 2px 4px black, 2px 0 4px black, 0 -2px 4px black;
+  color: var(--info-text-color, #2b2);
+  font-size: var(--info-text-font-size, 140%);
+  text-shadow: var(--popup-text-shadow, -2px 0 4px black, 0 2px 4px black, 2px 0 4px black, 0 -2px 4px black);
   will-change: transform;
 }
 
 .alert-text {
-  color: #fb0;
-  font-size: 170%;
-  text-shadow: -2px 0 4px black, 0 2px 4px black, 2px 0 4px black, 0 -2px 4px black;
+  color: var(--alert-text-color, #fb0);
+  font-size: var(--alert-text-font-size, 170%);
+  text-shadow: var(--popup-text-shadow, -2px 0 4px black, 0 2px 4px black, 2px 0 4px black, 0 -2px 4px black);
   will-change: transform;
 }
 
 .alarm-text {
-  color: #f30;
-  font-size: 230%;
-  text-shadow: -2px 0 4px black, 0 2px 4px black, 2px 0 4px black, 0 -2px 4px black;
+  color: var(--alarm-text-color, #f30);
+  font-size: var(--alarm-text-font-size, 230%);
+  text-shadow: var(--popup-text-shadow, -2px 0 4px black, 0 2px 4px black, 2px 0 4px black, 0 -2px 4px black);
   will-change: transform;
 }
 
@@ -126,7 +144,7 @@
   border: 1px solid black;
   padding: 0 0.2em;
   vertical-align: middle;
-  height: 18px;
+  height: var(--timeline-bar-height, 18px);
   margin-bottom: 2;
 }
 
@@ -143,20 +161,20 @@
 
 .timer-bar {
   width: calc(100% - 2px);
-  height: 18px;
-  margin-bottom: 2;
+  height: var(--timeline-bar-height, 18px);
+  margin-bottom: var(--timeline-bar-gap, 0);
 }
 
 :lang(ko) .timer-bar {
-  height: 23px;
+  height: var(--timeline-bar-height, 23px);
 }
 
 .timeline-bar-color {
-  background: #88f;
+  background: var(--timeline-bar-color, #88f);
 }
 
 .timeline-bar-color.soon {
-  background: #f88;
+  background: var(--timeline-bar-soon-color, #f88);
 }
 
 #timeline-debug {

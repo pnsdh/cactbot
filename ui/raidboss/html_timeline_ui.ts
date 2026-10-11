@@ -190,6 +190,11 @@ export class HTMLTimelineUI extends TimelineUI {
     const div = document.createElement('div');
     const bar = TimerBar.create();
     div.classList.add('timer-bar');
+    // Hooks for user css/skins: .channeling, .soon (added below), and [data-text] to target
+    // specific abilities, e.g. `.timer-bar[data-text*="Ultima"]`.
+    if (channeling)
+      div.classList.add('channeling');
+    div.dataset.text = e.text;
     div.appendChild(bar);
     bar.duration = channeling ? e.time - fightNow : this.options.ShowTimerBarsAtSeconds;
     bar.value = e.time - fightNow;
@@ -213,15 +218,19 @@ export class HTMLTimelineUI extends TimelineUI {
       }
     }
 
+    const setSoon = () => {
+      bar.fg = this.barExpiresSoonColor;
+      div.classList.add('soon');
+    };
     let soonTimeout: number | undefined = undefined;
     if (!channeling && e.time - fightNow > this.options.BarExpiresSoonSeconds) {
       bar.fg = this.barColor;
       soonTimeout = window.setTimeout(
-        () => bar.fg = this.barExpiresSoonColor,
+        setSoon,
         (e.time - fightNow - this.options.BarExpiresSoonSeconds) * 1000,
       );
     } else {
-      bar.fg = this.barExpiresSoonColor;
+      setSoon();
     }
 
     if (e.sortKey) {
