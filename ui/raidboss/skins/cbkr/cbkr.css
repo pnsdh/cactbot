@@ -236,14 +236,16 @@
   font-weight: 750;
 }
 
+/* Centered on the bar's actual height (not --timeline-bar-height, which jumps to the "next"
+   height before the bar grows). */
 .timer-bar timer-bar::part(timerbar-righttext) {
   position: absolute;
-  top: 0;
+  top: 50%;
   right: 0;
   width: var(--cbkr-time-w);
-  height: 100%;
   padding: 0;
-  line-height: var(--timeline-bar-height);
+  transform: translateY(-50%);
+  line-height: normal;
   text-align: center;
   font-family: var(--cbkr-num-font);
 
@@ -339,9 +341,11 @@
     inset 0 0 0 1px rgb(var(--cbkr-edge) / var(--cbkr-edge-a)),
     inset 0 0 0 2px rgb(var(--cbkr-h) / calc((var(--cbkr-flash) + var(--cbkr-pop) * var(--cbkr-pop-k, 1)) * 0.95)),
     inset 0 0 22px rgb(var(--cbkr-c) / calc(var(--cbkr-flash) * 0.45)),
-    0 0 16px rgb(var(--cbkr-c) / calc(var(--cbkr-pop) * var(--cbkr-pop-k, 1) * 0.45));
+    inset 0 0 16px rgb(var(--cbkr-c) / calc(var(--cbkr-pop) * var(--cbkr-pop-k, 1) * 0.45));
   opacity: var(--cbkr-fade);
-  transform: scale(calc(1 + var(--cbkr-pop) * 0.025));
+
+  /* The promotion glow stays inside the bar: bars span the overlay's width, so anything drawn
+     outside (scaling, outer glow) is cut off at its edges. */
 }
 
 .timer-bar.next timer-bar::part(timerbar-root) {
