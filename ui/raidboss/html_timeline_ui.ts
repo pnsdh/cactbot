@@ -89,6 +89,7 @@ export type ActiveBar = {
   // next bar.
   sortKey?: number;
   endTime?: number;
+  channeling?: boolean;
 };
 
 export class HTMLTimelineUI extends TimelineUI {
@@ -101,6 +102,11 @@ export class HTMLTimelineUI extends TimelineUI {
   private timerlist: HTMLElement | null = null;
 
   private activeBars: { [activebar: string]: ActiveBar } = {};
+  // Bars removed by force (a timeline sync removes every bar and adds the same events back right
+  // away), kept until the end of the current task so that OnAddTimer can reuse them instead of
+  // building new elements, which would also replay skin entry animations on every sync.
+  private parkedBars = new Map<string, ActiveBar>();
+  private parkedFlushQueued = false;
 
   private debugElement: HTMLElement | null = null;
   private debugFightTimer: TimerBar | null = null;
@@ -188,28 +194,42 @@ export class HTMLTimelineUI extends TimelineUI {
       this.debugFightTimer = null;
       // TODO: clear all timeouts?
       this.activeBars = {};
+      this.parkedBars.clear();
     }
   }
 
   public override OnAddTimer(fightNow: number, e: Event, channeling: boolean): void {
-    const div = document.createElement('div');
-    const bar = TimerBar.create();
-    div.classList.add('timer-bar');
-    // Hooks for user css/skins: .channeling, .soon, .expired and .next (the first bar in
-    // timeline order; see updateNextBar), and [data-text] to target specific abilities,
-    // e.g. `.timer-bar[data-text*="Ultima"]`.
-    if (channeling)
-      div.classList.add('channeling');
+    const parked = this.parkedBars.get(e.id);
+    const reuse = parked !== undefined && parked.channeling === channeling &&
+      this.activeBars[e.id] === undefined && parked.bar.parentElement !== null;
+    let div: HTMLElement;
+    let bar: TimerBar;
+    if (reuse) {
+      this.parkedBars.delete(e.id);
+      bar = parked.bar;
+      div = parked.bar.parentElement as HTMLElement;
+      div.classList.remove('soon', 'expired');
+    } else {
+      div = document.createElement('div');
+      bar = TimerBar.create();
+      div.classList.add('timer-bar');
+      // Hooks for user css/skins: .channeling, .soon, .expired and .next (the first bar in
+      // timeline order; see updateNextBar), and [data-text] to target specific abilities,
+      // e.g. `.timer-bar[data-text*="Ultima"]`.
+      if (channeling)
+        div.classList.add('channeling');
+      div.appendChild(bar);
+      bar.righttext = 'remain';
+      bar.toward = 'right';
+      bar.stylefill = !channeling ? 'fill' : 'empty';
+    }
     div.dataset.text = e.text;
-    div.appendChild(bar);
     bar.duration = channeling ? e.time - fightNow : this.options.ShowTimerBarsAtSeconds;
     bar.value = e.time - fightNow;
-    bar.righttext = 'remain';
     bar.lefttext = e.text;
-    bar.toward = 'right';
-    bar.stylefill = !channeling ? 'fill' : 'empty';
 
-    if (e.style)
+    // A reused bar already has its event's styles.
+    if (e.style && !reuse)
       bar.applyStyles(e.style);
 
     // Adding a timer with the same id immediately removes the previous.
@@ -250,15 +270,39 @@ export class HTMLTimelineUI extends TimelineUI {
       // Invert the order if the timer bars should "grow" in the reverse direction
       div.style.order = ((this.options.ReverseTimeline ? -1 : 1) * e.sortKey).toString();
     }
-    this.timerlist?.appendChild(div);
+    if (!reuse)
+      this.timerlist?.appendChild(div);
     this.activeBars[e.id] = {
       bar: bar,
       soonTimeout: soonTimeout,
       expiredTimeout: expiredTimeout,
       sortKey: e.sortKey,
       endTime: Date.now() + (e.time - fightNow) * 1000,
+      channeling: channeling,
     };
     this.updateNextBar();
+  }
+
+  private parkBar(id: string, activeBar: ActiveBar): void {
+    if (this.activeBars[id]?.bar === activeBar.bar)
+      delete this.activeBars[id];
+    if (activeBar.soonTimeout !== undefined)
+      window.clearTimeout(activeBar.soonTimeout);
+    this.parkedBars.set(id, activeBar);
+    if (this.parkedFlushQueued)
+      return;
+    this.parkedFlushQueued = true;
+    queueMicrotask(() => {
+      this.parkedFlushQueued = false;
+      if (this.parkedBars.size === 0)
+        return;
+      for (const parked of this.parkedBars.values()) {
+        const div = parked.bar.parentNode;
+        div?.parentNode?.removeChild(div);
+      }
+      this.parkedBars.clear();
+      this.updateNextBar();
+    });
   }
 
   // Marks the first bar in timeline order (the one the list shows first, e.g. an ongoing
@@ -308,8 +352,7 @@ export class HTMLTimelineUI extends TimelineUI {
     // Forced removals skip animations; otherwise a skin animating .timer-bar (e.g. on entry)
     // would leave a stale animationName and the bar would wait forever.
     if (force) {
-      removeBar();
-      this.updateNextBar();
+      this.parkBar(e.id, activeBar);
       return;
     }
     div.classList.add('animate-timer-bar-removed');

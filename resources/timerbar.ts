@@ -28,6 +28,12 @@ export default class TimerBar extends HTMLElement {
   private _loop: boolean;
   private _connected: boolean;
   private _hideTimer: number | null;
+  // One animation frame loop per bar: setting a time on a running bar must not start another.
+  private _frameRequested = false;
+  private readonly _onFrame = (): void => {
+    this._frameRequested = false;
+    this.advance();
+  };
   // What draw() last wrote, so that frames which wouldn't change anything skip the DOM writes
   // (and the style recalc, layout and repaint they cause).
   private _drawnProgress?: number;
@@ -637,9 +643,10 @@ export default class TimerBar extends HTMLElement {
         this._hideTimer = window.setTimeout(this.hide.bind(this), this._hideAfter * 1000);
       else if (this._hideAfter === 0)
         this.hide();
-    } else {
+    } else if (!this._frameRequested) {
       // Timer not completed, request another animation frame
-      window.requestAnimationFrame(this.advance.bind(this));
+      this._frameRequested = true;
+      window.requestAnimationFrame(this._onFrame);
     }
 
     this.draw();
