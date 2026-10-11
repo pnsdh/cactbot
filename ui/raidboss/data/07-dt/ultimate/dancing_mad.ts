@@ -300,8 +300,12 @@ const dmP4ResolutionTol = 250;
 //   추적은 손대지 않아 상태머신 100% 유지 → P4 진입(phase='p4')·수집 정상, P4 구간 알람만 남음. OFF면 원본 그대로.
 //   ★래퍼는 게이트만 하는 '투명 프록시': test_data_files가 트리거 함수의 toString()으로 matches↔capture 일치·
 //   빌트인 response 마커·outputStrings를 검사하므로, toString을 원본에 위임해 검증은 원본을 보게 함(런타임만 게이트).
-//   ★triggerSet 정의 후 파일 맨 아래에서 1회 호출.
-const dmApplyP4OnlyGate = (triggers: readonly unknown[] | undefined): void => {
+//   ★triggerSet의 triggers 배열을 감싸서 1회 적용(`triggers: dmApplyP4OnlyGate([...])`). 파일 맨 아래에서
+//   triggerSet.triggers를 참조하면 process-triggers(유저 파일 변환: `const triggerSet = {`→`Options.Triggers.push({`)
+//   결과물에서 triggerSet이 미정의라 eval 실패 → 반드시 인라인으로.
+const dmApplyP4OnlyGate = (
+  triggers: NonNullable<TriggerSet<Data>['triggers']>,
+): NonNullable<TriggerSet<Data>['triggers']> => {
   type DmT = {
     alarmText?: unknown;
     alertText?: unknown;
@@ -309,7 +313,7 @@ const dmApplyP4OnlyGate = (triggers: readonly unknown[] | undefined): void => {
     response?: unknown;
   };
   const outKeys = ['alarmText', 'alertText', 'infoText', 'response'] as const;
-  for (const trigger of (triggers ?? []) as unknown as DmT[]) {
+  for (const trigger of triggers as unknown as DmT[]) {
     for (const key of outKeys) {
       const orig = trigger[key];
       if (orig === undefined)
@@ -327,6 +331,7 @@ const dmApplyP4OnlyGate = (triggers: readonly unknown[] | undefined): void => {
       trigger[key] = wrapper;
     }
   }
+  return triggers;
 };
 
 // 타임스탬프 근접 비교/그룹핑(공용). ★한 사건의 여러 라인이 패킷 경계 지터로 갈려 도착해도(실측 최대 44ms,
@@ -2139,7 +2144,7 @@ const triggerSet: TriggerSet<Data> = {
   ],
   timelineFile: 'dancing_mad.txt',
   initData: () => ({ phase: 'p1' }),
-  triggers: [
+  triggers: dmApplyP4OnlyGate([
     // ───────── 페이즈 트래커 (업스트림) ─────────
     {
       id: 'DancingMad Phase Tracker',
@@ -5990,7 +5995,7 @@ const triggerSet: TriggerSet<Data> = {
         },
       },
     },
-  ],
+  ]),
   // 타임라인 원본은 한국어(source·표시 능력명 모두 한국어). 타 언어 클라이언트 지원:
   //   replaceSync = source(NPC명)을 각 언어로 치환 → 로그 sync 정상 작동.
   //   replaceText = 표시 능력명·주석을 각 언어로(BNpcName/Action/RSV 데이터 기반).
@@ -6558,8 +6563,5 @@ const triggerSet: TriggerSet<Data> = {
     },
   ],
 };
-
-// dmP4Only(P4 트리거만) 옵션 적용 — 정의는 상단 dmApplyP4OnlyGate. triggerSet 완성 후 1회 래핑.
-dmApplyP4OnlyGate(triggerSet.triggers);
 
 export default triggerSet;
