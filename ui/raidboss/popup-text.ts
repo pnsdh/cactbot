@@ -1714,7 +1714,15 @@ export class PopupText {
   }
 
   _updateCountdownInternal(span: HTMLElement, endTime: number): void {
+    // Fork: also stops once the text is gone (e.g. replaced by a newer one) before reaching 0.
+    let shown = false;
     const updateCountdown = () => {
+      if (span.isConnected) {
+        shown = true;
+      } else if (shown) {
+        clearInterval(interval);
+        return;
+      }
       let remainingTime = (endTime - +new Date()) / 1000;
       if (remainingTime <= 0) {
         remainingTime = 0;

@@ -192,7 +192,10 @@ export class HTMLTimelineUI extends TimelineUI {
       if (this.debugElement)
         this.debugElement.innerHTML = '';
       this.debugFightTimer = null;
-      // TODO: clear all timeouts?
+      for (const activeBar of [...Object.values(this.activeBars), ...this.parkedBars.values()]) {
+        window.clearTimeout(activeBar.soonTimeout);
+        window.clearTimeout(activeBar.expiredTimeout);
+      }
       this.activeBars = {};
       this.parkedBars.clear();
     }
