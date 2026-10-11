@@ -1,10 +1,23 @@
 import { UnreachableCode } from './not_reached';
 
-// The smallest change of the filled fraction that draw() renders.  A bar usually crosses its
-// lane over many seconds, i.e. a small fraction of a pixel per frame at high frame rates, so
-// most frames would repaint it for no visible movement.  1/2000 is below half a pixel on lanes
-// up to 1000px wide.
+// The smallest movement that draw() renders.  A bar usually crosses its lane over many seconds,
+// i.e. a small fraction of a pixel per frame at high frame rates, so most frames would repaint
+// it for no visible movement.  Half a pixel of the bar's width; until that width is known,
+// 1/2000 (below half a pixel on bars up to 1000px wide).
+const kMinProgressPixels = 0.5;
 const kMinProgressStep = 0.0005;
+
+// Bar widths, kept up to date by one observer shared by all bars (reading them every frame
+// would force layout).
+const barWidths = new WeakMap<Element, number>();
+let barResizeObserver: ResizeObserver | undefined;
+const getBarResizeObserver = (): ResizeObserver => {
+  barResizeObserver ??= new ResizeObserver((entries) => {
+    for (const entry of entries)
+      barWidths.set(entry.target, entry.contentRect.width);
+  });
+  return barResizeObserver;
+};
 
 export default class TimerBar extends HTMLElement {
   rootElement: HTMLElement;
@@ -416,6 +429,7 @@ export default class TimerBar extends HTMLElement {
 
   connectedCallback(): void {
     this._connected = true;
+    getBarResizeObserver().observe(this.rootElement);
     this.layout();
     this.updateText();
     if (!this._start)
@@ -426,6 +440,7 @@ export default class TimerBar extends HTMLElement {
 
   disconnectedCallback(): void {
     this._connected = false;
+    getBarResizeObserver().unobserve(this.rootElement);
   }
 
   attributeChangedCallback(name: string, _oldValue: string | number, newValue: string): void {
@@ -545,9 +560,11 @@ export default class TimerBar extends HTMLElement {
       percent = 1.0 - percent;
     const ended = remainSec <= 0;
     const drawn = this._drawnProgress;
+    const width = barWidths.get(this.rootElement) ?? 0;
+    const minStep = width > 0 ? kMinProgressPixels / width : kMinProgressStep;
     if (
       percent !== drawn &&
-      (ended || drawn === undefined || Math.abs(percent - drawn) >= kMinProgressStep)
+      (ended || drawn === undefined || Math.abs(percent - drawn) >= minStep)
     ) {
       this._drawnProgress = percent;
       this.foregroundElement.style.transform = `scaleX(${percent.toFixed(3)})`;
