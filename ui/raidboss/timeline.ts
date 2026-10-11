@@ -1,8 +1,6 @@
-import { commonNetRegex } from '../../resources/netregexes';
 import { UnreachableCode } from '../../resources/not_reached';
 import { LocaleRegex } from '../../resources/translations';
 import { EventResponses, LogEvent } from '../../types/event';
-import { CactbotBaseRegExp } from '../../types/net_trigger';
 import { LooseTimelineTrigger, RaidbossFileData, TimelineReplacement } from '../../types/trigger';
 
 import { PopupTextGenerator } from './popup-text';
@@ -680,7 +678,6 @@ export class TimelineController {
   protected timelines: { [filename: string]: string };
 
   private suppressNextEngage: boolean;
-  private wipeRegex: CactbotBaseRegExp<'ActorControl'>;
   protected activeTimeline: Timeline | null = null;
 
   constructor(
@@ -700,7 +697,6 @@ export class TimelineController {
 
     // Used to suppress any Engage! if there's a wipe between /countdown and Engage!.
     this.suppressNextEngage = false;
-    this.wipeRegex = commonNetRegex.wipe;
   }
 
   public SetPopupTextInterface(popupText: PopupTextGenerator): void {
@@ -732,11 +728,9 @@ export class TimelineController {
         // (e.g. countdown > wipe > face pull > engage), don't process this engage line
         if (this.suppressNextEngage)
           continue;
-      } else if (this.wipeRegex.test(log)) {
-        // If we see a wipe, ignore the next engage.  If we see a countdown before that wipe,
-        // we will clear this.  Therefore, this will only apply to active countdowns.
-        this.suppressNextEngage = true;
       }
+      // Fork: wipes are handled by SetInCombat(false) (a wipe line test here was a network log
+      // regex run against these old-format lines, so it never matched).
       this.activeTimeline.OnLogLine(log, currentTime);
     }
   }
@@ -759,6 +753,8 @@ export class TimelineController {
     styles: TimelineStyle[],
     zoneId: number,
   ): void {
+    // Fork: stop the previous timeline's timers (it kept scheduling updates if it was running).
+    this.activeTimeline?.Stop();
     this.activeTimeline = null;
 
     let text = '';
