@@ -113,7 +113,7 @@ raidboss의 타임라인 막대만 바꾸려면 `.timer-bar timer-bar`에 지정
 | --- | --- |
 | `.timer-bar.soon` | 곧 시전될 막대 (cactbot 설정의 `BarExpiresSoonSeconds` 이내) |
 | `.timer-bar.channeling` | 시전 중인 막대. cactbot은 원래 막대를 같은 줄에서 이 막대로 바꾸며, 이름 앞에 `시전중:`을 붙입니다. |
-| `.timer-bar.next` | 가장 먼저 끝나는 막대 (시전 막대 포함). 끝난 뒤 사라질 때까지 유지됩니다. |
+| `.timer-bar.next` | 타임라인 순서상 가장 앞선 막대 (시전 막대 포함). 끝난 뒤 사라질 때까지 유지됩니다. |
 | `.timer-bar.expired` | 시간이 다 된 막대 (`KeepExpiredTimerBarsForSeconds` 동안 표시) |
 | `timer-bar[ended]` | 막대 안쪽(`timer-bar` 요소)에 시간이 0이 된 바로 그 프레임부터 붙는 속성. 남은 시간 글자가 비는 시점과 같습니다. |
 | `.timer-bar[data-text="..."]` | 특정 기술의 막대. 예: `.timer-bar[data-text*="알테마"]` |
@@ -162,6 +162,29 @@ raidboss의 타임라인 막대만 바꾸려면 `.timer-bar timer-bar`에 지정
 
 * `.timer-bar`에 애니메이션을 넣을 때는 제거 애니메이션(`.animate-timer-bar-removed`)이 덮어써지지 않도록 더 높은 우선순위로 따로 지정합니다.
   cactbot은 제거 애니메이션이 끝나기를 기다렸다가 막대를 지우며, 끝나지 않으면 3초 뒤에 지웁니다.
+
+* OverlayPlugin에 내장된 브라우저(Chromium 95)는 `::part` 규칙에 지정한 애니메이션을 실행하지 않습니다.
+  막대 안쪽을 움직이려면 `@property`로 등록한 변수를 `timer-bar` 요소에서 애니메이션하고, `::part` 규칙에서는 그 변수를 `var()`로 읽기만 합니다.
+
+  ```css
+  @property --my-glow {
+    syntax: "<number>";
+    inherits: true;
+    initial-value: 0;
+  }
+
+  .timer-bar.soon timer-bar {
+    animation: my-pulse 1s ease-in-out infinite;
+  }
+
+  .timer-bar timer-bar::part(timerbar-root) {
+    box-shadow: inset 0 0 0 1px rgb(255 120 100 / var(--my-glow));
+  }
+
+  @keyframes my-pulse {
+    50% { --my-glow: 0.8; }
+  }
+  ```
 
 * 글꼴을 바꾸면 막대 안 글자의 세로 위치가 어긋날 수 있습니다. 이때는 글자 영역을 직접 맞춥니다.
 

@@ -80,6 +80,37 @@
   initial-value: 0;
 }
 
+/* Panel edge alpha, landing flash, "next" pop, stripe offset and cast fade-in. */
+@property --cbkr-edge-a {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0.08;
+}
+
+@property --cbkr-flash {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+@property --cbkr-pop {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+@property --cbkr-stripe-x {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0;
+}
+
+@property --cbkr-fade {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 1;
+}
+
 :root {
   --raidboss-font-family: "Pretendard Variable", "Pretendard", "Malgun Gothic", sans-serif;
   --cbkr-num-font: "cbkr Oxanium", "Pretendard Variable", sans-serif;
@@ -138,6 +169,7 @@
 
 .timer-bar timer-bar {
   --cbkr-d: 6.5px;
+  --cbkr-edge: 255 255 255;
   --timerbar-font-family: var(--raidboss-font-family);
   --timerbar-font-weight: 600;
   --timerbar-text-color: rgb(238 241 247);
@@ -168,10 +200,13 @@
 
 .timer-bar.next timer-bar {
   --cbkr-d: 12px;
+  --cbkr-edge: var(--cbkr-c);
+  --cbkr-edge-a: 0.32;
 
   font-size: 1.35em;
   /* stylelint-disable-next-line custom-property-no-missing-var-function */
   transition: font-size 210ms cubic-bezier(0.4, 0, 0.2, 1) 250ms, --cbkr-d 180ms ease-out;
+  animation: cbkr-promote 650ms cubic-bezier(0.16, 1, 0.3, 1), cbkr-breathe 1.6s ease-in-out infinite;
 }
 
 /* Text: centered vertically, name on the left, time in its own column on the right. */
@@ -240,28 +275,91 @@
   content: none;
 }
 
+/* ===== Animation driver =====
+   The Chromium (95) inside OverlayPlugin does not run animations set through ::part(), so every
+   animation runs on the timer-bar element itself and only changes custom properties, which the
+   shadow parts inherit and draw from.  The "next" bar's are set above with its size. */
+.timer-bar.soon timer-bar {
+  --cbkr-edge: var(--cbkr-soon);
+
+  animation: cbkr-blink 0.9s ease-in-out infinite;
+}
+
+/* A bar promoted while already blinking only grows: the blinking edge stays as is. */
+.timer-bar.next.soon timer-bar {
+  --cbkr-pop-k: 0;
+
+  animation:
+    cbkr-promote 650ms cubic-bezier(0.16, 1, 0.3, 1),
+    cbkr-breathe 1.6s ease-in-out infinite,
+    cbkr-blink 0.9s ease-in-out infinite;
+}
+
+/* Casting bars replace their ability bar in the same row: fade in place instead of sliding in,
+   and neither pop nor blink (cactbot marks them soon for their whole duration). */
+.timer-bar.channeling {
+  animation: none;
+}
+
+.timer-bar.channeling timer-bar,
+.timer-bar.channeling.soon timer-bar,
+.timer-bar.next.channeling.soon timer-bar {
+  --cbkr-edge: 255 255 255;
+  --cbkr-edge-a: 0.08;
+
+  animation: cbkr-cast-in 260ms ease-out, cbkr-stripes 1.6s linear infinite;
+}
+
+.timer-bar.next.channeling timer-bar,
+.timer-bar.next.channeling.soon timer-bar {
+  --cbkr-edge: var(--cbkr-c);
+  --cbkr-edge-a: 0.32;
+}
+
+/* Landing: from the frame the marker reaches the now line (shown for
+   KeepExpiredTimerBarsForSeconds) the diamond grows, a ring bursts out, the glow flares and
+   settles, the panel flashes and a band of light runs across the emptied time column. */
+#timeline .timer-bar timer-bar[ended] {
+  --cbkr-d: 13px;
+  --cbkr-edge: var(--cbkr-c);
+  --cbkr-edge-a: 0.4;
+
+  animation:
+    cbkr-ring 650ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards,
+    cbkr-impact 700ms ease-out forwards,
+    cbkr-sweep 480ms cubic-bezier(0.3, 0.6, 0.3, 1) forwards;
+}
+
 /* ===== Panel ===== */
 .timer-bar timer-bar::part(timerbar-root) {
   background-color: rgb(var(--cbkr-track) / 82%);
   background-image: var(--cbkr-end-fx, none), var(--cbkr-panel-tint, none);
   background-repeat: no-repeat;
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 8%);
+  box-shadow:
+    inset 0 0 0 1px rgb(var(--cbkr-edge) / var(--cbkr-edge-a)),
+    inset 0 0 0 2px rgb(var(--cbkr-h) / calc((var(--cbkr-flash) + var(--cbkr-pop) * var(--cbkr-pop-k, 1)) * 0.95)),
+    inset 0 0 22px rgb(var(--cbkr-c) / calc(var(--cbkr-flash) * 0.45)),
+    0 0 16px rgb(var(--cbkr-c) / calc(var(--cbkr-pop) * var(--cbkr-pop-k, 1) * 0.45));
+  opacity: var(--cbkr-fade);
+  transform: scale(calc(1 + var(--cbkr-pop) * 0.025));
 }
 
 .timer-bar.next timer-bar::part(timerbar-root) {
   --cbkr-panel-tint: linear-gradient(90deg, rgb(var(--cbkr-c) / 12%), transparent 65%);
 
   background-color: rgb(32 34 41 / 88%);
-  box-shadow: inset 0 0 0 1px rgb(var(--cbkr-c) / 32%);
-  animation: cbkr-promote 650ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.timer-bar.soon timer-bar::part(timerbar-root) {
-  animation: cbkr-blink 0.9s ease-in-out infinite;
-}
-
-.timer-bar.next.soon timer-bar::part(timerbar-root) {
-  animation: cbkr-promote 650ms cubic-bezier(0.16, 1, 0.3, 1), cbkr-blink 0.9s ease-in-out infinite;
+#timeline .timer-bar timer-bar[ended]::part(timerbar-root) {
+  --cbkr-line: calc(100% - var(--cbkr-time-w));
+  --cbkr-end-fx:
+    linear-gradient(
+      90deg,
+      transparent calc(var(--cbkr-line) + var(--cbkr-sx) - 26px),
+      rgb(var(--cbkr-h) / var(--cbkr-sa)) calc(var(--cbkr-line) + var(--cbkr-sx)),
+      transparent calc(var(--cbkr-line) + var(--cbkr-sx) + 4px)
+    ),
+    linear-gradient(90deg, transparent var(--cbkr-line), rgb(var(--cbkr-c) / var(--cbkr-fa)) var(--cbkr-line));
 }
 
 /* ===== Lane and marker ===== */
@@ -311,10 +409,6 @@
     ) 0 0 / var(--cbkr-line) 100% no-repeat;
 }
 
-.timer-bar.next timer-bar::part(timerbar-bg) {
-  animation: cbkr-breathe 1.6s ease-in-out infinite;
-}
-
 /* Diamond marker. */
 .timer-bar timer-bar::part(timerbar-fg) {
   transform: none !important;
@@ -328,58 +422,16 @@
     );
 }
 
-/* ===== Casting bars ===== */
-
-/* They replace their ability's bar in the same row: fade in place instead of sliding in, and
-   don't blink (cactbot marks them soon for their whole duration).  Effects stay on inner parts
-   so cactbot's removal animation on .timer-bar is never overridden. */
-.timer-bar.channeling {
-  animation: none;
-}
-
-.timer-bar.channeling timer-bar::part(timerbar-root),
-.timer-bar.channeling.soon timer-bar::part(timerbar-root),
-.timer-bar.next.channeling.soon timer-bar::part(timerbar-root) {
-  animation: cbkr-cast-in 260ms ease-out;
-}
-
 .timer-bar.channeling timer-bar::part(timerbar-bg) {
   background: none;
 }
 
-/* Flowing stripes that end at the now line and empty toward it. */
+/* Casting: flowing stripes that end at the now line and empty toward it. */
 .timer-bar.channeling timer-bar::part(timerbar-fg) {
   clip-path: inset(0 var(--cbkr-time-w) 0 calc((100% - var(--cbkr-time-w)) * (1 - var(--timerbar-progress, 1))));
   background: repeating-linear-gradient(-45deg, rgb(var(--cbkr-cast) / 30%) 0 4px, rgb(var(--cbkr-cast) / 13%) 4px 8px);
+  background-position: var(--cbkr-stripe-x) 0;
   background-size: 11.31px 100%;
-  animation: cbkr-stripes 1.6s linear infinite;
-}
-
-/* ===== Landing ===== */
-
-/* From the frame the marker reaches the now line (shown for KeepExpiredTimerBarsForSeconds):
-   the diamond grows, a ring bursts out, the glow flares and settles, the panel flashes and a
-   band of light runs across the emptied time column.  #timeline makes these win. */
-#timeline .timer-bar timer-bar[ended] {
-  --cbkr-d: 13px;
-}
-
-#timeline .timer-bar timer-bar[ended]::part(timerbar-bg) {
-  animation: cbkr-ring 650ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
-}
-
-#timeline .timer-bar timer-bar[ended]::part(timerbar-root) {
-  --cbkr-line: calc(100% - var(--cbkr-time-w));
-  --cbkr-end-fx:
-    linear-gradient(
-      90deg,
-      transparent calc(var(--cbkr-line) + var(--cbkr-sx) - 26px),
-      rgb(var(--cbkr-h) / var(--cbkr-sa)) calc(var(--cbkr-line) + var(--cbkr-sx)),
-      transparent calc(var(--cbkr-line) + var(--cbkr-sx) + 4px)
-    ),
-    linear-gradient(90deg, transparent var(--cbkr-line), rgb(var(--cbkr-c) / var(--cbkr-fa)) var(--cbkr-line));
-
-  animation: cbkr-impact 700ms ease-out forwards, cbkr-sweep 480ms cubic-bezier(0.3, 0.6, 0.3, 1) forwards;
 }
 
 /* ===== Removal ===== */
@@ -427,27 +479,20 @@
 }
 
 @keyframes cbkr-cast-in {
-  0% { opacity: 0.3; }
-  100% { opacity: 1; }
+  0% { --cbkr-fade: 0.3; }
+  100% { --cbkr-fade: 1; }
 }
 
 @keyframes cbkr-promote {
-  0% {
-    transform: scale(1);
-    box-shadow: inset 0 0 0 1px rgb(var(--cbkr-h) / 0%);
-  }
-
-  30% {
-    transform: scale(1.025);
-    box-shadow: inset 0 0 0 2px rgb(var(--cbkr-h) / 95%), 0 0 16px rgb(var(--cbkr-c) / 45%);
-  }
-  100% { transform: scale(1); }
+  0%,
+  100% { --cbkr-pop: 0; }
+  30% { --cbkr-pop: 1; }
 }
 
 @keyframes cbkr-blink {
   0%,
-  100% { box-shadow: inset 0 0 0 1px rgb(var(--cbkr-soon) / 25%); }
-  50% { box-shadow: inset 0 0 0 1px rgb(var(--cbkr-soon) / 85%); }
+  100% { --cbkr-edge-a: 0.25; }
+  50% { --cbkr-edge-a: 0.85; }
 }
 
 @keyframes cbkr-breathe {
@@ -457,8 +502,8 @@
 }
 
 @keyframes cbkr-stripes {
-  0% { background-position: 0 0; }
-  100% { background-position: 11.31px 0; }
+  0% { --cbkr-stripe-x: 0; }
+  100% { --cbkr-stripe-x: 11.31px; }
 }
 
 @keyframes cbkr-ring {
@@ -476,8 +521,8 @@
 }
 
 @keyframes cbkr-impact {
-  0% { box-shadow: inset 0 0 0 2px rgb(var(--cbkr-h) / 95%), inset 0 0 22px rgb(var(--cbkr-c) / 45%); }
-  100% { box-shadow: inset 0 0 0 1px rgb(var(--cbkr-c) / 40%), inset 0 0 0 rgb(var(--cbkr-c) / 0%); }
+  0% { --cbkr-flash: 1; }
+  100% { --cbkr-flash: 0; }
 }
 
 @keyframes cbkr-sweep {
