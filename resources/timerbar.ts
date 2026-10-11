@@ -1,5 +1,11 @@
 import { UnreachableCode } from './not_reached';
 
+// The smallest change of the filled fraction that draw() renders.  A bar usually crosses its
+// lane over many seconds, i.e. a small fraction of a pixel per frame at high frame rates, so
+// most frames would repaint it for no visible movement.  1/2000 is below half a pixel on lanes
+// up to 1000px wide.
+const kMinProgressStep = 0.0005;
+
 export default class TimerBar extends HTMLElement {
   rootElement: HTMLElement;
   foregroundElement: HTMLElement;
@@ -22,6 +28,10 @@ export default class TimerBar extends HTMLElement {
   private _loop: boolean;
   private _connected: boolean;
   private _hideTimer: number | null;
+  // What draw() last wrote, so that frames which wouldn't change anything skip the DOM writes
+  // (and the style recalc, layout and repaint they cause).
+  private _drawnProgress?: number;
+  private _drawnTexts = new Map<HTMLElement, string>();
 
   static get observedAttributes(): string[] {
     return [
@@ -473,6 +483,8 @@ export default class TimerBar extends HTMLElement {
     if (!this._connected)
       return;
 
+    this._drawnProgress = undefined;
+
     // Not inline backgrounds, so that --timerbar-bg/--timerbar-fg and ::part() can override them.
     this.backgroundElement.style.setProperty('--timerbar-bg-attr', this._bg);
     this.foregroundElement.style.setProperty('--timerbar-fg-attr', this._fg);
@@ -493,6 +505,7 @@ export default class TimerBar extends HTMLElement {
   }
 
   updateText(): void {
+    this._drawnTexts.clear();
     const varyingTexts = ['elapsed', 'duration', 'percent', 'remain'];
     // These values are filled in during draw() when the values change.
     if (!varyingTexts.includes(this._leftText)) {
@@ -506,6 +519,14 @@ export default class TimerBar extends HTMLElement {
       this.rightTextElement.innerHTML = this._rightText;
   }
 
+  // Sets a text that changes while the bar runs, only when it differs from the last one.
+  private drawText(element: HTMLElement, text: string): void {
+    if (this._drawnTexts.get(element) === text)
+      return;
+    this._drawnTexts.set(element, text);
+    element.innerText = text;
+  }
+
   draw(): void {
     const elapsedSec = (Date.now() - this._start) / 1000;
     const remainSec = Math.max(0, this._duration - elapsedSec);
@@ -516,45 +537,52 @@ export default class TimerBar extends HTMLElement {
     const displayElapsed = elapsedSec.toFixed(1);
     if (this._fill)
       percent = 1.0 - percent;
-    this.foregroundElement.style.transform = `scaleX(${percent.toFixed(3)})`;
-    // Exposed for user css/skins (inherited by every part), e.g. revealing a fixed gradient with
-    // clip-path instead of the default scaleX (which stretches it), or placing effects at the
-    // fill edge.
-    this.rootElement.style.setProperty('--timerbar-progress', percent.toFixed(4));
+    const ended = remainSec <= 0;
+    const drawn = this._drawnProgress;
+    if (
+      percent !== drawn &&
+      (ended || drawn === undefined || Math.abs(percent - drawn) >= kMinProgressStep)
+    ) {
+      this._drawnProgress = percent;
+      this.foregroundElement.style.transform = `scaleX(${percent.toFixed(3)})`;
+      // Exposed for user css/skins (inherited by every part), e.g. revealing a fixed gradient
+      // with clip-path instead of the default scaleX (which stretches it), or placing effects
+      // at the fill edge.
+      this.rootElement.style.setProperty('--timerbar-progress', percent.toFixed(4));
+    }
     // `ended` is set in the same frame the remaining time hits 0 (and the "remain" text goes
     // empty), so css can replace it without a gap, e.g. `timer-bar[ended]::part(...)`.
-    const ended = remainSec <= 0;
     if (ended !== this.hasAttribute('ended'))
       this.toggleAttribute('ended', ended);
     if (this._leftText !== '') {
       if (this._leftText === 'remain')
-        this.leftTextElement.innerText = displayRemain;
+        this.drawText(this.leftTextElement, displayRemain);
       else if (this._leftText === 'duration')
-        this.leftTextElement.innerText = `${displayRemain} / ${this._duration}`;
+        this.drawText(this.leftTextElement, `${displayRemain} / ${this._duration}`);
       else if (this._leftText === 'percent')
-        this.leftTextElement.innerText = `${(percent * 100).toFixed(1)} %`;
+        this.drawText(this.leftTextElement, `${(percent * 100).toFixed(1)} %`);
       else if (this._leftText === 'elapsed')
-        this.leftTextElement.innerText = displayElapsed;
+        this.drawText(this.leftTextElement, displayElapsed);
     }
     if (this._centerText !== '') {
       if (this._centerText === 'remain')
-        this.centerTextElement.innerText = displayRemain;
+        this.drawText(this.centerTextElement, displayRemain);
       else if (this._centerText === 'duration')
-        this.centerTextElement.innerText = `${displayRemain} / ${this._duration}`;
+        this.drawText(this.centerTextElement, `${displayRemain} / ${this._duration}`);
       else if (this._centerText === 'percent')
-        this.centerTextElement.innerText = `${(percent * 100).toFixed(1)} %`;
+        this.drawText(this.centerTextElement, `${(percent * 100).toFixed(1)} %`);
       else if (this._centerText === 'elapsed')
-        this.centerTextElement.innerText = displayElapsed;
+        this.drawText(this.centerTextElement, displayElapsed);
     }
     if (this._rightText !== '') {
       if (this._rightText === 'remain')
-        this.rightTextElement.innerText = displayRemain;
+        this.drawText(this.rightTextElement, displayRemain);
       else if (this._rightText === 'duration')
-        this.rightTextElement.innerText = `${displayRemain} / ${this._duration}`;
+        this.drawText(this.rightTextElement, `${displayRemain} / ${this._duration}`);
       else if (this._rightText === 'percent')
-        this.rightTextElement.innerText = `${(percent * 100).toFixed(1)} %`;
+        this.drawText(this.rightTextElement, `${(percent * 100).toFixed(1)} %`);
       else if (this._rightText === 'elapsed')
-        this.rightTextElement.innerText = displayElapsed;
+        this.drawText(this.rightTextElement, displayElapsed);
     }
   }
 
