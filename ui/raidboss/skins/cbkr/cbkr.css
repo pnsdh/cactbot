@@ -611,17 +611,14 @@
 }
 
 .info-text {
-  --cbkr-glow: rgb(80 240 170 / 95%);
   --cbkr-glow-soft: rgb(80 240 170 / 20%);
 }
 
 .alert-text {
-  --cbkr-glow: rgb(255 205 80 / 95%);
   --cbkr-glow-soft: rgb(255 205 80 / 20%);
 }
 
 .alarm-text {
-  --cbkr-glow: rgb(255 90 105 / 100%);
   --cbkr-glow-soft: rgb(255 90 105 / 28%);
 }
 
@@ -640,23 +637,17 @@
     cbkr-alarm-pulse 520ms ease-in-out 460ms 2;
 }
 
+/* Only opacity and transform, which the compositor animates: alerts come often in fights, and
+   animating their many-layered text-shadow repainted the text every frame. */
 @keyframes cbkr-alert-in {
   0% {
     opacity: 0;
-    letter-spacing: 0.22em;
     transform: translateY(10px) scale(0.96);
-    text-shadow: var(--cbkr-outline), 0 0 28px var(--cbkr-glow), 0 3px 16px rgb(0 0 0 / 0%);
-  }
-
-  45% {
-    opacity: 1;
-    text-shadow: var(--cbkr-outline), 0 0 20px var(--cbkr-glow), 0 3px 16px rgb(0 0 0 / 45%);
   }
 
   100% {
-    letter-spacing: -0.018em;
+    opacity: 1;
     transform: none;
-    text-shadow: var(--cbkr-outline), 0 0 16px var(--cbkr-glow-soft), 0 3px 16px rgb(0 0 0 / 45%);
   }
 }
 
