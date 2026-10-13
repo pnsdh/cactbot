@@ -118,7 +118,7 @@
   --timeline-height: 100%;
   --timeline-font-size: 20px;
   --timeline-bar-height: 32px;
-  --timeline-bar-gap: 6px;
+  --timeline-bar-gap: 0;
   --info-text-color: #74e8bd;
   --alert-text-color: #fdd166;
   --alarm-text-color: #ff6b6b;
@@ -145,6 +145,13 @@
    width on the left and the alerts use the space to its right. */
 .hide-alerts #timeline-container {
   --timeline-width: 100%;
+}
+
+/* Bars sit flush against each other; the stack keeps a margin from the overlay's edges so the
+   outer bars' edges are not drawn right against the window border. */
+#timeline-container {
+  box-sizing: border-box;
+  padding: 4px;
 }
 
 #container:not(.hide-alerts, .hide-timeline) #popup-text-container {
@@ -337,9 +344,12 @@
   background-color: rgb(var(--cbkr-track) / 82%);
   background-image: var(--cbkr-end-fx, none), var(--cbkr-panel-tint, none);
   background-repeat: no-repeat;
+
+  /* The rings carry a 0.5px blur: with no blur, the GPU raster in OverlayPlugin's CEF leaks a
+     bright pixel just outside each rounded corner. */
   box-shadow:
-    inset 0 0 0 1px rgb(var(--cbkr-edge) / var(--cbkr-edge-a)),
-    inset 0 0 0 2px rgb(var(--cbkr-h) / calc((var(--cbkr-flash) + var(--cbkr-pop) * var(--cbkr-pop-k, 1)) * 0.95)),
+    inset 0 0 0.5px 1px rgb(var(--cbkr-edge) / var(--cbkr-edge-a)),
+    inset 0 0 0.5px 2px rgb(var(--cbkr-h) / calc((var(--cbkr-flash) + var(--cbkr-pop) * var(--cbkr-pop-k, 1)) * 0.95)),
     inset 0 0 22px rgb(var(--cbkr-c) / calc(var(--cbkr-flash) * 0.45)),
     inset 0 0 16px rgb(var(--cbkr-c) / calc(var(--cbkr-pop) * var(--cbkr-pop-k, 1) * 0.45));
   opacity: var(--cbkr-fade);
