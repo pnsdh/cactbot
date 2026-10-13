@@ -118,7 +118,7 @@
   --timeline-height: 100%;
   --timeline-font-size: 20px;
   --timeline-bar-height: 32px;
-  --timeline-bar-gap: 6px;
+  --timeline-bar-gap: 0;
   --info-text-color: #74e8bd;
   --alert-text-color: #fdd166;
   --alarm-text-color: #ff6b6b;
@@ -145,6 +145,13 @@
    width on the left and the alerts use the space to its right. */
 .hide-alerts #timeline-container {
   --timeline-width: 100%;
+}
+
+/* Bars sit flush against each other; the stack keeps a margin from the overlay's edges so the
+   outer bars' edges are not drawn right against the window border. */
+#timeline-container {
+  box-sizing: border-box;
+  padding: 4px;
 }
 
 #container:not(.hide-alerts, .hide-timeline) #popup-text-container {
