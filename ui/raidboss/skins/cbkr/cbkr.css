@@ -344,9 +344,12 @@
   background-color: rgb(var(--cbkr-track) / 82%);
   background-image: var(--cbkr-end-fx, none), var(--cbkr-panel-tint, none);
   background-repeat: no-repeat;
+
+  /* The rings carry a 0.5px blur: with no blur, the GPU raster in OverlayPlugin's CEF leaks a
+     bright pixel just outside each rounded corner. */
   box-shadow:
-    inset 0 0 0 1px rgb(var(--cbkr-edge) / var(--cbkr-edge-a)),
-    inset 0 0 0 2px rgb(var(--cbkr-h) / calc((var(--cbkr-flash) + var(--cbkr-pop) * var(--cbkr-pop-k, 1)) * 0.95)),
+    inset 0 0 0.5px 1px rgb(var(--cbkr-edge) / var(--cbkr-edge-a)),
+    inset 0 0 0.5px 2px rgb(var(--cbkr-h) / calc((var(--cbkr-flash) + var(--cbkr-pop) * var(--cbkr-pop-k, 1)) * 0.95)),
     inset 0 0 22px rgb(var(--cbkr-c) / calc(var(--cbkr-flash) * 0.45)),
     inset 0 0 16px rgb(var(--cbkr-c) / calc(var(--cbkr-pop) * var(--cbkr-pop-k, 1) * 0.45));
   opacity: var(--cbkr-fade);
