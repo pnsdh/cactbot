@@ -26,6 +26,10 @@ export default class TimerBar extends HTMLElement {
   leftTextElement: HTMLElement;
   centerTextElement: HTMLElement;
   rightTextElement: HTMLElement;
+  runnerTrackElement: HTMLElement;
+  runnerElement: HTMLElement;
+  runnerFadeElement: HTMLElement;
+  runnerFixedElement: HTMLElement;
   private _duration: number;
   private _start: number;
   private _width: string;
@@ -51,6 +55,10 @@ export default class TimerBar extends HTMLElement {
   // (and the style recalc, layout and repaint they cause).
   private _drawnProgress?: number;
   private _drawnTexts = new Map<HTMLElement, string>();
+  // Read from the skin when the bar is connected (see syncRunner and draw).
+  private _runnerEnabled = false;
+  private _progressUpdates = true;
+  private _runnerAnimations: Animation[] = [];
 
   static get observedAttributes(): string[] {
     return [
@@ -324,6 +332,10 @@ export default class TimerBar extends HTMLElement {
     this.leftTextElement = this.shadowRoot?.getElementById('lefttext') as HTMLDivElement;
     this.centerTextElement = this.shadowRoot?.getElementById('centertext') as HTMLDivElement;
     this.rightTextElement = this.shadowRoot?.getElementById('righttext') as HTMLDivElement;
+    this.runnerTrackElement = this.shadowRoot?.getElementById('runnertrack') as HTMLDivElement;
+    this.runnerElement = this.shadowRoot?.getElementById('runner') as HTMLDivElement;
+    this.runnerFadeElement = this.shadowRoot?.getElementById('runnerfade') as HTMLDivElement;
+    this.runnerFixedElement = this.shadowRoot?.getElementById('runnerfixed') as HTMLDivElement;
   }
 
   init(root: ShadowRoot): void {
@@ -331,6 +343,13 @@ export default class TimerBar extends HTMLElement {
     // the shadow root; the fallbacks are the original defaults. --timerbar-bg/--timerbar-fg
     // override the bg/fg attribute colors, which layout() passes in via --timerbar-*-attr.
     // draw() also sets --timerbar-progress (0-1, the filled fraction) on the root part.
+    // timerbar-frame is an empty layer under the others (e.g. for borders a skin animates on
+    // their own).  The runner (hidden unless a skin shows timerbar-runner-track) moves with the
+    // progress through animations the compositor runs, like the fill: in place at 1, and at 0
+    // translated by its own width away from the side the fill is anchored to.  Its last item,
+    // timerbar-runner-e, has an opacity equal to the progress, and timerbar-runner-fixed moves
+    // the other way so it stays in place (shown where the runner is, if it clips it) (see
+    // syncRunner).
     root.innerHTML = `
       <style>
         .timerbar-root {
@@ -353,6 +372,22 @@ export default class TimerBar extends HTMLElement {
           height: 100%;
           background: var(--timerbar-fg, var(--timerbar-fg-attr));
           opacity: var(--timerbar-fg-opacity, 1.0);
+        }
+        .timerbar-runner-track {
+          display: none;
+        }
+        .timerbar-frame {
+          border-radius: inherit;
+        }
+        .timerbar-frame,
+        .timerbar-runner-track,
+        .timerbar-runner,
+        .timerbar-runner-item {
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: 100%;
+          height: 100%;
         }
         .text {
           position: absolute;
@@ -412,8 +447,19 @@ export default class TimerBar extends HTMLElement {
         }
       </style>
       <div id="root" class="timerbar-root" part="timerbar-root">
+        <div class="timerbar-frame" part="timerbar-frame"></div>
         <div id="bg" class="timerbar-bg" part="timerbar-bg"></div>
         <div id="fg" class="timerbar-fg" part="timerbar-fg"></div>
+        <div id="runnertrack" class="timerbar-runner-track" part="timerbar-runner-track">
+          <div id="runner" class="timerbar-runner" part="timerbar-runner">
+            <div id="runnerfixed" class="timerbar-runner-item" part="timerbar-runner-fixed"></div>
+            <div class="timerbar-runner-item" part="timerbar-runner-a"></div>
+            <div class="timerbar-runner-item" part="timerbar-runner-b"></div>
+            <div class="timerbar-runner-item" part="timerbar-runner-c"></div>
+            <div class="timerbar-runner-item" part="timerbar-runner-d"></div>
+            <div id="runnerfade" class="timerbar-runner-item" part="timerbar-runner-e"></div>
+          </div>
+        </div>
         <div class="text-container" part="text-container">
           <div id="lefttext" class="text timerbar-lefttext" part="text timerbar-lefttext"></div>
         </div>
@@ -429,6 +475,12 @@ export default class TimerBar extends HTMLElement {
 
   connectedCallback(): void {
     this._connected = true;
+    // Skins choose these once per bar: a shown runner track, and
+    // `--timerbar-progress-updates: off` to stop the per-frame progress writes (the fg scaleX and
+    // --timerbar-progress) when nothing reads them, which saves a style recalc every frame.
+    this._runnerEnabled = window.getComputedStyle(this.runnerTrackElement).display !== 'none';
+    this._progressUpdates = window.getComputedStyle(this.rootElement)
+      .getPropertyValue('--timerbar-progress-updates').trim() !== 'off';
     getBarResizeObserver().observe(this.rootElement);
     this.layout();
     this.updateText();
@@ -441,6 +493,7 @@ export default class TimerBar extends HTMLElement {
   disconnectedCallback(): void {
     this._connected = false;
     getBarResizeObserver().unobserve(this.rootElement);
+    this.cancelRunner();
   }
 
   attributeChangedCallback(name: string, _oldValue: string | number, newValue: string): void {
@@ -523,6 +576,47 @@ export default class TimerBar extends HTMLElement {
       this.foregroundElement.style.right = '';
       this.foregroundElement.style.transformOrigin = 'left center';
     }
+    this.syncRunner();
+  }
+
+  // Restarts the runner animations at the bar's current time.  Called whenever the time or the
+  // fill direction is set; in between they run on their own, without any per-frame work here.
+  private syncRunner(): void {
+    this.cancelRunner();
+    if (!this._connected || !this._runnerEnabled)
+      return;
+    const durationMs = this._duration * 1000;
+    const elapsedMs = Math.min(Math.max(Date.now() - this._start, 0), durationMs);
+    // Progress at the start and the end, as draw() computes it.
+    const from = this._fill ? 0 : 1;
+    const to = 1 - from;
+    // The fill is anchored to the right when layout() sets its transform origin there.
+    const anchoredRight = this._towardRight !== this._fill;
+    const offset = (progress: number): number =>
+      (anchoredRight ? 1 - progress : progress - 1) * 100;
+    const timing: KeyframeAnimationOptions = { duration: durationMs, fill: 'both' };
+    this._runnerAnimations = [
+      this.runnerElement.animate([
+        { transform: `translateX(${offset(from)}%)` },
+        { transform: `translateX(${offset(to)}%)` },
+      ], timing),
+      this.runnerFixedElement.animate([
+        { transform: `translateX(${-offset(from)}%)` },
+        { transform: `translateX(${-offset(to)}%)` },
+      ], timing),
+      this.runnerFadeElement.animate([{ opacity: from }, { opacity: to }], timing),
+    ];
+    // A start time rather than a current time: a current time would only count from when the
+    // animation actually starts, a frame or more later.
+    const startTime = performance.now() - elapsedMs;
+    for (const animation of this._runnerAnimations)
+      animation.startTime = startTime;
+  }
+
+  private cancelRunner(): void {
+    for (const animation of this._runnerAnimations)
+      animation.cancel();
+    this._runnerAnimations = [];
   }
 
   updateText(): void {
@@ -563,7 +657,7 @@ export default class TimerBar extends HTMLElement {
     const width = barWidths.get(this.rootElement) ?? 0;
     const minStep = width > 0 ? kMinProgressPixels / width : kMinProgressStep;
     if (
-      percent !== drawn &&
+      this._progressUpdates && percent !== drawn &&
       (ended || drawn === undefined || Math.abs(percent - drawn) >= minStep)
     ) {
       this._drawnProgress = percent;
@@ -636,6 +730,7 @@ export default class TimerBar extends HTMLElement {
     clearTimeout(this._hideTimer ?? 0);
     this._hideTimer = null;
 
+    this.syncRunner();
     this.advance();
   }
 

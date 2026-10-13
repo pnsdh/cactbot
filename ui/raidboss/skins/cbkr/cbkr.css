@@ -44,10 +44,11 @@
   initial-value: 6.5px;
 }
 
-@property --cbkr-glow-r {
-  syntax: "<length>";
+/* Glow size as a scale of its 26px radius. */
+@property --cbkr-glow-s {
+  syntax: "<number>";
   inherits: true;
-  initial-value: 26px;
+  initial-value: 1;
 }
 
 @property --cbkr-ring {
@@ -191,6 +192,7 @@
   --timerbar-border-radius: 6px;
   --timerbar-overflow: hidden;
   --timerbar-bg-opacity: 1;
+  --timerbar-progress-updates: off;
 
   font-size: 0.9em;
   /* stylelint-disable-next-line custom-property-no-missing-var-function */
@@ -325,6 +327,44 @@
   --cbkr-edge-a: 0.32;
 }
 
+/* Where ::part() animations run (Chromium 105+, :has() tells), the endless breathing and blinking
+   run on the glow and edge layers themselves, as transform and opacity animations the compositor
+   runs without restyling the bar every frame. */
+@supports selector(:has(*)) {
+  .timer-bar.next timer-bar,
+  .timer-bar.next.soon timer-bar {
+    animation: cbkr-promote 650ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .timer-bar.soon timer-bar {
+    animation: none;
+  }
+
+  .timer-bar.next timer-bar::part(timerbar-runner-b) {
+    animation: cbkr-breathe-glow 1.6s ease-in-out infinite;
+  }
+
+  .timer-bar.soon timer-bar::part(timerbar-frame) {
+    animation: cbkr-blink-edge 0.9s ease-in-out infinite;
+  }
+
+  .timer-bar.channeling timer-bar,
+  .timer-bar.channeling.soon timer-bar,
+  .timer-bar.next.channeling.soon timer-bar {
+    animation: cbkr-cast-in 260ms ease-out;
+  }
+
+  .timer-bar.channeling timer-bar::part(timerbar-runner-fixed) {
+    animation: cbkr-stripes-flow 1.6s linear infinite;
+  }
+
+  .timer-bar.channeling timer-bar::part(timerbar-frame),
+  #timeline .timer-bar timer-bar[ended]::part(timerbar-frame),
+  #timeline .timer-bar timer-bar[ended]::part(timerbar-runner-b) {
+    animation: none;
+  }
+}
+
 /* Landing: from the frame the marker reaches the now line (shown for
    KeepExpiredTimerBarsForSeconds) the diamond grows, a ring bursts out, the glow flares and
    settles, the panel flashes and a band of light runs across the emptied time column. */
@@ -348,7 +388,6 @@
   /* The rings carry a 0.5px blur: with no blur, the GPU raster in OverlayPlugin's CEF leaks a
      bright pixel just outside each rounded corner. */
   box-shadow:
-    inset 0 0 0.5px 1px rgb(var(--cbkr-edge) / var(--cbkr-edge-a)),
     inset 0 0 0.5px 2px rgb(var(--cbkr-h) / calc((var(--cbkr-flash) + var(--cbkr-pop) * var(--cbkr-pop-k, 1)) * 0.95)),
     inset 0 0 22px rgb(var(--cbkr-c) / calc(var(--cbkr-flash) * 0.45)),
     inset 0 0 16px rgb(var(--cbkr-c) / calc(var(--cbkr-pop) * var(--cbkr-pop-k, 1) * 0.45));
@@ -356,6 +395,12 @@
 
   /* The promotion glow stays inside the bar: bars span the overlay's width, so anything drawn
      outside (scaling, outer glow) is cut off at its edges. */
+}
+
+/* The edge on its own layer, so its blinking is only a change of opacity. */
+.timer-bar timer-bar::part(timerbar-frame) {
+  box-shadow: inset 0 0 0.5px 1px rgb(var(--cbkr-edge));
+  opacity: var(--cbkr-edge-a);
 }
 
 .timer-bar.next timer-bar::part(timerbar-root) {
@@ -379,10 +424,8 @@
 /* ===== Lane and marker ===== */
 .timer-bar timer-bar::part(timerbar-bg),
 .timer-bar timer-bar::part(timerbar-fg) {
-  /* The now line is the boundary with the time column.  These parts span the whole bar so the
-     marker can stop centered on the line and its glow fades out naturally over the time column;
-     lane details stop at the line.  The marker path runs from 12px to the line. */
-  --cbkr-x: calc(12px + var(--timerbar-progress, 1) * (100% - 12px - var(--cbkr-time-w)));
+  /* The now line is the boundary with the time column.  These parts span the whole bar; lane
+     details stop at the line. */
   --cbkr-line: calc(100% - var(--cbkr-time-w));
 
   left: 0 !important;
@@ -390,27 +433,10 @@
   width: 100%;
 }
 
-/* Lane: impact ring (only once ended), glow, trail, now line, 10s ticks, center line. */
+/* Lane: now line, 10s ticks, center line.  It never changes while the bar runs. */
 .timer-bar timer-bar::part(timerbar-bg) {
   opacity: 1;
   background:
-    radial-gradient(
-      circle at var(--cbkr-x) 50%,
-      transparent calc(var(--cbkr-ring) - 2px),
-      rgb(var(--cbkr-h) / var(--cbkr-ring-a)) var(--cbkr-ring),
-      transparent calc(var(--cbkr-ring) + 2px)
-    ),
-    radial-gradient(
-      circle at var(--cbkr-x) 50%,
-      rgb(var(--cbkr-c) / 45%) 0,
-      rgb(var(--cbkr-c) / 0%) var(--cbkr-glow-r)
-    ),
-    linear-gradient(
-      90deg,
-      transparent calc(var(--cbkr-x) - 150px),
-      rgb(var(--cbkr-c) / 20%) var(--cbkr-x),
-      transparent var(--cbkr-x)
-    ),
     linear-gradient(90deg, rgb(var(--cbkr-h) / 70%) 0 0)
     right calc(var(--cbkr-time-w) - 1px) top 0 / 2px 100% no-repeat,
     repeating-linear-gradient(90deg, rgb(255 255 255 / 5%) 0 1px, transparent 1px calc(100% / 3))
@@ -423,9 +449,59 @@
     ) 0 0 / var(--cbkr-line) 100% no-repeat;
 }
 
-/* Diamond marker. */
 .timer-bar timer-bar::part(timerbar-fg) {
   transform: none !important;
+  background: none;
+}
+
+/* What moves with the time is on timer-bar's runner, which the compositor moves, so a running bar
+   is never repainted for it (and --timerbar-progress-updates is off).  The marker travels from
+   12px to the now line: the runner spans that path and the marker sits on its right end. */
+.timer-bar timer-bar::part(timerbar-runner-track) {
+  display: block;
+}
+
+.timer-bar timer-bar::part(timerbar-runner) {
+  left: 12px;
+  width: calc(100% - 12px - var(--cbkr-time-w));
+}
+
+/* Around the marker, which sits on the runner's right end: the trail (150px to its left), the glow
+   and the impact ring (only once ended). */
+.timer-bar timer-bar::part(timerbar-runner-a) {
+  left: calc(100% - 150px);
+  width: 150px;
+  background: linear-gradient(90deg, transparent, rgb(var(--cbkr-c) / 20%));
+}
+
+/* Breathing and the landing flare scale the glow rather than redraw it. */
+.timer-bar timer-bar::part(timerbar-runner-b) {
+  top: calc(50% - 26px);
+  left: calc(100% - 26px);
+  width: 52px;
+  height: 52px;
+  background: radial-gradient(circle, rgb(var(--cbkr-c) / 45%) 0, rgb(var(--cbkr-c) / 0%) 26px);
+  transform: scale(var(--cbkr-glow-s));
+}
+
+.timer-bar timer-bar::part(timerbar-runner-c) {
+  left: calc(100% - 50px);
+  width: 100px;
+  background:
+    radial-gradient(
+      circle at 50px 50%,
+      transparent calc(var(--cbkr-ring) - 2px),
+      rgb(var(--cbkr-h) / var(--cbkr-ring-a)) var(--cbkr-ring),
+      transparent calc(var(--cbkr-ring) + 2px)
+    );
+}
+
+/* Diamond marker.  Its fill is a slice of a gradient across the whole bar, so its color shifts
+   along the path: d is cut where the path starts, e where it ends, and e fades in with the
+   progress (a linear gradient, so the blend matches the slice in between). */
+.timer-bar timer-bar::part(timerbar-runner-d),
+.timer-bar timer-bar::part(timerbar-runner-e) {
+  width: calc(100% + 12px + var(--cbkr-time-w));
   background: linear-gradient(135deg, rgb(var(--cbkr-h)), rgb(var(--cbkr-c)));
   clip-path:
     polygon(
@@ -436,16 +512,47 @@
     );
 }
 
+.timer-bar timer-bar::part(timerbar-runner-d) {
+  --cbkr-x: 12px;
+
+  left: calc(100% - 12px);
+}
+
+.timer-bar timer-bar::part(timerbar-runner-e) {
+  --cbkr-x: calc(100% - var(--cbkr-time-w));
+
+  left: -12px;
+}
+
 .timer-bar.channeling timer-bar::part(timerbar-bg) {
   background: none;
 }
 
-/* Casting: flowing stripes that end at the now line and empty toward it. */
-.timer-bar.channeling timer-bar::part(timerbar-fg) {
-  clip-path: inset(0 var(--cbkr-time-w) 0 calc((100% - var(--cbkr-time-w)) * (1 - var(--timerbar-progress, 1))));
+/* Casting: flowing stripes that end at the now line and empty toward it.  The runner spans the
+   lane and clips the stripes, which stay in place while it moves away toward the line. */
+.timer-bar.channeling timer-bar::part(timerbar-runner-track) {
+  width: calc(100% - var(--cbkr-time-w));
+  overflow: hidden;
+}
+
+.timer-bar.channeling timer-bar::part(timerbar-runner) {
+  left: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
+.timer-bar.channeling timer-bar::part(timerbar-runner-fixed) {
   background: repeating-linear-gradient(-45deg, rgb(var(--cbkr-cast) / 30%) 0 4px, rgb(var(--cbkr-cast) / 13%) 4px 8px);
   background-position: var(--cbkr-stripe-x) 0;
   background-size: 11.31px 100%;
+}
+
+.timer-bar.channeling timer-bar::part(timerbar-runner-a),
+.timer-bar.channeling timer-bar::part(timerbar-runner-b),
+.timer-bar.channeling timer-bar::part(timerbar-runner-c),
+.timer-bar.channeling timer-bar::part(timerbar-runner-d),
+.timer-bar.channeling timer-bar::part(timerbar-runner-e) {
+  display: none;
 }
 
 /* ===== Removal ===== */
@@ -511,8 +618,25 @@
 
 @keyframes cbkr-breathe {
   0%,
-  100% { --cbkr-glow-r: 22px; }
-  50% { --cbkr-glow-r: 34px; }
+  100% { --cbkr-glow-s: calc(22 / 26); }
+  50% { --cbkr-glow-s: calc(34 / 26); }
+}
+
+@keyframes cbkr-breathe-glow {
+  0%,
+  100% { transform: scale(calc(22 / 26)); }
+  50% { transform: scale(calc(34 / 26)); }
+}
+
+@keyframes cbkr-blink-edge {
+  0%,
+  100% { opacity: 0.25; }
+  50% { opacity: 0.85; }
+}
+
+@keyframes cbkr-stripes-flow {
+  0% { background-position: 0 0; }
+  100% { background-position: 11.31px 0; }
 }
 
 @keyframes cbkr-stripes {
@@ -524,13 +648,13 @@
   0% {
     --cbkr-ring: 6px;
     --cbkr-ring-a: 0.95;
-    --cbkr-glow-r: 44px;
+    --cbkr-glow-s: calc(44 / 26);
   }
 
   100% {
     --cbkr-ring: 46px;
     --cbkr-ring-a: 0;
-    --cbkr-glow-r: 24px;
+    --cbkr-glow-s: calc(24 / 26);
   }
 }
 

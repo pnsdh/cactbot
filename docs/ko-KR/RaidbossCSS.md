@@ -71,6 +71,7 @@ raidboss의 타임라인 막대만 바꾸려면 `.timer-bar timer-bar`에 지정
 | `--timerbar-bg-opacity` | 막대 배경 투명도 | `0.8` |
 | `--timerbar-fg` | 막대 채움 (그라데이션 가능) | 막대에 지정된 채움 색 |
 | `--timerbar-fg-opacity` | 막대 채움 투명도 | `1.0` |
+| `--timerbar-progress-updates` | `off`로 지정하면 매 프레임 채움(`scaleX`)과 `--timerbar-progress`를 갱신하지 않음 (러너만 쓰는 스킨용) | 갱신함 |
 
 막대 안쪽에는 다음 값도 자동으로 설정되며, `::part` 규칙 안에서 `var()`로 읽을 수 있습니다.
 
@@ -89,6 +90,43 @@ raidboss의 타임라인 막대만 바꾸려면 `.timer-bar timer-bar`에 지정
 }
 ```
 
+`--timerbar-progress`를 매 프레임 바꾸면 막대 안쪽 전체의 스타일을 다시 계산하고 다시 그립니다.
+진행에 따라 움직이는 장식은 아래 러너에 그리면 Chromium 합성기가 움직이므로 훨씬 가볍습니다.
+
+### 러너
+
+`timerbar-runner-track`을 보이게 하면(`display: block`) 그 안의 러너가 진행도에 따라 움직입니다.
+cactbot이 막대 시간을 맞출 때 애니메이션(Web Animations)을 만들어 두므로, 이후에는 매 프레임 작업이 없습니다.
+
+* `timerbar-runner`는 채움과 같은 방향으로 움직입니다. 진행도 1에서 제자리, 0에서 채움이 붙은 쪽의 반대로 자기 폭만큼 옮겨집니다.
+  기본 막대(왼쪽에서 채워짐)는 진행도가 0일 때 왼쪽 밖에 있다가 1이면 제자리에 옵니다.
+* 러너 안의 `timerbar-runner-a`~`timerbar-runner-e`는 러너와 함께 움직입니다. 기본 크기는 러너와 같습니다.
+  `timerbar-runner-e`는 투명도가 진행도와 같습니다.
+* `timerbar-runner-fixed`는 러너와 반대로 움직여 제자리에 있습니다. 러너에 `overflow: hidden`을 주면 러너가 지나간 부분만 드러납니다.
+* `timerbar-frame`은 다른 요소보다 아래에 깔리는 빈 층입니다. 테두리처럼 따로 애니메이션할 장식에 씁니다.
+
+진행도에 맞춰 움직이는 표식은 러너의 오른쪽 끝에 두면 됩니다.
+
+```css
+.timer-bar timer-bar {
+  --timerbar-progress-updates: off;
+}
+
+.timer-bar timer-bar::part(timerbar-fg) {
+  display: none;
+}
+
+.timer-bar timer-bar::part(timerbar-runner-track) {
+  display: block;
+}
+
+.timer-bar timer-bar::part(timerbar-runner-a) {
+  left: calc(100% - 8px);
+  width: 8px;
+  background: white;
+}
+```
+
 `--timerbar-fg`를 지정하면 곧 시전될 막대의 색 변화도 덮어씁니다.
 곧 시전될 막대에 다른 채움을 주려면 `.timer-bar.soon timer-bar`에 따로 지정합니다.
 
@@ -101,6 +139,9 @@ raidboss의 타임라인 막대만 바꾸려면 `.timer-bar timer-bar`에 지정
 | `timerbar-root` | 막대 전체 |
 | `timerbar-bg` | 배경 |
 | `timerbar-fg` | 채움 |
+| `timerbar-frame` | 맨 아래 빈 층 ([러너](#러너) 참고) |
+| `timerbar-runner-track`, `timerbar-runner` | 러너 영역과 러너 (기본은 숨김) |
+| `timerbar-runner-a`~`timerbar-runner-e`, `timerbar-runner-fixed` | 러너 안의 요소 |
 | `text-container` | 글자 영역 (왼쪽·가운데·오른쪽 각각) |
 | `text` | 글자 (왼쪽·가운데·오른쪽 공통) |
 | `timerbar-lefttext` | 왼쪽 글자 (기술 이름) |
