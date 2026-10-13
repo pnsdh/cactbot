@@ -4,6 +4,8 @@
 
 [cactbot](https://github.com/OverlayPlugin/cactbot)을 기반으로, 일부 트리거를 한국 서버 공략에 맞게 따로 작성한 포크입니다.
 
+문의·버그 제보는 [디스코드](https://discord.gg/R75tq68bA9)로 해 주세요.
+
 * 본가 cactbot의 기능을 모두 포함하며, 본가 업데이트는 자동으로 반영되어 함께 릴리즈됩니다.
 * 절 요성난무는 본가에도 트리거·타임라인이 있지만, 이 포크는 한국 서버 공략에 맞춰 따로 작성한 버전(P1~P5)을 사용합니다.
   본가가 업데이트되어도 이 포크의 절 요성난무 트리거는 유지됩니다.
@@ -143,7 +145,7 @@ cactbot: 0.37.5.2 C:\...\Plugins\cbkr\CactbotOverlay.dll (dir: C:\...\Plugins\cb
   해루봇이 변경한 것입니다. 설치 폴더 이름이 `cbkr`인지 확인하고, [오버레이 추가](#오버레이-추가)대로 다시 만듭니다.
 * 업데이트 알림이 뜨지 않는 경우:
   [설치 확인](#설치-확인)에서 버전이 네 자리인지 확인합니다.
-* 그 밖의 문제는 [본가 FAQ](docs/FAQ-Troubleshooting.md)를 참고합니다.
+* 그 밖의 문제는 [본가 FAQ](docs/FAQ-Troubleshooting.md)를 참고하거나 [디스코드](https://discord.gg/R75tq68bA9)로 문의합니다.
 
 ## 본가 cactbot으로 되돌리기
 
