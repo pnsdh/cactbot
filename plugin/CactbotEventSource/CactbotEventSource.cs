@@ -115,17 +115,23 @@ namespace Cactbot {
         Advanced_Combat_Tracker.ActGlobals.oFormActMain.TTS(msg["text"].ToString());
         return null;
       });
+      // Fork: overlays call these on their own threads while OverlayPlugin saves the config
+      // on the UI thread (see CactbotEventSourceConfig.OverlayDataLock).
       RegisterEventHandler("cactbotSaveData", (msg) => {
-        Config.OverlayData[msg["overlay"].ToString()] = msg["data"];
+        lock (Config.OverlayDataLock) {
+          Config.OverlayData[msg["overlay"].ToString()] = msg["data"];
+        }
         return null;
       });
       RegisterEventHandler("cactbotLoadData", (msg) => {
-        if (Config.OverlayData.ContainsKey(msg["overlay"].ToString())) {
-          var ret = new JObject();
-          ret["data"] = Config.OverlayData[msg["overlay"].ToString()];
-          return ret;
-        } else {
-          return null;
+        lock (Config.OverlayDataLock) {
+          if (Config.OverlayData.TryGetValue(msg["overlay"].ToString(), out JToken data)) {
+            var ret = new JObject();
+            ret["data"] = data;
+            return ret;
+          } else {
+            return null;
+          }
         }
       });
       RegisterEventHandler("cactbotChooseDirectory", (msg) => {

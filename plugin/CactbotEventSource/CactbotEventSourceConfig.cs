@@ -39,52 +39,65 @@ namespace Cactbot {
     }
 
     public void SaveConfig(IPluginConfig pluginConfig) {
-      pluginConfig.EventSourceConfigs["CactbotESConfig"] = JObject.FromObject(this);
+      lock (OverlayDataLock) {
+        pluginConfig.EventSourceConfigs["CactbotESConfig"] = JObject.FromObject(this);
+      }
     }
 
     public Dictionary<string, JToken> OverlayData = null;
+
+    // Fork: guards OverlayData, written by overlays' calls while the config is saved (a
+    // Dictionary changed during the save's enumeration threw, and the save was skipped).
+    [JsonIgnore]
+    public readonly object OverlayDataLock = new object();
 
     public DateTime LastUpdateCheck;
 
     [JsonIgnore]
     public string DisplayLanguage {
       get {
-        if (!OverlayData.TryGetValue("options", out JToken options))
-          return null;
-        var general = options["general"];
-        if (general == null)
-          return null;
-        var dir = general["DisplayLanguage"];
-        if (dir == null)
-          return null;
-        return dir.ToString();
+        lock (OverlayDataLock) {
+          if (!OverlayData.TryGetValue("options", out JToken options))
+            return null;
+          var general = options["general"];
+          if (general == null)
+            return null;
+          var dir = general["DisplayLanguage"];
+          if (dir == null)
+            return null;
+          return dir.ToString();
+        }
       }
     }
 
     [JsonIgnore]
     public string UserConfigFile {
       get {
-        if (!OverlayData.TryGetValue("options", out JToken options))
-          return null;
-        var general = options["general"];
-        if (general == null)
-          return null;
-        var dir = general["CactbotUserDirectory"];
-        if (dir == null)
-          return null;
-        return dir.ToString();
+        lock (OverlayDataLock) {
+          if (!OverlayData.TryGetValue("options", out JToken options))
+            return null;
+          var general = options["general"];
+          if (general == null)
+            return null;
+          var dir = general["CactbotUserDirectory"];
+          if (dir == null)
+            return null;
+          return dir.ToString();
+        }
       }
       set {
-        if (!OverlayData.TryGetValue("options", out JToken options)) {
-          options = new JObject();
-          OverlayData.Add("options", options);
+        lock (OverlayDataLock) {
+          if (!OverlayData.TryGetValue("options", out JToken options)) {
+            options = new JObject();
+            OverlayData.Add("options", options);
+          }
+          var general = options["general"];
+          if (general == null) {
+            general = new JObject();
+            options["general"] = general;
+          }
+          general["CactbotUserDirectory"] = value;
         }
-        var general = options["general"];
-        if (general == null) {
-          general = new JObject();
-          options["general"] = general;
-        }
-        general["CactbotUserDirectory"] = value;
       }
     }
   }
