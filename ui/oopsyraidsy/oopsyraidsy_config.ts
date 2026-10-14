@@ -338,6 +338,51 @@ const templateOptions: OptionsTemplate = {
       default: 'nick',
     },
     {
+      // Fork: skins of the live list and death report (ui/oopsyraidsy/skins).
+      id: 'Skin',
+      name: {
+        en: 'Oopsy Skin',
+        de: 'Oopsy Skin',
+        fr: 'Oopsy Skin',
+        ja: 'Oopsyのスキン',
+        cn: 'Oopsy皮肤',
+        ko: 'Oopsy 스킨',
+        tc: 'Oopsy皮膚',
+      },
+      type: 'select',
+      options: {
+        en: {
+          'Default': 'default',
+          'cbkr': 'cbkr',
+        },
+        de: {
+          'Default': 'default',
+          'cbkr': 'cbkr',
+        },
+        fr: {
+          'Défaut': 'default',
+          'cbkr': 'cbkr',
+        },
+        ja: {
+          '初期設定': 'default',
+          'cbkr': 'cbkr',
+        },
+        cn: {
+          '默认': 'default',
+          'cbkr': 'cbkr',
+        },
+        ko: {
+          '기본': 'default',
+          'cbkr': 'cbkr',
+        },
+        tc: {
+          '默認': 'default',
+          'cbkr': 'cbkr',
+        },
+      },
+      default: 'default',
+    },
+    {
       id: 'NumLiveListItemsInCombat',
       name: {
         en: 'Number of mistakes to show in combat',

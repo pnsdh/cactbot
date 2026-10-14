@@ -3,7 +3,7 @@ import { OopsyMistake, OopsyMistakeType } from '../../types/oopsy';
 
 import { DeathReport } from './death_report';
 import { MistakeObserver, ViewEvent } from './mistake_observer';
-import { GetFormattedTime, Translate } from './oopsy_common';
+import { FormatNumber, GetFormattedTime, Translate } from './oopsy_common';
 import { OopsyOptions } from './oopsy_options';
 
 type TableEntry = {
@@ -282,7 +282,7 @@ export class OopsySummaryList implements MistakeObserver {
       const hpElem = document.createElement('div');
       hpElem.classList.add('death-row-hp');
       if (event.currentHp !== undefined)
-        hpElem.innerText = event.currentHp.toString();
+        hpElem.innerText = FormatNumber(event.currentHp);
       detailsDiv.appendChild(hpElem);
 
       const damageElem = document.createElement('div');

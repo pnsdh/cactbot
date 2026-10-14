@@ -3,6 +3,7 @@ import logDefinitions from '../../resources/netlog_defs';
 import { DeathReportData, OopsyMistake } from '../../types/oopsy';
 
 import {
+  FormatNumber,
   kAttackFlags,
   kHealFlags,
   kShiftFlagValues,
@@ -104,7 +105,9 @@ export class DeathReport {
         if (ability.isAttack && ability.amount > 0) {
           const abilityName = event.splitLine[logDefinitions.Ability.fields.ability] ?? '???';
           const currentHp = event.splitLine[logDefinitions.Ability.fields.targetCurrentHp] ?? '???';
-          const text = `${abilityName} (${ability.amount}/${currentHp})`;
+          const currentHpNumber = parseInt(currentHp);
+          const currentHpText = isNaN(currentHpNumber) ? currentHp : FormatNumber(currentHpNumber);
+          const text = `${abilityName} (${FormatNumber(ability.amount)}/${currentHpText})`;
           return {
             type: 'death',
             name: data.targetName,
@@ -271,11 +274,15 @@ export class DeathReport {
     let amountStr: string | undefined;
     if (ability.isHeal) {
       amountClass = 'heal';
-      amountStr = ability.amount > 0 ? `+${ability.amount.toString()}` : ability.amount.toString();
+      amountStr = ability.amount > 0
+        ? `+${FormatNumber(ability.amount)}`
+        : FormatNumber(ability.amount);
       amount = ability.amount;
     } else if (ability.isAttack) {
       amountClass = 'damage';
-      amountStr = ability.amount > 0 ? `-${ability.amount.toString()}` : ability.amount.toString();
+      amountStr = ability.amount > 0
+        ? `-${FormatNumber(ability.amount)}`
+        : FormatNumber(ability.amount);
       amount = -1 * ability.amount;
     }
 
@@ -313,10 +320,10 @@ export class DeathReport {
     let amountStr: string;
     if (isHeal) {
       amountClass = 'heal';
-      amountStr = amount > 0 ? `+${amount.toString()}` : amount.toString();
+      amountStr = amount > 0 ? `+${FormatNumber(amount)}` : FormatNumber(amount);
     } else {
       amountClass = 'damage';
-      amountStr = amount > 0 ? `-${amount.toString()}` : amount.toString();
+      amountStr = amount > 0 ? `-${FormatNumber(amount)}` : FormatNumber(amount);
       amount *= -1;
     }
 
