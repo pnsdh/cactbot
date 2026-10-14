@@ -5,7 +5,7 @@ import { OopsyMistake } from '../../types/oopsy';
 
 import { DeathReport } from './death_report';
 import { MistakeObserver, ViewEvent } from './mistake_observer';
-import { GetFormattedTime, Translate } from './oopsy_common';
+import { FormatNumber, GetFormattedTime, Translate } from './oopsy_common';
 import { OopsyOptions } from './oopsy_options';
 
 const kCopiedMessage = {
@@ -135,7 +135,7 @@ export class DeathReportLive {
       this.AppendDetails(
         detailsDiv,
         event.timestampStr,
-        event.currentHp?.toString(),
+        event.currentHp !== undefined ? FormatNumber(event.currentHp) : undefined,
         event.amountStr,
         event.amountClass,
         event.icon,
@@ -280,8 +280,9 @@ export class OopsyLiveList implements MistakeObserver {
 
     const iconClass = m.type;
     const blame = m.name ?? m.blame;
+    // Fork: the name in its own element so skins can style it (see cbkr).
     const blameText = blame !== undefined
-      ? `${this.partyTracker.member(blame).toString()}: `
+      ? `<span class="mistake-blame">${this.partyTracker.member(blame).toString()}</span>: `
       : '';
     const translatedText = Translate(this.options.DisplayLanguage, m.text);
     if (translatedText === undefined)
@@ -312,6 +313,7 @@ export class OopsyLiveList implements MistakeObserver {
     }
 
     this.numItems++;
+    rowDiv.dataset.type = iconClass;
 
     const iconDiv = document.createElement('div');
     iconDiv.classList.add('mistake-icon');

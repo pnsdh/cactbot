@@ -1,0 +1,267 @@
+/*
+ * cbkr: a modern oopsy skin, matching the cbkr raidboss skin.
+ *
+ * Live list: one translucent charcoal panel; each kind of mistake gets a tinted icon badge, the
+ * player's name is bold, times and numbers use the Oxanium digits.  Deaths glow red from the left.
+ * Death report: the same panel with a red edge.
+ *
+ * Fonts are the raidboss cbkr skin's (SIL Open Font License 1.1, see the LICENSE files in
+ * ui/raidboss/skins/cbkr).  Rules are scoped to the live overlay (.flexcontainer) because the
+ * summary page reads the same skin option.
+ */
+
+@font-face {
+  font-family: "Pretendard Variable";
+  font-weight: 45 920;
+  font-style: normal;
+  font-display: swap;
+  src:
+    local("Pretendard Variable"),
+    url("../../../raidboss/skins/cbkr/PretendardVariable.woff2") format("woff2-variations"),
+    url("../../../raidboss/skins/cbkr/PretendardVariable.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "cbkr Oxanium";
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+  src:
+    url("../../../raidboss/skins/cbkr/Oxanium-digits.woff2") format("woff2-variations"),
+    url("../../../raidboss/skins/cbkr/Oxanium-digits.woff2") format("woff2");
+  unicode-range: U+002B-002E, U+0030-003A;
+}
+
+:root {
+  --cbkr-font: "Pretendard Variable", "Pretendard", "Malgun Gothic", sans-serif;
+  --cbkr-num-font: "cbkr Oxanium", "Pretendard Variable", sans-serif;
+
+  /* Palette as "r g b" channels so alpha can vary per use. */
+  --cbkr-text: 232 238 255;
+  --cbkr-dim: 160 172 196;
+  --cbkr-panel: 20 21 24;
+  --cbkr-edge: 186 204 255;
+  --cbkr-out-of-combat: 255 205 90;
+  --cbkr-pull: 120 220 160;
+  --cbkr-death: 255 96 104;
+  --cbkr-warn: 255 205 90;
+  --cbkr-fail: 255 132 104;
+  --cbkr-damage: 200 210 230;
+  --cbkr-potion: 196 150 255;
+  --cbkr-good: 116 232 189;
+  --cbkr-heal: 110 220 255;
+  --cbkr-wipe: 130 160 255;
+}
+
+/* ===== Text ===== */
+
+.flexcontainer div {
+  font-family: var(--cbkr-font);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: rgb(var(--cbkr-text));
+  text-shadow: none;
+}
+
+.flexcontainer .mistake-time,
+.flexcontainer .death-row-hp,
+.flexcontainer .death-row-amount,
+.flexcontainer .death-row-time {
+  font-family: var(--cbkr-num-font);
+  font-variant-numeric: tabular-nums;
+}
+
+.flexcontainer .mistake-blame {
+  font-weight: 700;
+  color: rgb(255 255 255);
+}
+
+/* ===== Icons ===== */
+
+.flexcontainer .mistake-icon {
+  --cbkr-c: var(--cbkr-damage);
+
+  text-shadow: none;
+}
+
+.flexcontainer .mistake-icon::before {
+  color: rgb(var(--cbkr-c));
+}
+
+.flexcontainer .mistake-icon.pull { --cbkr-c: var(--cbkr-pull); }
+.flexcontainer .mistake-icon.death { --cbkr-c: var(--cbkr-death); }
+.flexcontainer .mistake-icon.warn { --cbkr-c: var(--cbkr-warn); }
+.flexcontainer .mistake-icon.fail { --cbkr-c: var(--cbkr-fail); }
+.flexcontainer .mistake-icon.potion { --cbkr-c: var(--cbkr-potion); }
+.flexcontainer .mistake-icon.good { --cbkr-c: var(--cbkr-good); }
+.flexcontainer .mistake-icon.heal { --cbkr-c: var(--cbkr-heal); }
+.flexcontainer .mistake-icon.wipe { --cbkr-c: var(--cbkr-wipe); }
+.flexcontainer .mistake-icon.damage { --cbkr-c: var(--cbkr-damage); }
+
+.flexcontainer .icon-entry,
+.flexcontainer .icon-entry::before {
+  color: rgb(var(--cbkr-dim));
+}
+
+.flexcontainer .icon-entry:hover::before {
+  color: rgb(var(--cbkr-text));
+}
+
+/* ===== Live list ===== */
+
+.flexcontainer .livelist::-webkit-scrollbar {
+  width: 6px;
+}
+
+.flexcontainer .livelist::-webkit-scrollbar-track,
+.flexcontainer .livelist::-webkit-scrollbar-track:hover,
+.flexcontainer .livelist::-webkit-scrollbar-track:active {
+  background: transparent;
+  border: 0;
+}
+
+.flexcontainer .livelist::-webkit-scrollbar-thumb,
+.flexcontainer .livelist::-webkit-scrollbar-thumb:hover,
+.flexcontainer .livelist::-webkit-scrollbar-thumb:active {
+  background: rgb(var(--cbkr-edge) / 25%);
+  border: 0;
+  border-radius: 3px;
+}
+
+.flexcontainer .livelist .livelist-shadow {
+  margin: 6px;
+  padding: 4px 0;
+  border-radius: 7px;
+  background: rgb(var(--cbkr-panel) / 68%);
+  box-shadow: inset 0 0 0 1px rgb(var(--cbkr-edge) / 12%), 0 4px 18px rgb(0 0 0 / 35%);
+}
+
+.out-of-combat .flexcontainer .livelist .livelist-shadow {
+  box-shadow: inset 0 0 0 1px rgb(var(--cbkr-out-of-combat) / 30%), 0 4px 18px rgb(0 0 0 / 35%);
+}
+
+.flexcontainer .mistake-row,
+.flexcontainer .mistake-row:nth-child(odd),
+.flexcontainer .mistake-row:nth-child(even) {
+  position: relative;
+  height: 24px;
+  padding: 0 10px 0 6px;
+  background: none;
+  animation: cbkr-row-in 260ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.flexcontainer .mistake-row + .mistake-row::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 10px;
+  right: 10px;
+  height: 1px;
+  background: rgb(255 255 255 / 5%);
+}
+
+.flexcontainer .mistake-row[data-type="death"] {
+  background: linear-gradient(90deg, rgb(var(--cbkr-death) / 16%), transparent 70%);
+}
+
+.flexcontainer .mistake-row:hover {
+  background: rgb(var(--cbkr-edge) / 8%);
+}
+
+.flexcontainer .mistake-row .mistake-icon {
+  width: 18px;
+  height: 18px;
+  margin: 3px 8px 0 0;
+  border-radius: 5px;
+  background: rgb(var(--cbkr-c) / 16%);
+  font-size: 10px;
+}
+
+.flexcontainer .mistake-text {
+  color: rgb(var(--cbkr-text) / 88%);
+}
+
+.flexcontainer .mistake-time {
+  padding-left: 8px;
+  font-size: 12px;
+  color: rgb(var(--cbkr-dim));
+}
+
+.flexcontainer .copied-msg {
+  align-items: center;
+  border-radius: 5px;
+  background: rgb(var(--cbkr-panel) / 85%);
+  box-shadow: inset 0 0 0 1px rgb(var(--cbkr-edge) / 30%);
+  font-weight: 600;
+}
+
+/* Only opacity and transform, which the compositor animates. */
+@keyframes cbkr-row-in {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ===== Death report ===== */
+
+.flexcontainer .death-report > div {
+  margin: 6px;
+  padding: 10px 12px;
+  border-radius: 7px;
+  background: rgb(var(--cbkr-panel) / 78%);
+  box-shadow: inset 0 0 0 1px rgb(var(--cbkr-death) / 28%), 0 4px 18px rgb(0 0 0 / 35%);
+}
+
+.flexcontainer .death-title {
+  align-items: center;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgb(255 255 255 / 8%);
+}
+
+.flexcontainer .death-title div {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.flexcontainer .death-title-icon {
+  margin-right: 8px;
+}
+
+.flexcontainer .death-details {
+  column-gap: 8px;
+  row-gap: 2px;
+}
+
+.flexcontainer .death-details div {
+  font-size: 12.5px;
+}
+
+.flexcontainer .death-row-hp,
+.flexcontainer .death-row-time {
+  color: rgb(var(--cbkr-dim));
+}
+
+.flexcontainer .death-details .damage {
+  font-weight: 600;
+  color: rgb(var(--cbkr-death));
+  text-shadow: none;
+}
+
+.flexcontainer .death-details .heal {
+  color: rgb(var(--cbkr-good));
+}
+
+.flexcontainer .death-row-icon.mistake-icon {
+  display: flex;
+  align-items: center;
+  width: 14px;
+  font-size: 10px;
+}

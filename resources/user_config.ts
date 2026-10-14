@@ -409,7 +409,7 @@ class UserConfig {
         // doing it after user config files and before user css files
         // allows user css to override skin-specific css as well.
         if (options.Skin !== undefined)
-          this.handleSkin(options.Skin);
+          this.handleSkin(options.Skin, overlayName);
 
         for (const cssFile of cssFiles) {
           printUserFile(`local user file: ${basePath}${cssFile}`);
@@ -445,10 +445,12 @@ class UserConfig {
     });
   }
 
-  handleSkin(skinName: string) {
+  handleSkin(skinName: string, overlayName?: string) {
     if (!skinName || skinName === 'default')
       return;
-    const skinCSSRelativeHref = `../raidboss/skins/${skinName}/${skinName}.css`;
+    // Fork: oopsyraidsy has skins of its own (ui/oopsyraidsy/skins).
+    const skinFolder = overlayName === 'oopsyraidsy' ? 'oopsyraidsy' : 'raidboss';
+    const skinCSSRelativeHref = `../${skinFolder}/skins/${skinName}/${skinName}.css`;
     this.appendCSSLink(skinCSSRelativeHref);
   }
   appendJSLink(src: string) {

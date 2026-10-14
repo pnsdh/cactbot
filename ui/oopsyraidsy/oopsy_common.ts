@@ -95,6 +95,9 @@ export const Translate = (lang: Lang, obj?: LocaleText | string): string | undef
   return obj[lang] ?? obj['en'];
 };
 
+// Fork: HP and damage amounts with thousands separators.
+export const FormatNumber = (value: number): string => value.toLocaleString('en-US');
+
 export const GetFormattedTime = (baseTime: number | undefined, time: number): string => {
   if (!baseTime)
     return '';
