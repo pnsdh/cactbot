@@ -576,7 +576,7 @@ export class PlayerStateTracker {
     });
   }
 
-  OnWipe(_line: string, _splitLine: string[]): void {
+  OnWipe(): void {
     this.Reset();
   }
 

@@ -172,6 +172,9 @@ export class DamageTracker {
   // when someone else pulled.
   private partyPull = new PullWatch();
   private myPull = new PullWatch();
+  // A countdown started since combat last stopped: the next hits are the pull even if combat
+  // started first (the in-combat event can come before the first hit's line).
+  private countedDown = false;
   private lastTimestamp = 0;
   // logReplayMode - if using oopsy_viewer, we need to handle delays/suppresses differently
   public logReplayMode = false;
@@ -323,6 +326,13 @@ export class DamageTracker {
     this.partyPull.Reset();
     this.myPull.Reset();
     this.engageTime = undefined;
+    this.countedDown = true;
+  }
+
+  private CancelCountdown(): void {
+    this.ResetPull();
+    this.countdownEngageTime = undefined;
+    this.countedDown = false;
   }
 
   // The countdown ends its whole seconds after this line, which has the same clock and
@@ -404,12 +414,13 @@ export class DamageTracker {
   }
 
   OnNetLog(e: EventResponses['LogLine']): void {
-    if (this.ignoreZone)
-      return;
-
     const line = e.rawLine;
     const splitLine = e.line;
     const type = splitLine[logDefinitions.None.fields.type];
+
+    // Fork: except leaving the zone, which log replays only know from this line.
+    if (this.ignoreZone && type !== logDefinitions.ChangeZone.type)
+      return;
 
     // If we're waiting on a timestamp callback, check if any have passed with this line.
     // Ignore game log lines, which don't track milliseconds.
@@ -435,10 +446,8 @@ export class DamageTracker {
           this.OnEngageLine();
         if (this.countdownStartRegex.test(line))
           this.ResetPull();
-        if (this.countdownCancelRegex.test(line)) {
-          this.ResetPull();
-          this.countdownEngageTime = undefined;
-        }
+        if (this.countdownCancelRegex.test(line))
+          this.CancelCountdown();
         if (this.wipeCactbotEcho.test(line) || this.wipeEndEcho.test(line))
           this.Wipe(this.lastTimestamp);
         break;
@@ -446,8 +455,7 @@ export class DamageTracker {
         this.OnCountdown(splitLine);
         break;
       case logDefinitions.CountdownCancel.type:
-        this.ResetPull();
-        this.countdownEngageTime = undefined;
+        this.CancelCountdown();
         break;
       case logDefinitions.NetworkEffectResult.type:
         this.OnEffectResult(splitLine);
@@ -496,7 +504,6 @@ export class DamageTracker {
           splitLine[logDefinitions.ActorControl.fields.command] === actorControlFadeInCommandPre62
         ) {
           this.Wipe(this.lastTimestamp);
-          this.playerStateTracker.OnWipe(line, splitLine);
         }
         break;
     }
@@ -514,7 +521,7 @@ export class DamageTracker {
     // From the first hit (unless combat started otherwise), hits are candidates for the pull
     // until one lands, and the player's own for their first until one lands.
     const forParty = !this.partyPull.done &&
-      (this.partyPull.hits.size > 0 || !this.combatState.startTime);
+      (this.partyPull.hits.size > 0 || !this.combatState.startTime || this.countedDown);
     const forMe = !this.myPull.done && (forParty || this.partyPull.done);
     if (!forParty && !forMe)
       return;
@@ -575,6 +582,7 @@ export class DamageTracker {
     this.myPull.Reset();
     this.engageTime = undefined;
     this.countdownEngageTime = undefined;
+    this.countedDown = false;
   }
 
   OnTrigger(trigger: LooseOopsyTrigger, execMatches: RegExpExecArray, timestamp: number): void {
@@ -678,6 +686,8 @@ export class DamageTracker {
     });
 
     this.Reset();
+    // Fork: for every wipe (echoes too), not only the fade in.
+    this.playerStateTracker.OnWipe();
     this.combatState.StopCombat(timestamp);
   }
 
