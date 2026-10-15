@@ -2267,7 +2267,7 @@ const templateOptions: OptionsTemplate = {
         fr: 'Raidboss Skin',
         ja: 'Raidbossのスキン',
         cn: 'Raidboss皮肤',
-        ko: 'Raidboss 스킨',
+        ko: '레이드보스 스킨',
         tc: 'Raidboss皮膚',
       },
       type: 'select',

@@ -14,13 +14,13 @@ import {
 // or light theme.  The sections are the ones CactbotConfigurator.buildUI makes; this only moves
 // and relabels them.
 
-// Overlay names stay in English, as in OverlayPlugin and cactbot's docs; the tag above each title
-// says what the overlay is for.
-type SectionText = { title: string; tag: string; desc?: LocaleText };
+// Overlay names are the English ones (Korean spells them out rather than translating them); the tag
+// above each title says what the overlay is for.
+type SectionText = { title: LocaleText; tag: string; desc?: LocaleText };
 
 const kSections: { [group: string]: SectionText } = {
   general: {
-    title: 'General',
+    title: { en: 'General', ko: '일반' },
     tag: 'ALL OVERLAYS',
     desc: {
       en: 'Settings shared by all cactbot overlays.',
@@ -28,7 +28,7 @@ const kSections: { [group: string]: SectionText } = {
     },
   },
   raidboss: {
-    title: 'Raidboss',
+    title: { en: 'Raidboss', ko: '레이드보스' },
     tag: 'TIMELINE · ALERTS',
     desc: {
       en: 'How timelines and trigger alerts are shown, and the output of each trigger.',
@@ -36,7 +36,7 @@ const kSections: { [group: string]: SectionText } = {
     },
   },
   jobs: {
-    title: 'Jobs',
+    title: { en: 'Jobs', ko: '잡' },
     tag: 'JOB GAUGES · BUFFS',
     desc: {
       en: 'Job gauges, buffs and procs.',
@@ -44,7 +44,7 @@ const kSections: { [group: string]: SectionText } = {
     },
   },
   eureka: {
-    title: 'Eureka',
+    title: { en: 'Eureka', ko: '에우레카' },
     tag: 'FIELD OPERATIONS',
     desc: {
       en: 'Notorious monster tracking in field operations such as Eureka.',
@@ -52,7 +52,7 @@ const kSections: { [group: string]: SectionText } = {
     },
   },
   oopsyraidsy: {
-    title: 'Oopsyraidsy',
+    title: { en: 'Oopsyraidsy', ko: '웁시레이지' },
     tag: 'MISTAKES · DEATH REPORTS',
     desc: {
       en: 'Mistakes and death reports.',
@@ -60,7 +60,7 @@ const kSections: { [group: string]: SectionText } = {
     },
   },
   radar: {
-    title: 'Radar',
+    title: { en: 'Radar', ko: '레이더' },
     tag: 'HUNT RADAR',
     desc: {
       en: 'Hunt mob radar.',
@@ -137,9 +137,9 @@ const kTriggersView: LocaleText = {
 const kTriggerGroups = ['raidboss', 'oopsyraidsy'];
 const kMaxTriggerResults = 40;
 
-const groupTitle = (group: string): string => {
+const groupTitle = (group: string, translate: (text: LocaleText) => string): string => {
   const text = kSections[group];
-  return text?.title ?? group;
+  return text !== undefined ? translate(text.title) : group;
 };
 
 // Trigger search results: a list of buttons that open the trigger in its list.
@@ -170,8 +170,8 @@ const renderTriggerResults = (
     const where = document.createElement('span');
     where.classList.add('config-hit-where');
     where.textContent = hit.trigger !== undefined
-      ? `${hit.file.title} · ${groupTitle(hit.file.group)}`
-      : [hit.file.type, groupTitle(hit.file.group)].filter((x) => x).join(' · ');
+      ? `${hit.file.title} · ${groupTitle(hit.file.group, translate)}`
+      : [hit.file.type, groupTitle(hit.file.group, translate)].filter((x) => x).join(' · ');
     button.append(name, where);
     const preview = hit.trigger?.preview;
     if (preview !== undefined && preview !== '') {
@@ -376,7 +376,7 @@ export const buildSectionTabs = (
     if (!anchor || !header || group === '')
       continue;
     const text = kSections[group];
-    const title = text?.title ?? group;
+    const title = text !== undefined ? translate(text.title) : group;
 
     // A section is a page of its own now, not a collapsible block.
     anchor.onclick = null;

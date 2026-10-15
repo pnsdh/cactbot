@@ -361,7 +361,7 @@ const templateOptions: OptionsTemplate = {
         fr: 'Oopsyraidsy Skin',
         ja: 'Oopsyraidsyのスキン',
         cn: 'Oopsyraidsy皮肤',
-        ko: 'Oopsyraidsy 스킨',
+        ko: '웁시레이지 스킨',
         tc: 'Oopsyraidsy皮膚',
       },
       type: 'select',
