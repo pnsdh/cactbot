@@ -48,12 +48,17 @@ const processAbilityLine = (splitLine: string[]) => {
   };
 };
 
-// The last hit marked as killing, as the events can also hold an earlier death's (raised and
-// killed again within the report's window).
-const lastFatal = (events: TrackedEvent[]): TrackedLineEvent | undefined => {
+// A killing hit is resolved at most this long before it lands (the death).
+const kFatalBeforeDeathMs = 5000;
+
+// The last hit marked as killing for this death: the events can also hold an earlier death's
+// (raised and killed again within the report's window, maybe by something that isn't a hit).
+const lastFatal = (events: TrackedEvent[], deathTime: number): TrackedLineEvent | undefined => {
   for (let i = events.length - 1; i >= 0; i--) {
     const event = events[i];
-    if (event?.type === 'Ability' && event.fatal === true)
+    if (event === undefined || event.timestamp < deathTime - kFatalBeforeDeathMs)
+      break;
+    if (event.type === 'Ability' && event.fatal === true)
       return event;
   }
   return undefined;
@@ -102,12 +107,28 @@ export class DeathReport {
   public static generateMistake(data: DeathReportData): OopsyMistake {
     // Fork: the hit that took HP to 0 when it landed, if known.  Hits land some time after they
     // are resolved, so the last one resolved before the death may have landed after it.
-    const fatal = lastFatal(data.events);
+    const fatal = lastFatal(data.events, data.deathTimestamp);
+    // Fork: an earlier death's killing hit (raised since), too long before this death to be
+    // its own (it can have several, e.g. two hits at once).  Hits resolved up to a while after
+    // it were that death's too (landing on the body), not this one's.
+    let earlierFatal: TrackedLineEvent | undefined;
+    for (const event of data.events) {
+      if (
+        event.type === 'Ability' && event.fatal === true &&
+        event.timestamp < data.deathTimestamp - kFatalBeforeDeathMs
+      )
+        earlierFatal = event;
+    }
 
     // Walk backward through events until we find the last damage or a death reason.
     for (let i = data.events.length - 1; i >= 0; i--) {
       const event = data.events[i];
       if (!event)
+        break;
+      if (
+        earlierFatal !== undefined &&
+        event.timestamp < earlierFatal.timestamp + kFatalBeforeDeathMs
+      )
         break;
       if (fatal !== undefined && event.type === 'Ability') {
         if (event !== fatal)
