@@ -260,7 +260,7 @@ export class DamageTracker {
       type: 'pull',
       name: this.firstPuller,
       blame: this.firstPuller,
-      text: `${mistakeStr} (${Math.abs(seconds).toFixed(1)}s)`,
+      text: `${mistakeStr} (${Math.abs(seconds).toFixed(2)}s)`,
     });
   }
 
