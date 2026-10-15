@@ -126,5 +126,27 @@ UserConfig.registerOptions('general', {
           return value;
       },
     },
+    // Fork: the config page's theme (see config_tabs.ts).
+    {
+      id: 'ConfigTheme',
+      name: {
+        en: 'Config page theme',
+        ko: '설정 화면 테마',
+      },
+      type: 'select',
+      options: {
+        en: {
+          'Dark': 'dark',
+          'Light': 'light',
+          'Follow Windows': 'system',
+        },
+        ko: {
+          '다크': 'dark',
+          '라이트': 'light',
+          'Windows 설정 따르기': 'system',
+        },
+      },
+      default: 'dark',
+    },
   ],
 });

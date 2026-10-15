@@ -23,6 +23,7 @@ import {
 } from '../../types/trigger';
 
 import defaultOptions, { ConfigOptions } from './config_options';
+import { applyStoredTheme, applyTheme, buildSectionTabs } from './config_tabs';
 
 // Load other config files
 import './general_config';
@@ -34,6 +35,7 @@ import '../raidboss/raidboss_config';
 
 import '../../resources/defaults.css';
 import './config.css';
+import './config_modern.css';
 
 // Text in the butter bar, to prompt the user to reload after a config change.
 const kReloadText = {
@@ -78,6 +80,9 @@ const kDirectoryDefaultText = {
   ko: '(기본)',
   tc: '(默認)',
 };
+
+// Fork: how long saves wait for further changes (see saveConfigData).
+const kSaveDelayMs = 300;
 
 // Translating data folders to a category name.
 export const kPrefixToCategory = {
@@ -368,16 +373,31 @@ export class CactbotConfigurator {
     for (const [group, template] of Object.entries(templates))
       (this.contents[group] ??= []).push(template);
 
+    applyTheme(this.getStringOption('general', 'ConfigTheme', 'dark'));
     this.buildButterBar();
 
     const container = document.getElementById('container');
     if (!container)
       throw new UnreachableCode();
     this.buildUI(container, this.contents);
+    buildSectionTabs(container, this.lang, (text) => this.translate(text));
   }
 
-  async saveConfigData(): Promise<void> {
-    // TODO: rate limit this?
+  // Fork: text inputs save on every keystroke, and each save sends the whole config, so saves
+  // close together are combined.
+  private saveTimer?: number;
+
+  saveConfigData(): Promise<void> {
+    window.clearTimeout(this.saveTimer);
+    return new Promise((resolve) => {
+      this.saveTimer = window.setTimeout(() => {
+        this.saveTimer = undefined;
+        void this.flushConfigData().then(resolve);
+      }, kSaveDelayMs);
+    });
+  }
+
+  async flushConfigData(): Promise<void> {
     await callOverlayHandler({
       call: 'cactbotSaveData',
       overlay: 'options',
@@ -554,6 +574,8 @@ export class CactbotConfigurator {
     // Any type of SavedConfigEntry is fine here and we'll validate on loading.
     obj[finalArg] = value;
     void this.saveConfigData();
+    if (group === 'general' && finalArg === 'ConfigTheme' && typeof value === 'string')
+      applyTheme(value);
   }
 
   buildButterBar(): void {
@@ -571,6 +593,8 @@ export class CactbotConfigurator {
     buttonInput.type = 'button';
     buttonInput.onclick = () => {
       void callOverlayHandler({ call: 'cactbotReloadOverlays' });
+      // Fork: shown again on the next change.
+      document.getElementById('butter-margin')?.classList.add('hidden');
     };
     buttonInput.value = this.translate(kReloadButtonText);
     container.appendChild(buttonInput);
@@ -1190,6 +1214,7 @@ export class CactbotConfigurator {
   }
 }
 
+applyStoredTheme();
 UserConfig.getUserConfigLocation('config', defaultOptions, () => {
   const options = { ...defaultOptions };
   new CactbotConfigurator(

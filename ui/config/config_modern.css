@@ -1,0 +1,726 @@
+/*
+ * Fork: the config page's look, over config.css.  Dark by default (html[data-theme], see
+ * config_tabs.ts).  Upstream OverlayPlugin draws this page with Chromium 95, so nothing here needs
+ * a newer browser to look right.
+ */
+
+/* Rules follow the page from top to bottom rather than by specificity. */
+/* stylelint-disable no-descending-specificity */
+
+@font-face {
+  font-family: "Pretendard Variable";
+  font-weight: 45 920;
+  font-display: swap;
+  src: url("../raidboss/skins/cbkr/PretendardVariable.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "cbkr Oxanium";
+  font-weight: 200 800;
+  font-display: swap;
+  src: url("../raidboss/skins/cbkr/Oxanium-latin.woff2") format("woff2");
+}
+
+:root {
+  --cfg-font: "Pretendard Variable", "Pretendard", "Malgun Gothic", sans-serif;
+  --cfg-font-accent: "cbkr Oxanium", "Pretendard Variable", sans-serif;
+  --cfg-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --cfg-bg: #0e1014;
+  --cfg-bar: #12151b;
+  --cfg-surface: #171a21;
+  --cfg-surface-2: #1d212a;
+  --cfg-hover: #232835;
+  --cfg-line: rgb(255 255 255 / 7%);
+  --cfg-line-strong: rgb(255 255 255 / 13%);
+  --cfg-text: #e9edf5;
+  --cfg-muted: #8b93a6;
+  --cfg-faint: #5d6476;
+  --cfg-accent: #b9c9ff;
+  --cfg-accent-bg: rgb(185 201 255 / 12%);
+  --cfg-accent-ink: #0e1014;
+  --cfg-knob: #fff;
+  --cfg-knob-on: #10131a;
+  --cfg-info: #74e8bd;
+  --cfg-alert: #fdd166;
+  --cfg-alarm: #ff7a7a;
+  --cfg-warn-bg: rgb(253 209 102 / 10%);
+  --cfg-shadow: 0 10px 30px rgb(0 0 0 / 35%);
+
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --cfg-bg: #f4f5f8;
+  --cfg-bar: #eceef3;
+  --cfg-surface: #fff;
+  --cfg-surface-2: #f7f8fb;
+  --cfg-hover: #eef1f8;
+  --cfg-line: rgb(16 24 40 / 8%);
+  --cfg-line-strong: rgb(16 24 40 / 15%);
+  --cfg-text: #1a1f2b;
+  --cfg-muted: #636b7e;
+  --cfg-faint: #9aa1b2;
+  --cfg-accent: #3f5bd9;
+  --cfg-accent-bg: rgb(63 91 217 / 10%);
+  --cfg-accent-ink: #fff;
+  --cfg-knob-on: #fff;
+  --cfg-info: #128a5c;
+  --cfg-alert: #9a6a00;
+  --cfg-alarm: #d33b3b;
+  --cfg-warn-bg: rgb(176 120 0 / 9%);
+  --cfg-shadow: 0 8px 24px rgb(16 24 40 / 14%);
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-theme="system"] {
+    --cfg-bg: #f4f5f8;
+    --cfg-bar: #eceef3;
+    --cfg-surface: #fff;
+    --cfg-surface-2: #f7f8fb;
+    --cfg-hover: #eef1f8;
+    --cfg-line: rgb(16 24 40 / 8%);
+    --cfg-line-strong: rgb(16 24 40 / 15%);
+    --cfg-text: #1a1f2b;
+    --cfg-muted: #636b7e;
+    --cfg-faint: #9aa1b2;
+    --cfg-accent: #3f5bd9;
+    --cfg-accent-bg: rgb(63 91 217 / 10%);
+    --cfg-accent-ink: #fff;
+    --cfg-knob-on: #fff;
+    --cfg-info: #128a5c;
+    --cfg-alert: #9a6a00;
+    --cfg-alarm: #d33b3b;
+    --cfg-warn-bg: rgb(176 120 0 / 9%);
+    --cfg-shadow: 0 8px 24px rgb(16 24 40 / 14%);
+
+    color-scheme: light;
+  }
+}
+
+/* ===== Page ===== */
+
+html {
+  overflow: hidden;
+  background-color: var(--cfg-bg);
+  color: var(--cfg-text);
+  font-family: var(--cfg-font);
+  font-size: 13px;
+  font-weight: 450;
+  letter-spacing: -0.005em;
+}
+
+body {
+  height: 100%;
+}
+
+#container {
+  margin: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--cfg-line-strong);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+  border-radius: 99px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--cfg-faint);
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+a {
+  color: var(--cfg-accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+:focus-visible {
+  outline: 2px solid var(--cfg-accent);
+  outline-offset: 2px;
+}
+
+/* ===== Tabs ===== */
+
+.config-tab-bar {
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  height: 46px;
+  padding: 0 12px 0 14px;
+  background-color: var(--cfg-bar);
+  border-bottom: 1px solid var(--cfg-line);
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.config-tab-bar::-webkit-scrollbar {
+  height: 0;
+}
+
+.config-logo {
+  flex: none;
+  align-self: center;
+  width: 24px;
+  height: 24px;
+  margin-right: 10px;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--cfg-accent), #7d8cff);
+  color: var(--cfg-accent-ink);
+  font-family: var(--cfg-font-accent);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.config-tab {
+  flex: none;
+  position: relative;
+  padding: 0 11px;
+  border: none;
+  background: none;
+  color: var(--cfg-muted);
+  font: inherit;
+  font-weight: 560;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 160ms;
+}
+
+.config-tab:hover,
+.config-tab.config-active {
+  color: var(--cfg-text);
+}
+
+.config-tab::after {
+  content: "";
+  position: absolute;
+  left: 9px;
+  right: 9px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 2px;
+  background-color: var(--cfg-accent);
+  transform: scaleX(0);
+  transition: transform 220ms var(--cfg-ease);
+}
+
+.config-tab.config-active::after {
+  transform: none;
+}
+
+.config-tab:focus-visible {
+  outline-offset: -6px;
+}
+
+.config-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: scroll;
+}
+
+/* ===== Sections ===== */
+
+.config-tabs .overlay-container {
+  display: none;
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 16px 18px 80px;
+}
+
+.config-tabs .overlay-container.config-active {
+  display: block;
+  animation: config-section-in 220ms var(--cfg-ease);
+}
+
+@keyframes config-section-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.config-tabs .overlay-header {
+  position: static;
+  display: block;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: default;
+  text-transform: none;
+  font-size: 20px;
+  font-weight: 720;
+  letter-spacing: -0.015em;
+  color: var(--cfg-text);
+}
+
+.config-tabs .overlay-header::before {
+  content: attr(data-eyebrow);
+  display: block;
+  width: auto;
+  height: auto;
+  margin: 0 0 4px;
+  border: none;
+  font-family: var(--cfg-font-accent);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--cfg-accent);
+}
+
+.config-section-desc {
+  margin: 3px 0 14px;
+  color: var(--cfg-muted);
+  font-size: 12.5px;
+}
+
+/* ===== Option rows ===== */
+
+/* A card of rows: each row is a name cell and a control cell sharing a line. */
+.overlay-options {
+  margin: 0;
+  grid-template-columns: 1fr auto;
+  grid-gap: 0;
+  background-color: var(--cfg-surface);
+  border: 1px solid var(--cfg-line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.overlay-options > * {
+  padding: 10px 16px;
+  border-top: 1px solid var(--cfg-line);
+}
+
+.overlay-options > :nth-child(-n + 2) {
+  border-top-color: transparent;
+}
+
+.overlay-options > .option-input-container {
+  justify-items: end;
+}
+
+.option-name {
+  font-weight: 560;
+}
+
+.comment {
+  margin: 3px 0 0;
+  max-width: 560px;
+  color: var(--cfg-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.comment > * {
+  margin-bottom: 0;
+}
+
+/* ===== Controls ===== */
+
+input[type="text"],
+select {
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--cfg-line-strong);
+  border-radius: 7px;
+  background-color: var(--cfg-surface-2);
+  color: var(--cfg-text);
+  font: inherit;
+  transition: border-color 140ms, box-shadow 140ms;
+}
+
+input[type="text"] {
+  width: 64px;
+  font-family: var(--cfg-font-accent);
+  font-size: 13.5px;
+  font-weight: 560;
+}
+
+input[type="text"].input-string-field,
+.trigger-outputstring > input[type="text"],
+.timeline-add-row-text,
+.timeline-text-edit {
+  font-family: var(--cfg-font);
+  font-size: 13px;
+  font-weight: 450;
+}
+
+input[type="text"]::placeholder {
+  color: var(--cfg-faint);
+}
+
+select {
+  min-width: 150px;
+  padding-right: 28px;
+  appearance: none;
+  cursor: pointer;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--cfg-muted) 50%),
+    linear-gradient(135deg, var(--cfg-muted) 50%, transparent 50%);
+  background-position: calc(100% - 14px) 50%, calc(100% - 9px) 50%;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+}
+
+input[type="text"]:hover,
+select:hover {
+  border-color: var(--cfg-faint);
+}
+
+input[type="text"]:focus,
+select:focus {
+  outline: none;
+  border-color: var(--cfg-accent);
+  box-shadow: 0 0 0 3px var(--cfg-accent-bg);
+}
+
+input:disabled,
+select:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Checkboxes are switches: the knob is a background circle that slides. */
+input[type="checkbox"] {
+  flex: none;
+  width: 36px;
+  height: 20px;
+  margin: 0;
+  border-radius: 99px;
+  appearance: none;
+  cursor: pointer;
+  background-color: var(--cfg-line-strong);
+  background-image: radial-gradient(circle at 10px 50%, var(--cfg-knob) 6.5px, transparent 7.5px);
+  background-position: 0 0;
+  background-repeat: no-repeat;
+  transition: background-color 200ms, background-position 220ms var(--cfg-ease);
+}
+
+input[type="checkbox"]:checked {
+  background-color: var(--cfg-accent);
+  background-image: radial-gradient(circle at 10px 50%, var(--cfg-knob-on) 6.5px, transparent 7.5px);
+  background-position: 16px 0;
+}
+
+input[type="checkbox"]:focus-visible {
+  outline-offset: 2px;
+}
+
+input[type="submit"],
+input[type="button"],
+button {
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--cfg-line-strong);
+  border-radius: 7px;
+  background-color: var(--cfg-surface-2);
+  color: var(--cfg-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 140ms, border-color 140ms;
+}
+
+input[type="submit"]:hover,
+input[type="button"]:hover,
+button:hover {
+  background-color: var(--cfg-hover);
+  border-color: var(--cfg-faint);
+}
+
+.config-tab-bar .config-tab {
+  height: auto;
+  border: none;
+  border-radius: 0;
+  background: none;
+}
+
+.input-dir-label {
+  color: var(--cfg-muted);
+  max-width: 360px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+
+/* ===== Trigger lists (raidboss, oopsy) ===== */
+
+.trigger-expansion-container {
+  margin: 0;
+  padding: 0;
+}
+
+.trigger-expansion-header,
+.trigger-file-header,
+.timeline-edit-header {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-weight: 650;
+  transition: background-color 140ms;
+}
+
+.trigger-expansion-header:hover,
+.trigger-file-header:hover,
+.timeline-edit-header:hover {
+  background-color: var(--cfg-hover);
+}
+
+/* A chevron that points down when open. */
+.trigger-expansion-header::before,
+.trigger-file-header::before,
+.timeline-edit-header::before,
+.collapsed .trigger-expansion-header::before,
+.collapsed .trigger-file-header::before,
+.collapsed .timeline-edit-header::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  margin: 0 3px 3px;
+  border: solid var(--cfg-muted);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  transition: transform 200ms var(--cfg-ease);
+}
+
+.collapsed .trigger-expansion-header::before,
+.collapsed .trigger-file-header::before,
+.collapsed .timeline-edit-header::before {
+  margin: 0 3px;
+  transform: rotate(-45deg);
+}
+
+.trigger-file-container {
+  margin: 0;
+  border-top: 1px solid var(--cfg-line);
+}
+
+.trigger-expansion-container:not(.collapsed) > .trigger-expansion-header {
+  border-bottom: 1px solid var(--cfg-line);
+}
+
+.trigger-file-header {
+  grid-template-columns: auto 1fr auto auto;
+  justify-items: start;
+  padding-left: 32px;
+  font-weight: 560;
+}
+
+.trigger-file-header-part {
+  margin: 0;
+}
+
+.trigger-file-header-part:nth-child(n + 2) {
+  color: var(--cfg-muted);
+  font-size: 12px;
+  font-weight: 450;
+}
+
+.trigger-file-container > .overlay-options,
+.trigger-file-options,
+.timeline-edit-container {
+  margin: 0 16px 12px 46px;
+}
+
+.trigger-file-container > .overlay-options {
+  background-color: var(--cfg-surface-2);
+}
+
+.timeline-edit-container {
+  border: 1px solid var(--cfg-line);
+  border-radius: 8px;
+}
+
+.timeline-edit-header {
+  padding: 8px 12px;
+  font-weight: 560;
+}
+
+.trigger-file-options {
+  grid-gap: 4px 20px;
+  padding: 4px 0;
+}
+
+.trigger-file-options > .trigger {
+  padding-top: 10px;
+  border-top: 1px solid var(--cfg-line);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.trigger-file-options > .trigger-details {
+  padding-top: 10px;
+  border-top: 1px solid var(--cfg-line);
+}
+
+.trigger-file-options > :nth-child(-n + 2) {
+  border-top-color: transparent;
+}
+
+.trigger.disabled {
+  color: var(--cfg-faint);
+}
+
+.trigger-details {
+  grid-gap: 4px 10px;
+  font-size: 12.5px;
+}
+
+.trigger-label,
+.trigger-outputstring-label {
+  color: var(--cfg-muted);
+}
+
+.trigger-outputstring-label::before {
+  content: "";
+}
+
+.trigger-source a {
+  font-size: 12px;
+}
+
+.trigger-set-override-warning {
+  margin: 8px 0;
+  padding: 12px 14px;
+  color: var(--cfg-alert);
+  background-color: var(--cfg-warn-bg);
+  border: 1px solid var(--cfg-alert);
+  border-radius: 8px;
+}
+
+.alarm-text {
+  color: var(--cfg-alarm);
+}
+
+.alert-text {
+  color: var(--cfg-alert);
+}
+
+.info-text {
+  color: var(--cfg-info);
+}
+
+.regex-text,
+.function-text {
+  color: var(--cfg-muted);
+}
+
+.sound-text {
+  color: var(--cfg-accent);
+}
+
+/* Timeline editing. */
+.timeline-scroller {
+  margin: 8px 12px 16px;
+  border: 1px solid var(--cfg-line);
+  border-radius: 8px;
+  background-color: var(--cfg-bg);
+  color: var(--cfg-muted);
+}
+
+.timeline-listing-header,
+.timeline-add-header {
+  margin: 12px 12px 0;
+  font-weight: 650;
+}
+
+.timeline-add-container,
+.timeline-add-button,
+.timeline-text-container {
+  margin-left: 12px;
+}
+
+/* ===== Reload prompt (the butter bar), as a floating pill ===== */
+
+#butter-margin,
+#butter-margin.hidden {
+  display: block;
+  position: fixed;
+  left: 50%;
+  bottom: 14px;
+  z-index: 10;
+  margin: 0;
+  transform: translate(-50%, 0);
+  transition: transform 320ms var(--cfg-ease), opacity 220ms;
+}
+
+#butter-margin.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 24px);
+}
+
+#butter-bar {
+  position: static;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: auto;
+  height: auto;
+  padding: 6px 6px 6px 16px;
+  border: 1px solid var(--cfg-line-strong);
+  border-radius: 99px;
+  background-color: var(--cfg-surface-2);
+  box-shadow: var(--cfg-shadow);
+  white-space: nowrap;
+  overflow: visible;
+}
+
+#butter-bar::before {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: var(--cfg-accent);
+  box-shadow: 0 0 0 4px var(--cfg-accent-bg);
+}
+
+#butter-bar .reload-button {
+  padding: 0 14px;
+  height: 28px;
+  border: none;
+  border-radius: 99px;
+  background-color: var(--cfg-accent);
+  color: var(--cfg-accent-ink);
+}
+
+#butter-bar .reload-button:hover {
+  background-color: var(--cfg-accent);
+  filter: brightness(1.08);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}
