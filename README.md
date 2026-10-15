@@ -82,6 +82,7 @@ cactbot 설정(트리거 옵션, 알람, 표시 언어 등)은 OverlayPlugin 설
 **제대로 설치됐는지 확인하려면?**
 `OverlayPlugin.dll` 탭 아래쪽 로그에 `cactbot: 0.37.5.6 C:\...\Plugins\cbkr\CactbotOverlay.dll`처럼 버전이 네 자리이고 경로가 `cbkr`인 줄이 있으면 정상입니다.
 이 줄이 두 번 나오면 cactbot이 두 개 설치된 것이니 [기존 cactbot 제거](#기존-cactbot을-쓰던-경우)를 다시 확인합니다.
+`CactbotOverlay.dll` 파일을 마우스 오른쪽 버튼으로 클릭 → **속성** → **자세히**에서 파일 설명이 `CactbotOverlay (커스텀)`인지로도 확인할 수 있습니다.
 
 **오버레이가 비어 있거나 cactbot 오류가 나요.**
 zip의 차단 해제를 하지 않고 압축을 풀었을 수 있습니다. ACT를 종료하고 차단 해제한 zip으로 다시 덮어씁니다.
