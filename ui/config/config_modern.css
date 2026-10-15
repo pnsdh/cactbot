@@ -1422,8 +1422,17 @@ button:hover {
     margin-right: 10px;
   }
 
-  .timeline-add-container {
-    overflow-x: auto;
+  /* config.css sets these widths with !important. */
+  .timeline-add-container .timeline-add-row-time {
+    width: 56px !important;
+  }
+
+  .timeline-add-container .timeline-add-row-text {
+    width: 150px !important;
+  }
+
+  .timeline-add-container .timeline-add-row-duration {
+    width: 40px !important;
   }
 }
 

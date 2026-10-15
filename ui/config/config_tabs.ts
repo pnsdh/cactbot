@@ -135,6 +135,23 @@ const kTriggersView: LocaleText = {
 
 // Sections with a trigger list (config_triggers.ts) switch between it and their options.
 const kTriggerGroups = ['raidboss', 'oopsyraidsy'];
+
+// Other words for what options call something, so searching either finds them.
+const kSearchAliases: { [word: string]: string } = {
+  '볼륨': '소리 크기',
+  '음량': '소리 크기',
+  '사운드': '소리',
+  'volume': '소리 크기',
+};
+
+const searchTerms = (query: string): string[] => {
+  const terms = [query];
+  for (const [word, alias] of Object.entries(kSearchAliases)) {
+    if (query.includes(word))
+      terms.push(query.replace(word, alias));
+  }
+  return terms;
+};
 const kMaxTriggerResults = 40;
 
 const groupTitle = (group: string, translate: (text: LocaleText) => string): string => {
@@ -239,6 +256,7 @@ const buildSearch = (
     document.documentElement.classList.toggle('config-searching', searching);
     box.classList.toggle('config-has-query', searching);
     let anyHit = renderTriggerResults(results, query, translate);
+    const terms = searchTerms(query);
     for (const { section } of sections()) {
       let sectionHit = false;
       for (const card of section.querySelectorAll<HTMLElement>('.config-card')) {
@@ -249,7 +267,7 @@ const buildSearch = (
           if (name.classList.contains('option-input-container'))
             continue;
           const text = `${name.textContent ?? ''} ${name.dataset.optionId ?? ''}`.toLowerCase();
-          const hit = !searching || text.includes(query);
+          const hit = !searching || terms.some((term) => text.includes(term));
           name.classList.toggle('config-search-miss', !hit);
           name.nextElementSibling?.classList.toggle('config-search-miss', !hit);
           if (hit && name.style.display !== 'none')
