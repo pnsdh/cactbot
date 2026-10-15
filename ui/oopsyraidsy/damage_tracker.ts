@@ -234,7 +234,8 @@ export class DamageTracker {
     this.CheckPull();
   }
 
-  private OnPull(timestamp: number, puller: string) {
+  // Without a puller, combat started but when the hit landed is unknown: nothing is reported.
+  private OnPull(timestamp: number, puller?: string) {
     this.pendingPullHits.clear();
     this.pullTime = timestamp;
     this.firstPuller = puller;
@@ -296,13 +297,14 @@ export class DamageTracker {
     });
   }
 
-  // Training dummies and the like get no EffectResult line for damage: after a while (or at once
-  // when known to be one), the first hit resolved counts as the pull.
+  // Training dummies whose HP doesn't go down get no EffectResult line for damage, so when their
+  // hits land is unknown (the resolve time can be well over a second earlier, depending on the
+  // action): after a while, or at once when known to be one, give up on reporting this pull.
   private CheckPendingPullHits(now = false): void {
     // The first one in is the first resolved.
     for (const first of this.pendingPullHits.values()) {
       if (now || this.lastTimestamp - first.resolved >= kPullHitLandTimeoutMs)
-        this.OnPull(first.resolved, first.puller);
+        this.OnPull(first.resolved);
       return;
     }
   }
@@ -369,8 +371,8 @@ export class DamageTracker {
           );
           if (hit === undefined)
             break;
-          // Full HP after the hit: a training dummy, whose hits only get this line when they
-          // apply a status, so it tells nothing about which landed first.
+          // Full HP after the hit: a training dummy whose HP doesn't go down, whose hits only get
+          // this line when they apply a status, so it tells nothing about which landed first.
           const hp = splitLine[fields.currentHp];
           if (hp !== undefined && hp !== '' && hp === splitLine[fields.maxHp]) {
             this.CheckPendingPullHits(true);
