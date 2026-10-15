@@ -4,7 +4,7 @@ import PartyTracker from '../../resources/party';
 import UserConfig from '../../resources/user_config';
 import { LocaleText } from '../../types/trigger';
 
-import { DamageTracker, earlyPullTriggerId } from './damage_tracker';
+import { DamageTracker } from './damage_tracker';
 import oopsyFileData from './data/oopsy_manifest.txt';
 import { MistakeCollector } from './mistake_collector';
 import defaultOptions, { OopsyOptions } from './oopsy_options';
@@ -56,9 +56,6 @@ const dropHandler = async (e: DragEvent, damageTracker: DamageTracker): Promise<
 };
 
 const initViewer = (options: OopsyOptions, _isConnected: boolean) => {
-  // TODO: fix early pulls from logs (and also make them more accurate <_<)
-  (options.DisabledTriggers ??= {})[earlyPullTriggerId] = true;
-
   // TODO: should we fake this out for the viewer so that it knows jobs?
   const partyTracker = new PartyTracker(options);
   const mistakeCollector = new MistakeCollector(options, false);
