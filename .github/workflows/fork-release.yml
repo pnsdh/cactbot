@@ -101,6 +101,14 @@ jobs:
             echo "::error::Expected 4 assembly versions set to ${VERSION}, found ${count}"
             exit 1
           fi
+          # The file's description (Properties > Details) tells this build from upstream's.
+          sed -i -E 's/(AssemblyTitle\("[^"]*)"/\1 (커스텀)"/' plugin/*/Properties/AssemblyInfo.cs
+          grep -h "AssemblyTitle(" plugin/*/Properties/AssemblyInfo.cs
+          titles=$(grep -c 'AssemblyTitle(".* (커스텀)")' plugin/*/Properties/AssemblyInfo.cs | awk -F: '{s+=$2} END {print s}')
+          if [ "$titles" -ne 2 ]; then
+            echo "::error::Expected 2 assembly titles marked custom, found ${titles}"
+            exit 1
+          fi
 
       - name: Build Cactbot Plugin
         shell: cmd
