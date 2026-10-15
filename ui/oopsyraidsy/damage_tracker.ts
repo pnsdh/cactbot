@@ -113,6 +113,14 @@ const kDamageDownWindowMs = 500;
 const kDamageDownMinGroup = 3;
 const kDamageDownGroupMissing = 1;
 
+// Fork: the same mistake for the same player within this is one (e.g. hit by two casts of an
+// ability at once, as when two spreads stand together and each hits both).
+const kSameMomentMs = 500;
+
+// Fork: names that the game hides until needed (e.g. "_rsv_40489_-1_6_0_0_SE2DC5B04_EE2DC5B04"),
+// told by RSVData lines on zoning in.
+const kRsvNameRegex = /_rsv_[^|]*/g;
+
 // Fork: getting it again from the same ability within this (e.g. every tick) is not repeated.
 const kDamageDownRepeatMs = 5000;
 
@@ -238,6 +246,10 @@ export class DamageTracker {
   private damageDownSkipEffects = new Set<string>();
   private damageDownFailIds = new Set<string>();
   private lineGivesDamageDown = false;
+  // Fork: when each player last got each damage/effect/share/solo mistake (see kSameMomentMs),
+  // and the hidden names (see kRsvNameRegex).
+  private mistakeMoments = new Map<string, number>();
+  private rsvNames: { [key: string]: string } = {};
   private data: OopsyData;
   private timestampCallbacks: {
     timestamp: number;
@@ -475,10 +487,22 @@ export class DamageTracker {
   }
 
   OnNetLog(e: EventResponses['LogLine']): void {
-    const line = e.rawLine;
-    const splitLine = e.line;
+    let line = e.rawLine;
+    let splitLine = e.line;
     const type = splitLine[logDefinitions.None.fields.type];
     this.lineGivesDamageDown = false;
+
+    // Fork: hidden names given their names, for everything below (and copies, as other
+    // listeners get the same event).
+    if (type === logDefinitions.RSVData.type) {
+      const key = splitLine[logDefinitions.RSVData.fields.key];
+      const value = splitLine[logDefinitions.RSVData.fields.value];
+      if (key !== undefined && value !== undefined)
+        this.rsvNames[key] = value;
+    } else if (line.includes('_rsv_')) {
+      line = line.replace(kRsvNameRegex, (key) => this.rsvNames[key] ?? key);
+      splitLine = splitLine.map((field) => this.rsvNames[field] ?? field);
+    }
 
     // Fork: except leaving the zone, which log replays only know from this line.
     if (this.ignoreZone && type !== logDefinitions.ChangeZone.type)
@@ -663,9 +687,11 @@ export class DamageTracker {
     const fields = logDefinitions.Ability.fields;
     const id = splitLine[fields.id] ?? '';
     const targetId = splitLine[fields.targetId] ?? '';
+    // Only the party and alliance (not others around, e.g. in a FATE).
     if (
       IsPlayerId(splitLine[fields.sourceId]) || !IsPlayerId(targetId) ||
-      this.damageDownSkipIds.has(id)
+      this.damageDownSkipIds.has(id) ||
+      this.playerStateTracker.partyTracker.nameFromId(targetId) === undefined
     )
       return;
 
@@ -881,9 +907,11 @@ export class DamageTracker {
         if (typeof m === 'object') {
           const mistakeTimestamp = timestamp + delaySeconds * 1000;
           if (Array.isArray(m)) {
-            for (const mistake of m)
-              this.playerStateTracker.OnMistakeObj(mistakeTimestamp, mistake);
-          } else if (isOopsyMistake(m)) {
+            for (const mistake of m) {
+              if (!this.RepeatedMistake(mistakeTimestamp, mistake))
+                this.playerStateTracker.OnMistakeObj(mistakeTimestamp, mistake);
+            }
+          } else if (isOopsyMistake(m) && !this.RepeatedMistake(mistakeTimestamp, m)) {
             this.playerStateTracker.OnMistakeObj(mistakeTimestamp, m);
           }
         }
@@ -963,6 +991,25 @@ export class DamageTracker {
     this.data.inCombat = this.inCombat;
   }
 
+  // Fork: whether a trigger already gave this same mistake (type, player, text) at this moment
+  // (see kSameMomentMs), e.g. a zone's own stack trigger for two stacks overlapping.
+  private RepeatedMistake(timestamp: number, mistake: OopsyMistake): boolean {
+    const text = typeof mistake.text === 'object' ? JSON.stringify(mistake.text) : mistake.text;
+    const key = `same:${mistake.type}:${mistake.blame ?? mistake.name ?? ''}:${text ?? ''}`;
+    const last = this.mistakeMoments.get(key);
+    this.mistakeMoments.set(key, timestamp);
+    return last !== undefined && Math.abs(timestamp - last) < kSameMomentMs;
+  }
+
+  // Fork: whether this player already got this kind of mistake for something of this name at
+  // this moment (see kSameMomentMs): by name, as abilities of one name can have several ids.
+  private SameMoment(kind: string, name: string, targetId: string): boolean {
+    const key = `${kind}:${name}:${targetId}`;
+    const last = this.mistakeMoments.get(key);
+    this.mistakeMoments.set(key, this.lastTimestamp);
+    return last !== undefined && this.lastTimestamp - last < kSameMomentMs;
+  }
+
   private AddDamageTriggers(type: OopsyMistakeType, dict?: MistakeMap): void {
     if (!dict)
       return;
@@ -974,7 +1021,9 @@ export class DamageTracker {
         netRegex: NetRegexes.ability({ id: id, ...playerDamageFields }),
         mistake: (_data, matches) => {
           // Fork: a hit giving Damage Down is OnDamageDown's (run for this line already).
-          if (this.lineGivesDamageDown)
+          if (
+            this.lineGivesDamageDown || this.SameMoment('Damage', matches.ability, matches.targetId)
+          )
             return;
           return {
             type: type,
@@ -999,6 +1048,8 @@ export class DamageTracker {
         type: 'GainsEffect',
         netRegex: NetRegexes.gainsEffect({ effectId: id, ...playerTargetFields }),
         mistake: (_data, matches) => {
+          if (this.SameMoment('GainsEffect', matches.effect, matches.targetId))
+            return;
           return {
             type: type,
             blame: matches.target,
@@ -1029,6 +1080,8 @@ export class DamageTracker {
           const numTargets = parseInt(matches.targetCount);
           if (numTargets === 1 || isNaN(numTargets))
             return;
+          if (this.SameMoment('Share', matches.ability, matches.targetId))
+            return;
           return {
             type: type,
             blame: matches.target,
@@ -1054,6 +1107,8 @@ export class DamageTracker {
         mistake: (_data, matches) => {
           // Taken alone, some are still marked as AOEActionEffect type 22, with one target.
           if (matches.type === '22' && parseInt(matches.targetCount) !== 1)
+            return;
+          if (this.SameMoment('Solo', matches.ability, matches.targetId))
             return;
           return {
             type: type,
@@ -1088,6 +1143,7 @@ export class DamageTracker {
     this.damageDownSkipIds.clear();
     this.damageDownSkipEffects.clear();
     this.damageDownFailIds.clear();
+    this.mistakeMoments.clear();
 
     this.ignoreZone = this.options.IgnoreContentTypes.includes(this.contentType) ||
       this.options.IgnoreZoneIds.includes(this.zoneId);
