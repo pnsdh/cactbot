@@ -314,6 +314,8 @@ export class DamageTracker {
       name: pull.puller,
       blame: pull.puller,
       text: `${mistakeStr} (${Math.abs(seconds).toFixed(2)}s)`,
+      // Not counted as a pull in the summary: it is reported every pull with a 0s minimum.
+      triggerType: pull === this.myPull ? 'OwnPull' : undefined,
     });
   }
 
