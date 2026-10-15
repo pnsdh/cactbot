@@ -223,12 +223,15 @@ export class DamageTracker {
   public logReplayMode = false;
   private triggerSuppress: { [triggerId: string]: number } = {};
   // Fork: Damage Downs from abilities (see OnDamageDown): the ones being gathered by ability id,
-  // when each player last got one (by player and ability id, and by player id), and the ability
-  // and status ids this zone's triggers already report.
+  // when each player last got one (by player and ability id, and by player id), the ability and
+  // status ids this zone's triggers already report, its damageFail ids, and whether the
+  // current line gives one.
   private damageDowns = new Map<string, DamageDownEvent>();
   private damageDownLast = new Map<string, number>();
   private damageDownSkipIds = new Set<string>();
   private damageDownSkipEffects = new Set<string>();
+  private damageDownFailIds = new Set<string>();
+  private lineGivesDamageDown = false;
   private data: OopsyData;
   private timestampCallbacks: {
     timestamp: number;
@@ -469,6 +472,7 @@ export class DamageTracker {
     const line = e.rawLine;
     const splitLine = e.line;
     const type = splitLine[logDefinitions.None.fields.type];
+    this.lineGivesDamageDown = false;
 
     // Fork: except leaving the zone, which log replays only know from this line.
     if (this.ignoreZone && type !== logDefinitions.ChangeZone.type)
@@ -643,8 +647,10 @@ export class DamageTracker {
 
   // Fork: an enemy ability giving a player Damage Down means they failed something (stood in
   // it, or did a mechanic wrong), unless many got it from it at once: then someone's failure
-  // gave it to everyone, and it isn't theirs.  Abilities and statuses that this zone's triggers
-  // already report are left to them.
+  // gave it to everyone, and it isn't theirs.  Hits that give it are this rule's alone, also
+  // for abilities in damageWarn/damageFail (those only report hits without it), so the same
+  // mistake counts the same everywhere.  Abilities that this zone's share, solo or own
+  // triggers report, and statuses that its gainsEffect lists report, are left to them.
   private OnDamageDown(splitLine: string[]): void {
     if (!this.options.DamageDownMistakes)
       return;
@@ -670,6 +676,7 @@ export class DamageTracker {
     }
     if (gives === undefined)
       return;
+    this.lineGivesDamageDown = true;
 
     let event = this.damageDowns.get(id);
     if (!event) {
@@ -699,12 +706,33 @@ export class DamageTracker {
   ): void {
     if (this.damageDowns.get(id) === event)
       this.damageDowns.delete(id);
-    // Not when everyone alive got it either (e.g. the one or two left when others are dead).
+    // More than the option's players at once is someone's failure applied to many: shown once,
+    // on nobody.  So is everyone alive getting it (e.g. the one or two left when others are
+    // dead), but not shown.
     const count = event.targets.size;
-    // More than the option's players at once is someone's failure applied to many.
     const maxPlayers = this.options.DamageDownMaxPlayers;
-    if (count > maxPlayers || event.alive > 0 && count >= event.alive)
+    if (count <= maxPlayers && event.alive > 0 && count >= event.alive)
       return;
+    if (count > maxPlayers) {
+      const key = `group:${id}`;
+      const last = this.damageDownLast.get(key);
+      this.damageDownLast.set(key, event.time);
+      if (last !== undefined && event.time - last < kDamageDownRepeatMs)
+        return;
+      this.playerStateTracker.OnMistakeObj(event.time, {
+        type: 'fail',
+        text: {
+          en: `${event.ability} (${count} players)`,
+          de: `${event.ability} (${count} Spieler)`,
+          fr: `${event.ability} (${count} joueurs)`,
+          ja: `${event.ability} (${count}人)`,
+          cn: `${event.ability} (${count}人)`,
+          ko: `${event.ability} (${count}명)`,
+          tc: `${event.ability} (${count}人)`,
+        },
+      });
+      return;
+    }
     for (const [targetId, target] of event.targets) {
       const key = `${targetId}:${id}`;
       const last = this.damageDownLast.get(key);
@@ -717,7 +745,8 @@ export class DamageTracker {
         continue;
       this.damageDownLast.set(targetId, event.time);
       this.playerStateTracker.OnMistakeObj(event.time, {
-        type: 'warn',
+        // As the zone's triggers have it, for abilities in its damageFail.
+        type: this.damageDownFailIds.has(id) ? 'fail' : 'warn',
         blame: target.name,
         reportId: targetId,
         triggerType: 'Damage',
@@ -726,11 +755,12 @@ export class DamageTracker {
     }
   }
 
-  // Fork: the ability and status ids that a trigger set reports itself (see OnDamageDown).
+  // Fork: the ability and status ids that a trigger set reports itself, and its damageFail ids
+  // (see OnDamageDown).
   private SkipDamageDowns(set: ProcessedOopsyTriggerSet): void {
+    for (const id of Object.values(set.damageFail ?? {}))
+      this.damageDownFailIds.add(id);
     const maps = [
-      set.damageWarn,
-      set.damageFail,
       set.shareWarn,
       set.shareFail,
       set.soloWarn,
@@ -933,6 +963,9 @@ export class DamageTracker {
         type: 'Ability',
         netRegex: NetRegexes.ability({ id: id, ...playerDamageFields }),
         mistake: (_data, matches) => {
+          // Fork: a hit giving Damage Down is OnDamageDown's (run for this line already).
+          if (this.lineGivesDamageDown)
+            return;
           return {
             type: type,
             blame: matches.target,
@@ -1044,6 +1077,7 @@ export class DamageTracker {
     this.damageDownLast.clear();
     this.damageDownSkipIds.clear();
     this.damageDownSkipEffects.clear();
+    this.damageDownFailIds.clear();
 
     this.ignoreZone = this.options.IgnoreContentTypes.includes(this.contentType) ||
       this.options.IgnoreZoneIds.includes(this.zoneId);
