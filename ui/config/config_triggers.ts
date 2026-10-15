@@ -21,6 +21,8 @@ export type TriggerFile = {
   title: string;
   type?: string;
   triggers: TriggerEntry[];
+  // Saved config paths for the whole file (trigger set options, timeline edits).
+  settingPaths: string[][];
 };
 
 type Context = {
@@ -28,6 +30,8 @@ type Context = {
   readSaved: (group: string, path: string[]) => SavedConfigEntry | undefined;
   // Shows a section's trigger list.
   showTriggers: (group: string) => void;
+  // Files were added (raidboss's load after the page shows).
+  onTriggersChanged: () => void;
 };
 
 const kAll: LocaleText = { en: 'All', ko: '전체' };
@@ -42,6 +46,7 @@ let context: Context = {
   translate: (text) => text.en,
   readSaved: () => undefined,
   showTriggers: () => undefined,
+  onTriggersChanged: () => undefined,
 };
 
 export const setTriggerBrowserContext = (value: Partial<Context>): void => {
@@ -59,6 +64,7 @@ export const registerTriggerFile = (
   title: string,
   type: string | undefined,
   triggers: TriggerEntry[],
+  settingPaths: string[][] = [],
 ): void => {
   (files[group] ??= []).push({
     group: group,
@@ -66,12 +72,14 @@ export const registerTriggerFile = (
     title: stripTags(title),
     type: type,
     triggers: triggers,
+    settingPaths: settingPaths,
   });
 };
 
-// Anything saved for a trigger other than empty boxes and "default" counts as a change.
-const isChange = (entry: SavedConfigEntry | undefined): boolean => {
-  if (entry === undefined)
+// Anything saved other than empty boxes, "default" and shown timeline entries (true) counts as a
+// change.  A config edited by hand could have null too.
+const isChange = (entry: SavedConfigEntry | null | undefined): boolean => {
+  if (entry === undefined || entry === null || entry === true)
     return false;
   if (typeof entry === 'string')
     return entry !== '' && entry !== 'default';
@@ -81,7 +89,8 @@ const isChange = (entry: SavedConfigEntry | undefined): boolean => {
 };
 
 const changedCount = (file: TriggerFile): number =>
-  file.triggers.filter((t) => isChange(context.readSaved(file.group, ['triggers', t.id]))).length;
+  file.triggers.filter((t) => isChange(context.readSaved(file.group, ['triggers', t.id]))).length +
+  file.settingPaths.filter((path) => isChange(context.readSaved(file.group, path))).length;
 
 const format = (text: LocaleText, n: number): string =>
   context.translate(text).replace('${n}', n.toLocaleString());
@@ -118,6 +127,17 @@ const makeChip = (label: string, count?: number): HTMLButtonElement => {
   return chip;
 };
 
+const makeKeyboardButton = (element: HTMLElement): void => {
+  element.tabIndex = 0;
+  element.setAttribute('role', 'button');
+  element.addEventListener('keydown', (e) => {
+    if (e.target !== element || e.key !== 'Enter' && e.key !== ' ')
+      return;
+    element.click();
+    e.preventDefault();
+  });
+};
+
 // Finds a trigger's row in an open file, as either config builds it.
 const findTriggerRow = (file: TriggerFile, id: string): HTMLElement | undefined => {
   for (const row of file.container.querySelectorAll<HTMLElement>('.trigger')) {
@@ -149,7 +169,11 @@ export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void 
     const update = () => {
       const n = changedCount(file);
       changed.set(file, n);
-      const parts = [file.type, format(kTriggerCount, file.triggers.length)];
+      // Files with only a timeline or trigger set options have no count.
+      const count = file.triggers.length > 0
+        ? format(kTriggerCount, file.triggers.length)
+        : undefined;
+      const parts = [file.type, count];
       meta.textContent = parts.filter((p) => p !== undefined).join(' · ');
       if (n > 0) {
         const span = document.createElement('span');
@@ -167,6 +191,13 @@ export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void 
         file.container.scrollIntoView({ block: 'start' });
     });
   }
+  // Headers that open things can be reached and used with the keyboard.
+  for (
+    const header of groupDiv.querySelectorAll<HTMLElement>(
+      '.trigger-file-header, .timeline-edit-header',
+    )
+  )
+    makeKeyboardButton(header);
 
   const toolbar = document.createElement('div');
   toolbar.classList.add('config-trigger-toolbar');
@@ -280,6 +311,7 @@ export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void 
   const count = groupDiv.closest('.overlay-container')?.querySelector('.config-view-count');
   if (count)
     count.textContent = triggerCount(group).toLocaleString();
+  context.onTriggersChanged();
 
   browsers[group] = {
     showFile: (file: TriggerFile) => {
@@ -329,6 +361,15 @@ export const searchTriggers = (
   return { hits: hits, total: total };
 };
 
+const flash = (elements: HTMLElement[]): void => {
+  for (const element of elements) {
+    element.classList.remove('config-flash');
+    // Restart the animation.
+    void element.offsetWidth;
+    element.classList.add('config-flash');
+  }
+};
+
 export const revealTrigger = (hit: TriggerHit): void => {
   const { file, trigger } = hit;
   context.showTriggers(file.group);
@@ -337,10 +378,17 @@ export const revealTrigger = (hit: TriggerHit): void => {
   if (file.container.classList.contains('collapsed'))
     header?.click();
   const row = trigger !== undefined ? findTriggerRow(file, trigger.id) : undefined;
-  const target = row ?? file.container;
-  target.scrollIntoView({ block: row !== undefined ? 'center' : 'start' });
-  target.classList.remove('config-flash');
-  // Restart the animation.
-  void target.offsetWidth;
-  target.classList.add('config-flash');
+  if (row === undefined) {
+    flash([file.container]);
+    file.container.scrollIntoView({ block: 'start' });
+    return;
+  }
+  // The row's top goes right under the file's header, which stays on top while open (rows with
+  // many output strings are taller than the page, so centering them would hide their name).
+  row.scrollIntoView({ block: 'start' });
+  const scroller = row.closest('.config-scroll');
+  if (scroller !== null && header !== null)
+    scroller.scrollTop -= header.getBoundingClientRect().height + 8;
+  const details = row.nextElementSibling;
+  flash(details instanceof HTMLElement ? [row, details] : [row]);
 };

@@ -376,6 +376,8 @@ export class CactbotConfigurator {
       (this.contents[group] ??= []).push(template);
 
     applyTheme(this.getStringOption('general', 'ConfigTheme', 'dark'));
+    // Best effort: the save goes out as a message right away.
+    window.addEventListener('beforeunload', () => void this.flushPendingSave());
     setTriggerBrowserContext({
       translate: (text) => this.translate(text),
       readSaved: (group, path) => this._getOptionLeafHelper(group, path),
@@ -401,6 +403,16 @@ export class CactbotConfigurator {
         void this.flushConfigData().then(resolve);
       }, kSaveDelayMs);
     });
+  }
+
+  // Saves a change still waiting in saveConfigData now, as the page is about to go away (reloads
+  // also reload this page).
+  flushPendingSave(): Promise<void> {
+    if (this.saveTimer === undefined)
+      return Promise.resolve();
+    window.clearTimeout(this.saveTimer);
+    this.saveTimer = undefined;
+    return this.flushConfigData();
   }
 
   async flushConfigData(): Promise<void> {
@@ -598,9 +610,12 @@ export class CactbotConfigurator {
     buttonInput.classList.add('reload-button');
     buttonInput.type = 'button';
     buttonInput.onclick = () => {
-      void callOverlayHandler({ call: 'cactbotReloadOverlays' });
-      // Fork: shown again on the next change.
-      document.getElementById('butter-margin')?.classList.add('hidden');
+      // Fork: a change made just before is saved first (see saveConfigData).
+      void this.flushPendingSave().then(() => {
+        void callOverlayHandler({ call: 'cactbotReloadOverlays' });
+        // Fork: shown again on the next change.
+        document.getElementById('butter-margin')?.classList.add('hidden');
+      });
     };
     buttonInput.value = this.translate(kReloadButtonText);
     container.appendChild(buttonInput);

@@ -774,6 +774,19 @@ class RaidbossConfigurator {
 
   // Fork: lets the config page's trigger browser show and search this file (config_triggers.ts).
   registerTriggerFile(info: RaidbossFileInfo, triggerContainer: HTMLElement): void {
+    // Changes saved for the whole file, besides its triggers'.
+    const setId = info.triggerSet.id;
+    const settingPaths: string[][] = setId !== undefined
+      ? [[kOptionKeys.triggerSets, setId], [kOptionKeys.triggerSetConfig, setId]]
+      : [];
+    if (info.triggerSet.timeline !== undefined && typeof info.zoneId === 'number')
+      settingPaths.push(['timeline', info.zoneId.toString()]);
+    // An overridden set shows a warning instead of its triggers.
+    if (info.triggerSet.overriddenByFile !== undefined) {
+      registerTriggerFile('raidboss', triggerContainer, info.title, info.type, [], settingPaths);
+      return;
+    }
+
     const severities = ['alarm', 'alert', 'info'] as const;
     const triggers: TriggerEntry[] = [];
     for (const [trigId, trig] of Object.entries(info.triggers ?? {})) {
@@ -793,9 +806,14 @@ class RaidbossConfigurator {
         severity: severity,
       });
     }
-    if (info.triggerSet.overriddenByFile !== undefined)
-      triggers.length = 0;
-    registerTriggerFile('raidboss', triggerContainer, info.title, info.type, triggers);
+    registerTriggerFile(
+      'raidboss',
+      triggerContainer,
+      info.title,
+      info.type,
+      triggers,
+      settingPaths,
+    );
   }
 
   buildTriggerRows(key: string, info: RaidbossFileInfo, triggerOptions: HTMLElement): void {

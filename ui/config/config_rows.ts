@@ -149,6 +149,9 @@ const kTopics: { [group: string]: Topic[] } = {
   ],
 };
 
+// Link options shown in the section's description instead of as rows.
+const kDescLinks = ['Coverage'];
+
 const kOtherTitle: LocaleText = { en: 'Other', ko: '기타' };
 const kTriggersTitle: LocaleText = { en: 'Triggers', ko: '트리거' };
 const kResetTitle: LocaleText = { en: 'Reset to default', ko: '기본값으로' };
@@ -244,7 +247,12 @@ const makeCard = (title: string | undefined, rows: HTMLElement): HTMLElement => 
 const isNumberType = (type: string | undefined) => type === 'float' || type === 'integer';
 
 // A box with its unit, and a slider for 0-1 values that edits the box.
-const decorateNumber = (input: HTMLInputElement, id: string, translate: Translate): void => {
+const decorateNumber = (
+  input: HTMLInputElement,
+  id: string,
+  integer: boolean,
+  translate: Translate,
+): void => {
   const unit = kUnits[id];
   const box = document.createElement('span');
   box.classList.add('config-num');
@@ -256,9 +264,23 @@ const decorateNumber = (input: HTMLInputElement, id: string, translate: Translat
     span.textContent = translate(unit);
     box.appendChild(span);
   }
+  // Anything but a number (or nothing, for the default) is marked: it would be saved as is.
+  const markInvalid = () => {
+    const value = input.value.trim();
+    const n = Number(value);
+    box.classList.toggle(
+      'config-invalid',
+      value !== '' && !(integer ? Number.isInteger(n) : isFinite(n)),
+    );
+  };
+  markInvalid();
+  // Set back to the default's value by the reset button, without saving it.
+  input.addEventListener('config-shown', markInvalid);
 
-  if (!kFractions.has(id))
+  if (!kFractions.has(id)) {
+    input.addEventListener('input', markInvalid);
     return;
+  }
   const range = document.createElement('input');
   range.type = 'range';
   range.classList.add('config-range');
@@ -272,11 +294,13 @@ const decorateNumber = (input: HTMLInputElement, id: string, translate: Translat
       range.value = value.toString();
   };
   sync();
+  input.addEventListener('input', markInvalid);
   range.oninput = () => {
     input.value = parseFloat(range.value).toFixed(2);
-    input.dispatchEvent(new Event('input'));
+    input.dispatchEvent(new Event('input', { bubbles: true }));
   };
   input.addEventListener('input', sync);
+  input.addEventListener('config-shown', sync);
   box.before(range);
 };
 
@@ -287,6 +311,12 @@ const addReset = (left: HTMLElement, inputDiv: HTMLElement, translate: Translate
     'input[type="checkbox"], input[type="text"], select',
   );
   if (control === null)
+    return;
+  // A select whose default isn't one of its choices couldn't be put back.
+  if (
+    control instanceof HTMLSelectElement &&
+    ![...control.options].some((o) => o.value === defaultValue)
+  )
     return;
   const current = () =>
     control instanceof HTMLInputElement && control.type === 'checkbox'
@@ -310,12 +340,22 @@ const addReset = (left: HTMLElement, inputDiv: HTMLElement, translate: Translate
   reset.innerHTML =
     '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>';
   reset.onclick = () => {
+    // Its control is disabled by another option's value.
+    if (control.disabled)
+      return;
+    const box = type === 'string' || isNumberType(type);
     if (control instanceof HTMLInputElement && control.type === 'checkbox')
       control.checked = defaultValue === 'true';
+    // Boxes save as empty, which means the default (so a later new default applies too).
     else
+      control.value = box ? '' : defaultValue;
+    control.dispatchEvent(new Event('input', { bubbles: true }));
+    control.dispatchEvent(new Event('change', { bubbles: true }));
+    // ...and show the default's value, as the page does on load.
+    if (box) {
       control.value = defaultValue;
-    control.dispatchEvent(new Event('input'));
-    control.dispatchEvent(new Event('change'));
+      control.dispatchEvent(new Event('config-shown', { bubbles: true }));
+    }
   };
 
   // The control cell is a grid of one column: keep the button on the control's line.
@@ -355,13 +395,31 @@ export const arrangeSection = (
       rows.set(id, [...rows.get(id) ?? [], child]);
   }
 
+  for (const id of kDescLinks) {
+    const [left, inputDiv] = rows.get(id) ?? [];
+    const anchor = inputDiv?.querySelector('a');
+    const desc = section.querySelector('.config-section-desc');
+    if (!left || !inputDiv || !anchor || !desc)
+      continue;
+    const link = document.createElement('a');
+    link.classList.add('config-desc-link');
+    link.href = anchor.href;
+    link.target = '_blank';
+    const name = left.querySelector('.option-name')?.textContent ?? anchor.textContent ?? '';
+    link.textContent = `${name} ↗`;
+    desc.appendChild(link);
+    left.remove();
+    inputDiv.remove();
+    rows.delete(id);
+  }
+
   for (const [id, [left, inputDiv]] of rows) {
     if (left === undefined || inputDiv === undefined)
       continue;
     const type = left.dataset.optionType;
     const input = inputDiv.querySelector<HTMLInputElement>('input[type="text"]');
     if (input !== null && isNumberType(type))
-      decorateNumber(input, id, translate);
+      decorateNumber(input, id, type === 'integer', translate);
     if (type !== 'html' && type !== 'directory')
       addReset(left, inputDiv, translate);
   }

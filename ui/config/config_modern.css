@@ -10,14 +10,14 @@
 @font-face {
   font-family: "Pretendard Variable";
   font-weight: 45 920;
-  font-display: swap;
+  font-display: block;
   src: url("../raidboss/skins/cbkr/PretendardVariable.woff2") format("woff2");
 }
 
 @font-face {
   font-family: "cbkr Oxanium";
   font-weight: 200 800;
-  font-display: swap;
+  font-display: block;
   src: url("../raidboss/skins/cbkr/Oxanium-latin.woff2") format("woff2");
 }
 
@@ -241,7 +241,7 @@ a:hover {
 
 .config-tabs .overlay-container {
   display: none;
-  max-width: 860px;
+  max-width: 1000px;
   margin: 0 auto;
   padding: 16px 18px 80px;
 }
@@ -958,6 +958,7 @@ button:hover {
   color: var(--cfg-muted);
   font-size: 12.5px;
   font-weight: 560;
+  transition: background-color 160ms, border-color 160ms, color 160ms;
 }
 
 .config-chips > .config-chip:hover {
@@ -1015,8 +1016,9 @@ button:hover {
 }
 
 .config-trigger-browser .trigger-file-container > .trigger-file-header {
+  position: relative;
   display: block;
-  padding: 11px 14px;
+  padding: 11px 36px 11px 14px;
   border-radius: 10px;
 }
 
@@ -1054,6 +1056,7 @@ button:hover {
 
 /* Where a search result was opened. */
 .config-flash {
+  border-radius: 6px;
   animation: config-flash 1.8s ease-out;
 }
 
@@ -1067,7 +1070,7 @@ button:hover {
 /* ===== Trigger search results ===== */
 
 .config-trigger-results {
-  max-width: 860px;
+  max-width: 1000px;
   margin: 0 auto 80px;
   padding: 0 18px;
 }
@@ -1211,6 +1214,192 @@ button:hover {
 #butter-bar .reload-button:hover {
   background-color: var(--cfg-accent);
   filter: brightness(1.08);
+}
+
+/* ===== Details ===== */
+
+/* A number box with something that isn't a number. */
+.config-num.config-invalid,
+.config-num.config-invalid:focus-within {
+  border-color: var(--cfg-alarm);
+  box-shadow: 0 0 0 3px rgb(255 100 100 / 14%);
+}
+
+.config-desc-link {
+  margin-left: 6px;
+  font-weight: 560;
+  white-space: nowrap;
+}
+
+.timeline-add-container > div,
+.timeline-add-row-remove {
+  white-space: nowrap;
+}
+
+.option-input-container a {
+  overflow-wrap: anywhere;
+}
+
+/* Search results show each section's title right above its cards. */
+.config-searching .overlay-container > a {
+  display: block;
+  margin-bottom: 12px;
+}
+
+/* An open file keeps its header (and the way to close it) in view while its triggers scroll. */
+.config-trigger-browser .trigger-file-container:not(.collapsed) > .trigger-file-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--cfg-line);
+  border-radius: 10px 10px 0 0;
+  background-color: var(--cfg-surface);
+}
+
+.config-trigger-browser .trigger-file-container > .trigger-file-header::after {
+  content: "";
+  position: absolute;
+  top: 20px;
+  right: 16px;
+  width: 6px;
+  height: 6px;
+  border: solid var(--cfg-muted);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  transition: transform 200ms var(--cfg-ease), opacity 160ms;
+}
+
+.config-trigger-browser .trigger-file-container:not(.collapsed) > .trigger-file-header::after {
+  top: 23px;
+  transform: rotate(-135deg);
+}
+
+/* Closed cards show theirs only when pointed at, so a page of cards stays calm. */
+.config-trigger-browser .trigger-file-container.collapsed > .trigger-file-header::after {
+  opacity: 0;
+}
+
+.config-trigger-browser .trigger-file-container.collapsed > .trigger-file-header:hover::after,
+.config-trigger-browser .trigger-file-container.collapsed > .trigger-file-header:focus-visible::after {
+  opacity: 1;
+}
+
+/* Lists that change in place (another expansion, settings and triggers) come in like tabs do. */
+.config-trigger-browser > .trigger-expansion-container.config-active,
+.config-view-enter > .config-card {
+  animation: config-fade-in 220ms var(--cfg-ease);
+}
+
+.config-trigger-browser .trigger-file-container:not(.collapsed) > :not(.trigger-file-header) {
+  animation: config-fade-in 220ms var(--cfg-ease);
+}
+
+@keyframes config-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+/* ===== Small windows ===== */
+
+@media (max-width: 600px) {
+  .config-tab-bar {
+    position: relative;
+    padding-left: 10px;
+  }
+
+  .config-logo {
+    display: none;
+  }
+
+  /* Search is an icon that opens over the tabs. */
+  .config-search {
+    flex: 0 0 32px;
+    justify-content: center;
+    gap: 0;
+    min-width: 32px;
+    padding: 0;
+  }
+
+  .config-search input[type="text"].config-search-input {
+    width: 0;
+    opacity: 0;
+  }
+
+  .config-search kbd {
+    display: none;
+  }
+
+  .config-search:focus-within,
+  .config-search.config-has-query {
+    position: absolute;
+    top: 8px;
+    left: 10px;
+    right: 10px;
+    z-index: 3;
+    width: auto;
+    justify-content: flex-start;
+    gap: 7px;
+    padding: 0 10px;
+  }
+
+  .config-search:focus-within input[type="text"].config-search-input,
+  .config-search.config-has-query input[type="text"].config-search-input {
+    width: auto;
+    opacity: 1;
+  }
+
+  .config-tabs .overlay-container,
+  .config-trigger-results {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  #butter-bar {
+    max-width: calc(100vw - 24px);
+  }
+
+  .reload-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Names above their controls. */
+  .overlay-options,
+  .trigger-file-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .overlay-options > .option-input-container {
+    justify-items: start;
+    padding-top: 0;
+    border-top: none;
+  }
+
+  .config-range {
+    width: 96px;
+  }
+
+  .trigger-file-options > .trigger-details {
+    padding-top: 6px;
+    border-top: none;
+  }
+
+  .config-trigger-browser .trigger-file-container > .overlay-options,
+  .config-trigger-browser .trigger-file-options,
+  .config-trigger-browser .timeline-edit-container {
+    margin-left: 10px;
+    margin-right: 10px;
+  }
+
+  .timeline-add-container {
+    overflow-x: auto;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -180,7 +180,12 @@ const renderTriggerResults = (
       pill.textContent = preview;
       button.appendChild(pill);
     }
-    button.onclick = () => revealTrigger(hit);
+    button.onclick = () => {
+      // Keys go to the page again (the search box empties as the tab changes).
+      if (document.activeElement instanceof HTMLElement)
+        document.activeElement.blur();
+      revealTrigger(hit);
+    };
     list.appendChild(button);
   }
   results.append(list, title);
@@ -199,7 +204,7 @@ const buildSearch = (
   scroller: HTMLElement,
   translate: (text: LocaleText) => string,
   sections: () => { section: HTMLElement }[],
-): { box: HTMLElement; results: HTMLElement; clear: () => void } => {
+): { box: HTMLElement; results: HTMLElement; clear: () => void; refresh: () => void } => {
   const results = document.createElement('div');
   results.classList.add('config-card', 'config-trigger-results');
   const box = document.createElement('label');
@@ -225,6 +230,7 @@ const buildSearch = (
       return;
     searching = query !== '';
     document.documentElement.classList.toggle('config-searching', searching);
+    box.classList.toggle('config-has-query', searching);
     let anyHit = renderTriggerResults(results, query, translate);
     for (const { section } of sections()) {
       let sectionHit = false;
@@ -242,7 +248,7 @@ const buildSearch = (
           if (hit && name.style.display !== 'none')
             cardHit = true;
         }
-        card.classList.toggle('config-search-miss', !cardHit);
+        card.classList.toggle('config-search-miss', searching && !cardHit);
         sectionHit ||= cardHit;
       }
       section.classList.toggle('config-search-empty', searching && !sectionHit);
@@ -278,7 +284,12 @@ const buildSearch = (
     input.value = '';
     run();
   };
-  return { box: box, results: results, clear: clear };
+  // Results again when more triggers came in.
+  const refresh = () => {
+    if (searching)
+      run();
+  };
+  return { box: box, results: results, clear: clear, refresh: refresh };
 };
 
 type ShowView = (view: 'settings' | 'triggers') => void;
@@ -313,8 +324,18 @@ const buildViewSwitch = (
     triggers.classList.toggle('config-active', view === 'triggers');
     storageSet(storage, view);
   };
-  settings.onclick = () => show('settings');
-  triggers.onclick = () => show('triggers');
+  // The cards that come in fade in; only for a moment, so cards shown again by a search don't.
+  let enterTimer: number | undefined;
+  const switchTo = (view: 'settings' | 'triggers') => {
+    if (section.dataset.view === view)
+      return;
+    show(view);
+    section.classList.add('config-view-enter');
+    window.clearTimeout(enterTimer);
+    enterTimer = window.setTimeout(() => section.classList.remove('config-view-enter'), 300);
+  };
+  settings.onclick = () => switchTo('settings');
+  triggers.onclick = () => switchTo('triggers');
   section.classList.add('config-has-triggers');
   section.querySelector('.config-section-desc')?.after(bar);
   show(storageGet(storage) === 'triggers' ? 'triggers' : 'settings');
@@ -344,8 +365,12 @@ export const buildSectionTabs = (
   const views = new Map<string, ShowView>();
   const search = buildSearch(scroller, translate, () => [...tabs.values()]);
   let shown: string | undefined;
+  // Each tab comes back where it was left.
+  const scrollTops = new Map<string, number>();
   const select = (group: string) => {
     search.clear();
+    if (shown !== undefined && shown !== group)
+      scrollTops.set(shown, scroller.scrollTop);
     for (const [key, { tab, section }] of tabs) {
       const active = key === group;
       tab.classList.toggle('config-active', active);
@@ -355,11 +380,12 @@ export const buildSectionTabs = (
     }
     // Not on the first one: that would lay out the whole page before it shows.
     if (shown !== undefined && shown !== group)
-      scroller.scrollTop = 0;
+      scroller.scrollTop = scrollTops.get(group) ?? 0;
     shown = group;
     storageSet(kTabStorageKey, group);
   };
   setTriggerBrowserContext({
+    onTriggersChanged: search.refresh,
     showTriggers: (group) => {
       select(group);
       views.get(group)?.('triggers');
