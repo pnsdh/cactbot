@@ -292,6 +292,118 @@ a:hover {
   font-size: 12.5px;
 }
 
+/* ===== Search ===== */
+
+.config-search {
+  flex: 0 1 240px;
+  min-width: 120px;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  margin-left: auto;
+  padding: 0 10px;
+  border: 1px solid var(--cfg-line-strong);
+  border-radius: 99px;
+  background-color: var(--cfg-surface);
+  cursor: text;
+  transition: border-color 160ms, box-shadow 160ms;
+}
+
+.config-search::before {
+  content: "";
+  flex: none;
+  width: 14px;
+  height: 14px;
+  background-color: var(--cfg-muted);
+
+  /* Chromium 95 (upstream OverlayPlugin) only has the prefixed mask. */
+  /* stylelint-disable-next-line property-no-vendor-prefix */
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.6-3.6'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+.config-search:focus-within {
+  border-color: var(--cfg-accent);
+  box-shadow: 0 0 0 3px var(--cfg-accent-bg);
+}
+
+.config-search input[type="text"].config-search-input {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: none;
+  box-shadow: none;
+  text-align: left;
+  font-family: var(--cfg-font);
+  font-size: 13px;
+  font-weight: 450;
+}
+
+.config-search kbd {
+  flex: none;
+  padding: 0 5px;
+  border: 1px solid var(--cfg-line-strong);
+  border-radius: 4px;
+  color: var(--cfg-faint);
+  font-family: var(--cfg-font-accent);
+  font-size: 10.5px;
+}
+
+.config-search:focus-within kbd {
+  display: none;
+}
+
+.config-searching.config-tabs .overlay-container {
+  display: block;
+  padding-bottom: 6px;
+  animation: none;
+}
+
+.config-searching .config-section-desc,
+.config-searching .config-card-tree,
+.config-searching .config-tab.config-active::after {
+  display: none;
+}
+
+.config-searching .overlay-container.config-search-empty,
+.config-search-miss,
+.config-hidden {
+  display: none !important;
+}
+
+.config-no-results {
+  margin: 48px 16px;
+  text-align: center;
+  color: var(--cfg-muted);
+}
+
+/* ===== Cards ===== */
+
+/* The title comes after the rows in the page (so it can be hidden with no rows), above them on
+   screen. */
+.config-card {
+  display: flex;
+  flex-direction: column-reverse;
+  margin-bottom: 18px;
+}
+
+.config-card-title {
+  margin: 0 0 7px 4px;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  color: var(--cfg-muted);
+}
+
+.config-card > .overlay-options:empty,
+.config-card > .overlay-options:empty + .config-card-title {
+  display: none;
+}
+
 /* ===== Option rows ===== */
 
 /* A card of rows: each row is a name cell and a control cell sharing a line. */
@@ -318,8 +430,107 @@ a:hover {
   justify-items: end;
 }
 
+/* Flex rather than config.css's grid, so the changed mark sits after the name. */
 .option-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   font-weight: 560;
+}
+
+/* Trigger lists are rows that span the card, so only the first has no line above. */
+.config-card-tree .overlay-options > :nth-child(2) {
+  border-top-color: var(--cfg-line);
+}
+
+/* Changed from the default: a dot after the name, and a reset button by the control. */
+.config-modified .option-name::after {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin: 0 0 2px 8px;
+  border-radius: 50%;
+  background-color: var(--cfg-accent);
+  box-shadow: 0 0 0 3px var(--cfg-accent-bg);
+  vertical-align: middle;
+}
+
+.config-ctl {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.config-ctl > .config-reset {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--cfg-faint);
+}
+
+.config-ctl > .config-reset:hover {
+  background-color: var(--cfg-hover);
+  color: var(--cfg-text);
+}
+
+.config-reset svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* A number box with its unit. */
+.config-num {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  border: 1px solid var(--cfg-line-strong);
+  border-radius: 7px;
+  background-color: var(--cfg-surface-2);
+  transition: border-color 140ms, box-shadow 140ms;
+}
+
+.config-num:hover {
+  border-color: var(--cfg-faint);
+}
+
+.config-num:focus-within {
+  border-color: var(--cfg-accent);
+  box-shadow: 0 0 0 3px var(--cfg-accent-bg);
+}
+
+.config-num input[type="text"],
+.config-num input[type="text"]:focus {
+  width: 58px;
+  height: 28px;
+  padding: 0 8px;
+  border: none;
+  background: none;
+  box-shadow: none;
+  text-align: right;
+}
+
+.config-unit {
+  margin-left: -4px;
+  padding-right: 9px;
+  color: var(--cfg-muted);
+  font-size: 12px;
+}
+
+.config-range {
+  width: 130px;
+  margin: 0;
+  accent-color: var(--cfg-accent);
+  cursor: pointer;
 }
 
 .comment {

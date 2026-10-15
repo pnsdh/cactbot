@@ -1,6 +1,8 @@
 import { Lang, langToLocale } from '../../resources/languages';
 import { LocaleText } from '../../types/trigger';
 
+import { arrangeSection } from './config_rows';
+
 // Fork: the config page shows one overlay's options at a time, picked from tabs across the top
 // (the page sits next to OverlayPlugin's own list, so a second sidebar would crowd it), in a dark
 // or light theme.  The sections are the ones CactbotConfigurator.buildUI makes; this only moves
@@ -118,6 +120,100 @@ export const applyStoredTheme = (): void => {
     applyTheme(theme);
 };
 
+const kSearchPlaceholder: LocaleText = {
+  en: 'Search settings',
+  ko: '설정 검색',
+};
+
+const kNoResults: LocaleText = {
+  en: 'No matching settings.',
+  ko: '일치하는 설정이 없습니다.',
+};
+
+// Searches option names and descriptions in every section at once: sections, cards and rows
+// without a match are hidden while there is a query.  Trigger lists are not searched.
+const buildSearch = (
+  scroller: HTMLElement,
+  translate: (text: LocaleText) => string,
+  sections: () => { section: HTMLElement }[],
+): { box: HTMLElement; clear: () => void } => {
+  const box = document.createElement('label');
+  box.classList.add('config-search');
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.classList.add('config-search-input');
+  input.placeholder = translate(kSearchPlaceholder);
+  input.spellcheck = false;
+  const key = document.createElement('kbd');
+  key.textContent = '/';
+  box.append(input, key);
+
+  const empty = document.createElement('p');
+  empty.classList.add('config-no-results');
+  empty.textContent = translate(kNoResults);
+  scroller.prepend(empty);
+
+  const run = () => {
+    const query = input.value.trim().toLowerCase();
+    const searching = query !== '';
+    document.documentElement.classList.toggle('config-searching', searching);
+    let anyHit = false;
+    for (const { section } of sections()) {
+      let sectionHit = false;
+      for (const card of section.querySelectorAll<HTMLElement>('.config-card')) {
+        if (card.classList.contains('config-card-tree'))
+          continue;
+        let cardHit = false;
+        for (const name of card.querySelectorAll<HTMLElement>('[data-option-id]')) {
+          if (name.classList.contains('option-input-container'))
+            continue;
+          const text = `${name.textContent ?? ''} ${name.dataset.optionId ?? ''}`.toLowerCase();
+          const hit = !searching || text.includes(query);
+          name.classList.toggle('config-search-miss', !hit);
+          name.nextElementSibling?.classList.toggle('config-search-miss', !hit);
+          if (hit && name.style.display !== 'none')
+            cardHit = true;
+        }
+        card.classList.toggle('config-search-miss', !cardHit);
+        sectionHit ||= cardHit;
+      }
+      section.classList.toggle('config-search-empty', searching && !sectionHit);
+      anyHit ||= sectionHit;
+    }
+    empty.classList.toggle('config-hidden', !searching || anyHit);
+    scroller.scrollTop = 0;
+  };
+  input.addEventListener('input', run);
+  input.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape')
+      return;
+    input.value = '';
+    run();
+    input.blur();
+  });
+
+  // "/" or Ctrl+F starts a search from anywhere but a text box.
+  document.addEventListener('keydown', (e) => {
+    const target = e.target;
+    const typing = target instanceof HTMLInputElement && target.type === 'text' ||
+      target instanceof HTMLSelectElement;
+    if (e.key === '/' && !typing || e.key === 'f' && e.ctrlKey) {
+      input.focus();
+      input.select();
+      e.preventDefault();
+    }
+  });
+
+  const clear = () => {
+    if (input.value === '')
+      return;
+    input.value = '';
+    run();
+  };
+  run();
+  return { box: box, clear: clear };
+};
+
 export const buildSectionTabs = (
   container: HTMLElement,
   lang: Lang,
@@ -138,7 +234,9 @@ export const buildSectionTabs = (
   scroller.classList.add('config-scroll');
 
   const tabs = new Map<string, { tab: HTMLButtonElement; section: HTMLElement }>();
+  const search = buildSearch(scroller, translate, () => [...tabs.values()]);
   const select = (group: string) => {
+    search.clear();
     for (const [key, { tab, section }] of tabs) {
       const active = key === group;
       tab.classList.toggle('config-active', active);
@@ -174,6 +272,7 @@ export const buildSectionTabs = (
       desc.textContent = translate(text.desc);
       anchor.after(desc);
     }
+    arrangeSection(section, group, translate);
 
     const tab = document.createElement('button');
     tab.classList.add('config-tab');
@@ -201,6 +300,7 @@ export const buildSectionTabs = (
     e.preventDefault();
   });
 
+  bar.appendChild(search.box);
   container.prepend(bar, scroller);
   const saved = storageGet(kTabStorageKey);
   const first = [...tabs.keys()][0];

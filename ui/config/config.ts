@@ -23,6 +23,7 @@ import {
 } from '../../types/trigger';
 
 import defaultOptions, { ConfigOptions } from './config_options';
+import { tagOptionRow } from './config_rows';
 import { applyStoredTheme, applyTheme, buildSectionTabs } from './config_tabs';
 
 // Load other config files
@@ -679,6 +680,7 @@ export class CactbotConfigurator {
           if (!ret)
             continue;
           elements.set(opt, ret.elements);
+          tagOptionRow(ret.elements, opt, getOptDefault(opt, this.configOptions));
           values[opt.id] = ret.value;
         }
 
