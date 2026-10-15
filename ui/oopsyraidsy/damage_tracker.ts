@@ -112,6 +112,8 @@ const kDamageDownWindowMs = 500;
 // applied to everyone: the one who failed isn't known.
 const kDamageDownMinGroup = 3;
 const kDamageDownGroupMissing = 1;
+// Fork: a full party, for players of the alliance's other parties (whose deaths aren't known).
+const kDamageDownFullParty = 8;
 
 // Fork: the same mistake for the same player within this is one (e.g. hit by two casts of an
 // ability at once, as when two spreads stand together and each hits both).
@@ -139,8 +141,9 @@ const damageDownText = {
 type DamageDownEvent = {
   ability: string;
   time: number;
-  // Party members alive when it was given.
+  // Party members alive when it was given, and in all.
   alive: number;
+  partySize: number;
   targets: Map<string, { name: string; blamed: boolean }>;
 };
 
@@ -249,7 +252,7 @@ export class DamageTracker {
   // Fork: when each player last got each damage/effect/share/solo mistake (see kSameMomentMs),
   // and the hidden names (see kRsvNameRegex).
   private mistakeMoments = new Map<string, number>();
-  private rsvNames: { [key: string]: string } = {};
+  private rsvNames = new Map<string, string>();
   private data: OopsyData;
   private timestampCallbacks: {
     timestamp: number;
@@ -454,9 +457,11 @@ export class DamageTracker {
     const fields = logDefinitions.NetworkEffectResult.fields;
     const key = `${splitLine[fields.id] ?? ''}:${splitLine[fields.sequenceId] ?? ''}`;
     // Full HP after the hit: a training dummy whose HP doesn't go down, whose hits only get
-    // this line when they apply a status, so it tells nothing about which landed first.
+    // this line when they apply a status, so it tells nothing about which landed first.  Not a
+    // player, though (e.g. an enemy's first hit taken fully by a shield).
     const hp = splitLine[fields.currentHp];
-    const fullHp = hp !== undefined && hp !== '' && hp === splitLine[fields.maxHp];
+    const fullHp = hp !== undefined && hp !== '' && hp === splitLine[fields.maxHp] &&
+      !IsPlayerId(splitLine[fields.id]);
 
     let landed = false;
     // The party's first, as the same hit may be both.
@@ -498,10 +503,10 @@ export class DamageTracker {
       const key = splitLine[logDefinitions.RSVData.fields.key];
       const value = splitLine[logDefinitions.RSVData.fields.value];
       if (key !== undefined && value !== undefined)
-        this.rsvNames[key] = value;
+        this.rsvNames.set(key, value);
     } else if (line.includes('_rsv_')) {
-      line = line.replace(kRsvNameRegex, (key) => this.rsvNames[key] ?? key);
-      splitLine = splitLine.map((field) => this.rsvNames[field] ?? field);
+      line = line.replace(kRsvNameRegex, (key) => this.rsvNames.get(key) ?? key);
+      splitLine = splitLine.map((field) => this.rsvNames.get(field) ?? field);
     }
 
     // Fork: except leaving the zone, which log replays only know from this line.
@@ -543,7 +548,9 @@ export class DamageTracker {
         this.OnCountdown(splitLine);
         break;
       case logDefinitions.CountdownCancel.type:
-        this.CancelCountdown();
+        // Fork: only while counting down (stale opcodes after a patch can make any line one).
+        if (this.CountingDown())
+          this.CancelCountdown();
         break;
       case logDefinitions.InCombat.type:
         // Fork: log replays get no in combat events (live, these come from OverlayPlugin):
@@ -719,6 +726,7 @@ export class DamageTracker {
           : ability,
         time: this.lastTimestamp,
         alive: this.playerStateTracker.AliveCount(),
+        partySize: this.playerStateTracker.PartySize(),
         targets: new Map<string, { name: string; blamed: boolean }>(),
       };
       this.damageDowns.set(id, newEvent);
@@ -736,18 +744,30 @@ export class DamageTracker {
     id: string,
     event: DamageDownEvent,
   ): void {
-    if (this.damageDowns.get(id) === event)
-      this.damageDowns.delete(id);
+    // Not when dropped meanwhile (e.g. by a zone change or reload).
+    if (this.damageDowns.get(id) !== event)
+      return;
+    this.damageDowns.delete(id);
     // Someone's failure applied to everyone (see kDamageDownMinGroup), or to more players than
-    // the option's when set: shown once, on nobody.  Not shown at all when only the one or two
-    // left alive got it.
+    // the option's when set: shown once, on nobody.  Counted in your own party, the one whose
+    // deaths are known, unless none of it got it (then: the others of a full party).
     const count = event.targets.size;
+    let own = 0;
+    for (const targetId of event.targets.keys()) {
+      if (this.playerStateTracker.IsPlayerInParty(targetId))
+        own++;
+    }
     const maxPlayers = this.options.DamageDownMaxPlayers;
-    const known = event.alive > 0;
-    const group = maxPlayers > 0
-      ? count > maxPlayers
-      : known && count >= kDamageDownMinGroup && count >= event.alive - kDamageDownGroupMissing;
-    if (!group && known && count >= event.alive)
+    let group: boolean;
+    if (maxPlayers > 0)
+      group = count > maxPlayers;
+    else if (own > 0)
+      group = own >= kDamageDownMinGroup && own >= event.alive - kDamageDownGroupMissing;
+    else
+      group = count >= kDamageDownFullParty - kDamageDownGroupMissing;
+    // Not shown at all when only the one or two left alive of the party got it (but shown when
+    // alone, e.g. solo or with duty support).
+    if (!group && own > 0 && own >= event.alive && event.partySize > own)
       return;
     if (group) {
       const key = `group:${id}`;
@@ -785,7 +805,8 @@ export class DamageTracker {
         type: this.damageDownFailIds.has(id) ? 'fail' : 'warn',
         blame: target.name,
         reportId: targetId,
-        triggerType: 'Damage',
+        // No trigger type, so that death reports show it as its own line (they show 'Damage'
+        // ones only as marks on the hits of damageWarn/damageFail abilities).
         text: event.ability,
       });
     }

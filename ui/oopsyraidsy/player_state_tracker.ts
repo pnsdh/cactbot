@@ -413,6 +413,11 @@ export class PlayerStateTracker {
     delete this.trackedEffectMap[targetId]?.[effectId];
   }
 
+  // Fork: how many are in the party.
+  PartySize(): number {
+    return this.partyIds.size;
+  }
+
   // Fork: how many party members are alive (0 if the party isn't known).
   AliveCount(): number {
     let count = 0;
