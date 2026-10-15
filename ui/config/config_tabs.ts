@@ -204,6 +204,9 @@ const buildSearch = (
   scroller: HTMLElement,
   translate: (text: LocaleText) => string,
   sections: () => { section: HTMLElement }[],
+  // The page's scroll position before a search, and back after it.
+  onStart: () => void,
+  onEnd: () => void,
 ): { box: HTMLElement; results: HTMLElement; clear: () => void; refresh: () => void } => {
   const results = document.createElement('div');
   results.classList.add('config-card', 'config-trigger-results');
@@ -224,11 +227,15 @@ const buildSearch = (
   scroller.prepend(empty);
 
   let searching = false;
+  let lastQuery = '';
   const run = () => {
     const query = input.value.trim().toLowerCase();
     if (query === '' && !searching)
       return;
+    const wasSearching = searching;
     searching = query !== '';
+    if (searching && !wasSearching)
+      onStart();
     document.documentElement.classList.toggle('config-searching', searching);
     box.classList.toggle('config-has-query', searching);
     let anyHit = renderTriggerResults(results, query, translate);
@@ -255,7 +262,12 @@ const buildSearch = (
       anyHit ||= sectionHit;
     }
     empty.classList.toggle('config-hidden', !searching || anyHit);
-    scroller.scrollTop = 0;
+    // Results start at the top; the same query again (more triggers came in) keeps its place.
+    if (searching && query !== lastQuery)
+      scroller.scrollTop = 0;
+    lastQuery = query;
+    if (!searching && wasSearching)
+      onEnd();
   };
   input.addEventListener('input', run);
   input.addEventListener('keydown', (e) => {
@@ -352,25 +364,43 @@ export const buildSectionTabs = (
 
   const bar = document.createElement('nav');
   bar.classList.add('config-tab-bar');
-  bar.setAttribute('role', 'tablist');
   const logo = document.createElement('div');
   logo.classList.add('config-logo');
   logo.textContent = 'c';
-  bar.appendChild(logo);
+  // The tabs scroll sideways in a narrow window; the search box beside them doesn't.
+  const tabList = document.createElement('div');
+  tabList.classList.add('config-tab-list');
+  tabList.setAttribute('role', 'tablist');
+  bar.append(logo, tabList);
 
   const scroller = document.createElement('div');
   scroller.classList.add('config-scroll');
 
   const tabs = new Map<string, { tab: HTMLButtonElement; section: HTMLElement }>();
   const views = new Map<string, ShowView>();
-  const search = buildSearch(scroller, translate, () => [...tabs.values()]);
   let shown: string | undefined;
-  // Each tab comes back where it was left.
+  // Each tab comes back where it was left, also after a search.
   const scrollTops = new Map<string, number>();
-  const select = (group: string) => {
-    search.clear();
-    if (shown !== undefined && shown !== group)
+  const saveScroll = () => {
+    if (shown !== undefined)
       scrollTops.set(shown, scroller.scrollTop);
+  };
+  const restoreScroll = () => {
+    if (shown !== undefined)
+      scroller.scrollTop = scrollTops.get(shown) ?? 0;
+  };
+  const search = buildSearch(
+    scroller,
+    translate,
+    () => [...tabs.values()],
+    saveScroll,
+    restoreScroll,
+  );
+  const select = (group: string) => {
+    // While searching, the position was saved as the search started.
+    if (!document.documentElement.classList.contains('config-searching') && shown !== group)
+      saveScroll();
+    search.clear();
     for (const [key, { tab, section }] of tabs) {
       const active = key === group;
       tab.classList.toggle('config-active', active);
@@ -425,7 +455,7 @@ export const buildSectionTabs = (
     tab.setAttribute('role', 'tab');
     tab.textContent = title;
     tab.onclick = () => select(group);
-    bar.appendChild(tab);
+    tabList.appendChild(tab);
     tabs.set(group, { tab: tab, section: section });
     scroller.appendChild(section);
   }

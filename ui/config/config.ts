@@ -394,13 +394,15 @@ export class CactbotConfigurator {
   // Fork: text inputs save on every keystroke, and each save sends the whole config, so saves
   // close together are combined.
   private saveTimer?: number;
+  private saving?: Promise<void>;
 
   saveConfigData(): Promise<void> {
     window.clearTimeout(this.saveTimer);
     return new Promise((resolve) => {
       this.saveTimer = window.setTimeout(() => {
         this.saveTimer = undefined;
-        void this.flushConfigData().then(resolve);
+        this.saving = this.flushConfigData();
+        void this.saving.then(resolve);
       }, kSaveDelayMs);
     });
   }
@@ -409,10 +411,11 @@ export class CactbotConfigurator {
   // also reload this page).
   flushPendingSave(): Promise<void> {
     if (this.saveTimer === undefined)
-      return Promise.resolve();
+      return this.saving ?? Promise.resolve();
     window.clearTimeout(this.saveTimer);
     this.saveTimer = undefined;
-    return this.flushConfigData();
+    this.saving = this.flushConfigData();
+    return this.saving;
   }
 
   async flushConfigData(): Promise<void> {

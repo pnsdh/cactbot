@@ -21,9 +21,12 @@ export type TriggerFile = {
   title: string;
   type?: string;
   triggers: TriggerEntry[];
-  // Saved config paths for the whole file (trigger set options, timeline edits).
-  settingPaths: string[][];
+  // Saved config for the whole file (trigger set options, timeline edits).
+  settings: FileSetting[];
 };
+
+// A saved config path, and the default its value is compared with (without one, see isChange).
+export type FileSetting = { path: string[]; default?: string };
 
 type Context = {
   translate: (text: LocaleText) => string;
@@ -64,7 +67,7 @@ export const registerTriggerFile = (
   title: string,
   type: string | undefined,
   triggers: TriggerEntry[],
-  settingPaths: string[][] = [],
+  settings: FileSetting[] = [],
 ): void => {
   (files[group] ??= []).push({
     group: group,
@@ -72,7 +75,7 @@ export const registerTriggerFile = (
     title: stripTags(title),
     type: type,
     triggers: triggers,
-    settingPaths: settingPaths,
+    settings: settings,
   });
 };
 
@@ -88,9 +91,21 @@ const isChange = (entry: SavedConfigEntry | null | undefined): boolean => {
   return true;
 };
 
+// A value saved for an option with a known default: empty is the default too.
+const differs = (entry: SavedConfigEntry | null | undefined, value: string): boolean => {
+  if (entry === undefined || entry === null || entry === '')
+    return false;
+  if (typeof entry === 'object')
+    return isChange(entry);
+  return entry.toString() !== value;
+};
+
 const changedCount = (file: TriggerFile): number =>
   file.triggers.filter((t) => isChange(context.readSaved(file.group, ['triggers', t.id]))).length +
-  file.settingPaths.filter((path) => isChange(context.readSaved(file.group, path))).length;
+  file.settings.filter((s) => {
+    const saved = context.readSaved(file.group, s.path);
+    return s.default !== undefined ? differs(saved, s.default) : isChange(saved);
+  }).length;
 
 const format = (text: LocaleText, n: number): string =>
   context.translate(text).replace('${n}', n.toLocaleString());
@@ -185,6 +200,8 @@ export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void 
     update();
     file.container.addEventListener('change', update);
     file.container.addEventListener('input', update);
+    // Timeline rows are removed with a button, saving without an input event.
+    file.container.addEventListener('click', update);
     // Opening a card scrolls it into view, as it moves to a row of its own.
     header.addEventListener('click', () => {
       if (!file.container.classList.contains('collapsed'))

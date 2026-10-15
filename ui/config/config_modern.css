@@ -167,11 +167,18 @@ a:hover {
   padding: 0 12px 0 14px;
   background-color: var(--cfg-bar);
   border-bottom: 1px solid var(--cfg-line);
+}
+
+.config-tab-list {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
   overflow-x: auto;
   overflow-y: hidden;
 }
 
-.config-tab-bar::-webkit-scrollbar {
+.config-tab-list::-webkit-scrollbar {
   height: 0;
 }
 
@@ -1332,8 +1339,27 @@ button:hover {
     display: none;
   }
 
-  .config-search:focus-within,
+  /* A query left in the box: a dot on the icon, so the tabs stay usable. */
+  .config-search.config-has-query::after {
+    content: "";
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: var(--cfg-accent);
+  }
+
   .config-search.config-has-query {
+    position: relative;
+  }
+
+  .config-search.config-has-query:focus-within::after {
+    display: none;
+  }
+
+  .config-search:focus-within {
     position: absolute;
     top: 8px;
     left: 10px;
@@ -1345,8 +1371,7 @@ button:hover {
     padding: 0 10px;
   }
 
-  .config-search:focus-within input[type="text"].config-search-input,
-  .config-search.config-has-query input[type="text"].config-search-input {
+  .config-search:focus-within input[type="text"].config-search-input {
     width: auto;
     opacity: 1;
   }

@@ -34,7 +34,12 @@ import {
   ConfigProcessedFile,
   ConfigProcessedFileMap,
 } from '../config/config';
-import { buildTriggerBrowser, registerTriggerFile, TriggerEntry } from '../config/config_triggers';
+import {
+  buildTriggerBrowser,
+  FileSetting,
+  registerTriggerFile,
+  TriggerEntry,
+} from '../config/config_triggers';
 
 import raidbossFileData from './data/raidboss_manifest.txt';
 import { RaidbossTriggerField, RaidbossTriggerOutput } from './popup-text';
@@ -774,16 +779,31 @@ class RaidbossConfigurator {
 
   // Fork: lets the config page's trigger browser show and search this file (config_triggers.ts).
   registerTriggerFile(info: RaidbossFileInfo, triggerContainer: HTMLElement): void {
-    // Changes saved for the whole file, besides its triggers'.
+    // Changes saved for the whole file, besides its triggers': its alert output and options (each
+    // against its default), and timeline edits.
+    const settings: FileSetting[] = [];
     const setId = info.triggerSet.id;
-    const settingPaths: string[][] = setId !== undefined
-      ? [[kOptionKeys.triggerSets, setId], [kOptionKeys.triggerSetConfig, setId]]
-      : [];
+    if (setId !== undefined) {
+      settings.push({
+        path: [kOptionKeys.triggerSets, setId, kOptionKeys.output],
+        default: this.base.getStringOption(
+          'raidboss',
+          defaultAlertOutput.id,
+          defaultAlertOutput.default.toString(),
+        ),
+      });
+      for (const opt of info.triggerSet.config ?? []) {
+        settings.push({
+          path: [kOptionKeys.triggerSetConfig, setId, opt.id],
+          default: typeof opt.default === 'function' ? undefined : opt.default.toString(),
+        });
+      }
+    }
     if (info.triggerSet.timeline !== undefined && typeof info.zoneId === 'number')
-      settingPaths.push(['timeline', info.zoneId.toString()]);
+      settings.push({ path: ['timeline', info.zoneId.toString()] });
     // An overridden set shows a warning instead of its triggers.
     if (info.triggerSet.overriddenByFile !== undefined) {
-      registerTriggerFile('raidboss', triggerContainer, info.title, info.type, [], settingPaths);
+      registerTriggerFile('raidboss', triggerContainer, info.title, info.type, [], settings);
       return;
     }
 
@@ -812,7 +832,7 @@ class RaidbossConfigurator {
       info.title,
       info.type,
       triggers,
-      settingPaths,
+      settings,
     );
   }
 
