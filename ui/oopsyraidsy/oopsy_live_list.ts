@@ -189,7 +189,9 @@ export class DeathReportLive {
 export class OopsyLiveList implements MistakeObserver {
   private container: Element;
   private iconContainer: HTMLElement;
-  private inCombat = false;
+  // Fork: true so that SetInCombat(false) in the constructor applies the out of combat look
+  // (it returned early, leaving it until the first combat ended).
+  private inCombat = true;
   private numItems = 0;
   private items: HTMLElement[] = [];
   private baseTime?: number;
@@ -420,5 +422,7 @@ export class OopsyLiveList implements MistakeObserver {
 
   OnChangeZone(): void {
     this.Reset();
+    // Fork: mistakes after leaving (e.g. in town) were timed from the last pull's start.
+    this.baseTime = undefined;
   }
 }

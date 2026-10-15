@@ -31,7 +31,9 @@ export type InternalOopsyTriggerType =
   | 'Damage'
   | 'GainsEffect'
   | 'Share'
-  | 'Solo';
+  | 'Solo'
+  // Fork: the player's own first hit, reported apart from the pull (see DamageTracker).
+  | 'OwnPull';
 
 export type DeathReportData = {
   lang: Lang;

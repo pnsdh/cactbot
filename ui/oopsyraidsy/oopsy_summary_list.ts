@@ -93,6 +93,9 @@ export class OopsySummaryTable implements MistakeObserver {
     // Don't create a player row if the summary doesn't care about this type of mistake.
     if (!this.types.includes(m.type))
       return;
+    // Fork: the player's own first hit only shows their timing; the pull is counted apart.
+    if (m.triggerType === 'OwnPull')
+      return;
 
     if (!this.mistakes) {
       // Wait until we've seen any mistakes to start the table.

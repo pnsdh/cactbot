@@ -7,6 +7,8 @@ type AbilityTracker = {
   [abilityId: string]: {
     time: number;
     source: string;
+    // Fork: how long its effect lasts, from the effect itself (see General Target Mit Duration).
+    duration?: number;
   };
 };
 
@@ -23,7 +25,22 @@ export interface Data extends OopsyData {
     [targetId: string]: AbilityTracker;
   };
   partyDamageTracker: AbilityTracker;
+  // Fork: the cast last reported as an overwrite (see FirstOverwriteOfCast).
+  lastOverwriteCast?: string;
 }
+
+// Fork: a cast hitting several enemies (e.g. Reprisal on two bosses) has a line for each, and
+// may overwrite on each: reported once.
+const FirstOverwriteOfCast = (
+  data: Data,
+  matches: { sourceId: string; id: string; timestamp: string },
+): boolean => {
+  const cast = `${matches.sourceId}:${matches.id}:${matches.timestamp}`;
+  if (data.lastOverwriteCast === cast)
+    return false;
+  data.lastOverwriteCast = cast;
+  return true;
+};
 
 const raiseAbilityIds = [
   '7D', // raise
@@ -34,11 +51,13 @@ const raiseAbilityIds = [
   '478D', // angel whisper
   '7423', // variant raise
   '7426', // variant raise II
+  'BFAE', // occult raise (Fork)
 ];
 
 const targetMitAbilityIdToDuration: { [id: string]: number } = {
   // There are L98 traits that increase Reprisal, Feint, and Addle from 10s to 15s
-  // TODO: Add a level check to determine duration?
+  // Fork: the duration of the effect each applies is used instead when seen (level synced
+  // content gives 10s; see targetMitEffectIdToAbilityId).
   '1D6F': 15, // reprisal
   '1D7D': 15, // feint
   'B47': 10, // dismantle
@@ -48,6 +67,13 @@ const targetMitAbilityIdToDuration: { [id: string]: number } = {
   '8712': 10, // candy cane
 };
 const targetMitAbilityIds = Object.keys(targetMitAbilityIdToDuration);
+
+// Fork: the effects the abilities above put on their target, whose durations depend on level.
+const targetMitEffectIdToAbilityId: { [id: string]: string } = {
+  '4A9': '1D6F', // reprisal
+  '4AB': '1D7D', // feint
+  '4B3': '1D88', // addle
+};
 
 const partyMitAbilityIdToDuration: { [id: string]: number } = {
   // tanks
@@ -62,7 +88,7 @@ const partyMitAbilityIdToDuration: { [id: string]: number } = {
   '650C': 20, // expedient
   '409A': 20, // fey/seraphic illumination (order)
   'E1D': 5, // collective unconscious
-  '9087': 15, // sun sign
+  '90A7': 15, // sun sign
   '5EEA': 15, // kerachole
   '5EF6': 20, // holos
   '5EF7': 15, // panhaima
@@ -299,20 +325,21 @@ const triggerSet: OopsyTriggerSet<Data> = {
         const newSource = matches.source;
         const lastTime = mitTracker[matches.id]?.time;
         const lastSource = mitTracker[matches.id]?.source;
+        const lastDuration = mitTracker[matches.id]?.duration;
 
         mitTracker[matches.id] = {
           time: newTime,
           source: newSource,
         };
 
-        const duration = isTargetMit
+        const duration = lastDuration ?? (isTargetMit
           ? targetMitAbilityIdToDuration[matches.id]
-          : partyMitAbilityIdToDuration[matches.id];
+          : partyMitAbilityIdToDuration[matches.id]);
         if (lastTime !== undefined && lastSource !== undefined && duration !== undefined) {
           const diff = newTime - lastTime;
           const leeway =
             (duration * 1000 - diff) > data.options.MinimumTimeForOverwrittenMit * 1000;
-          if (diff < duration * 1000 && leeway) {
+          if (diff < duration * 1000 && leeway && FirstOverwriteOfCast(data, matches)) {
             const lastSourceShort = data.party.member(lastSource).toString();
             return {
               type: 'heal',
@@ -330,6 +357,23 @@ const triggerSet: OopsyTriggerSet<Data> = {
             };
           }
         }
+      },
+    },
+    {
+      // Fork: how long the effect of a target mitigation lasts, which is shorter in level synced
+      // content, for General Overwritten Mit.
+      id: 'General Target Mit Duration',
+      type: 'GainsEffect',
+      netRegex: NetRegexes.gainsEffect({ effectId: Object.keys(targetMitEffectIdToAbilityId) }),
+      run: (data, matches) => {
+        const abilityId = targetMitEffectIdToAbilityId[matches.effectId];
+        if (abilityId === undefined)
+          return;
+        const tracked = data.targetMitTracker[matches.targetId]?.[abilityId];
+        const duration = parseFloat(matches.duration);
+        if (tracked === undefined || tracked.source !== matches.source || isNaN(duration))
+          return;
+        tracked.duration = duration;
       },
     },
     {
@@ -376,7 +420,7 @@ const triggerSet: OopsyTriggerSet<Data> = {
           const diff = newTime - lastTime;
           const leeway =
             (duration * 1000 - diff) > data.options.MinimumTimeForOverwrittenDamage * 1000;
-          if (diff < duration * 1000 && leeway) {
+          if (diff < duration * 1000 && leeway && FirstOverwriteOfCast(data, matches)) {
             const lastSourceShort = data.party.member(lastSource).toString();
             return {
               type: 'warn',

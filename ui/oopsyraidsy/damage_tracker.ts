@@ -81,6 +81,9 @@ const latePullText = {
 // How long to wait for a hit that may be the pull to land (see PullWatch).
 const kPullHitLandTimeoutMs = 3000;
 
+// How far behind the latest line's time a line can be and still not be taken as the time.
+const kMaxTimestampLagMs = 2000;
+
 // Internal trigger id for early pull
 export const earlyPullTriggerId = 'General Early Pull';
 
@@ -160,12 +163,15 @@ export class DamageTracker {
   // both are known.
   private engageTime?: number;
   // When the current countdown ends, from its Countdown line.  While set, the engage chat line
-  // is ignored: it has no milliseconds and arrives late, by a varying amount.
+  // is ignored (see OnEngageLine).
   private countdownEngageTime?: number;
   // The pull (anyone's first hit to land), and the player's own first hit to land, shown too
   // when someone else pulled.
   private partyPull = new PullWatch();
   private myPull = new PullWatch();
+  // A countdown started since combat last stopped: the next hits are the pull even if combat
+  // started first (the in-combat event can come before the first hit's line).
+  private countedDown = false;
   private lastTimestamp = 0;
   // logReplayMode - if using oopsy_viewer, we need to handle delays/suppresses differently
   public logReplayMode = false;
@@ -232,7 +238,8 @@ export class DamageTracker {
       inCombat: this.inCombat,
       IsImmune: (targetId?: string) => {
         // 52 = hallowed, 199 = holmgang, 32A = living, 32B = walking, 72C = bolide
-        const invulnIds = ['52', '199', '32A', '32B', '72C'];
+        // Fork: CB7 = undead rebirth (living dead's 7.0 follow-up, HP can't drop below 1)
+        const invulnIds = ['52', '199', '32A', '32B', '72C', 'CB7'];
         if (this.playerStateTracker.HasEffect(targetId, invulnIds))
           return true;
         return false;
@@ -308,6 +315,8 @@ export class DamageTracker {
       name: pull.puller,
       blame: pull.puller,
       text: `${mistakeStr} (${Math.abs(seconds).toFixed(2)}s)`,
+      // Not counted as a pull in the summary: it is reported every pull with a 0s minimum.
+      triggerType: pull === this.myPull ? 'OwnPull' : undefined,
     });
   }
 
@@ -317,6 +326,17 @@ export class DamageTracker {
     this.partyPull.Reset();
     this.myPull.Reset();
     this.engageTime = undefined;
+    this.countedDown = true;
+  }
+
+  private CountingDown(): boolean {
+    return this.countdownEngageTime !== undefined && this.lastTimestamp < this.countdownEngageTime;
+  }
+
+  private CancelCountdown(): void {
+    this.ResetPull();
+    this.countdownEngageTime = undefined;
+    this.countedDown = false;
   }
 
   // The countdown ends its whole seconds after this line, which has the same clock and
@@ -335,12 +355,25 @@ export class DamageTracker {
     this.ResetPull();
     const engageTime = this.lastTimestamp + seconds * 1000;
     this.countdownEngageTime = engageTime;
+    // Fork: the encounter starts now (its time base at the end of the countdown), so mistakes
+    // during the countdown (e.g. a pre-pull mitigation missing someone) stay with this pull:
+    // starting it at the first hit cleared them from the live list.
+    this.combatState.StartCombat(engageTime);
     this.OnRequestTimestampCallback(engageTime, () => {
       // Cancelled or replaced by another countdown since.
       if (this.countdownEngageTime !== engageTime)
         return;
       this.OnEngage(engageTime);
     });
+  }
+
+  // Only without a Countdown line (e.g. its opcode not yet updated after a patch).  The engage
+  // chat line has no milliseconds of its own: the latest line's time when it is processed is
+  // within ~0.1s of the Countdown line's (measured on logs having both).
+  private OnEngageLine(): void {
+    if (this.engageTime !== undefined || this.countdownEngageTime !== undefined)
+      return;
+    this.OnEngage(this.lastTimestamp);
   }
 
   private OnEffectResult(splitLine: string[]): void {
@@ -369,17 +402,24 @@ export class DamageTracker {
 
   private UpdateLastTimestamp(splitLine: string[]): void {
     const timeField = splitLine[logDefinitions.None.fields.timestamp];
-    if (timeField !== undefined)
-      this.lastTimestamp = new Date(timeField).getTime();
+    if (timeField === undefined)
+      return;
+    const timestamp = new Date(timeField).getTime();
+    // Fork: some lines (e.g. CombatantMemory) come up to ~1s behind the others: the time
+    // doesn't go back for them.  A bigger jump back is a new log or a clock change.
+    if (timestamp < this.lastTimestamp && this.lastTimestamp - timestamp < kMaxTimestampLagMs)
+      return;
+    this.lastTimestamp = timestamp;
   }
 
   OnNetLog(e: EventResponses['LogLine']): void {
-    if (this.ignoreZone)
-      return;
-
     const line = e.rawLine;
     const splitLine = e.line;
     const type = splitLine[logDefinitions.None.fields.type];
+
+    // Fork: except leaving the zone, which log replays only know from this line.
+    if (this.ignoreZone && type !== logDefinitions.ChangeZone.type)
+      return;
 
     // If we're waiting on a timestamp callback, check if any have passed with this line.
     // Ignore game log lines, which don't track milliseconds.
@@ -401,18 +441,14 @@ export class DamageTracker {
 
     switch (type) {
       case logDefinitions.GameLog.type:
-        if (this.countdownEngageRegex.test(line) && this.countdownEngageTime === undefined) {
-          // Only without a Countdown line (e.g. its opcode not yet updated after a patch).
-          // This line's own timestamp has no milliseconds: use the latest other line's, which is
-          // late by however long this one took to be read from the game.
-          this.OnEngage(this.lastTimestamp);
-        }
-        if (this.countdownStartRegex.test(line))
+        if (this.countdownEngageRegex.test(line))
+          this.OnEngageLine();
+        // Unless already done for this countdown from its Countdown line (which also started
+        // the encounter, see OnCountdown).
+        if (this.countdownStartRegex.test(line) && !this.CountingDown())
           this.ResetPull();
-        if (this.countdownCancelRegex.test(line)) {
-          this.ResetPull();
-          this.countdownEngageTime = undefined;
-        }
+        if (this.countdownCancelRegex.test(line))
+          this.CancelCountdown();
         if (this.wipeCactbotEcho.test(line) || this.wipeEndEcho.test(line))
           this.Wipe(this.lastTimestamp);
         break;
@@ -420,11 +456,28 @@ export class DamageTracker {
         this.OnCountdown(splitLine);
         break;
       case logDefinitions.CountdownCancel.type:
-        this.ResetPull();
-        this.countdownEngageTime = undefined;
+        this.CancelCountdown();
+        break;
+      case logDefinitions.InCombat.type:
+        // Fork: log replays get no in combat events (live, these come from OverlayPlugin):
+        // without this, pulls without a countdown after a kill merged into one.
+        if (this.logReplayMode) {
+          const fields = logDefinitions.InCombat.fields;
+          this.OnInCombatChangedEvent({
+            type: 'onInCombatChangedEvent',
+            detail: {
+              inACTCombat: splitLine[fields.inACTCombat] === '1',
+              inGameCombat: splitLine[fields.inGameCombat] === '1',
+            },
+          });
+        }
         break;
       case logDefinitions.NetworkEffectResult.type:
         this.OnEffectResult(splitLine);
+        this.playerStateTracker.OnHp(splitLine);
+        break;
+      case logDefinitions.StatusEffect.type:
+        this.playerStateTracker.OnHp(splitLine);
         break;
       case logDefinitions.ChangeZone.type:
         {
@@ -466,7 +519,6 @@ export class DamageTracker {
           splitLine[logDefinitions.ActorControl.fields.command] === actorControlFadeInCommandPre62
         ) {
           this.Wipe(this.lastTimestamp);
-          this.playerStateTracker.OnWipe(line, splitLine);
         }
         break;
     }
@@ -484,7 +536,7 @@ export class DamageTracker {
     // From the first hit (unless combat started otherwise), hits are candidates for the pull
     // until one lands, and the player's own for their first until one lands.
     const forParty = !this.partyPull.done &&
-      (this.partyPull.hits.size > 0 || !this.combatState.startTime);
+      (this.partyPull.hits.size > 0 || !this.combatState.startTime || this.countedDown);
     const forMe = !this.myPull.done && (forParty || this.partyPull.done);
     if (!forParty && !forMe)
       return;
@@ -545,6 +597,7 @@ export class DamageTracker {
     this.myPull.Reset();
     this.engageTime = undefined;
     this.countdownEngageTime = undefined;
+    this.countedDown = false;
   }
 
   OnTrigger(trigger: LooseOopsyTrigger, execMatches: RegExpExecArray, timestamp: number): void {
@@ -625,7 +678,8 @@ export class DamageTracker {
         const ret = ValueOrFunction(trigger.deathReason, matches);
         if (ret !== null && typeof ret === 'object' && !Array.isArray(ret)) {
           if (!isOopsyMistake(ret))
-            this.playerStateTracker.OnDeathReason(timestamp, ret);
+            // Fork: at the time it applies (e.g. when a doom runs out), not when it was seen.
+            this.playerStateTracker.OnDeathReason(timestamp + delaySeconds * 1000, ret);
         }
       }
       if ('run' in trigger)
@@ -648,6 +702,8 @@ export class DamageTracker {
     });
 
     this.Reset();
+    // Fork: for every wipe (echoes too), not only the fade in.
+    this.playerStateTracker.OnWipe();
     this.combatState.StopCombat(timestamp);
   }
 
@@ -777,8 +833,11 @@ export class DamageTracker {
       const trigger: OopsyTrigger<OopsyData> = {
         id: key,
         type: 'Ability',
-        netRegex: NetRegexes.ability({ type: '21', id: id, ...playerDamageFields }),
+        netRegex: NetRegexes.ability({ id: id, ...playerDamageFields }),
         mistake: (_data, matches) => {
+          // Taken alone, some are still marked as AOEActionEffect type 22, with one target.
+          if (matches.type === '22' && parseInt(matches.targetCount) !== 1)
+            return;
           return {
             type: type,
             blame: matches.target,
@@ -804,6 +863,9 @@ export class DamageTracker {
     this.triggers = [];
     // Fork: only this zone's initData (this list used to keep every zone's of the session).
     this.dataInitializers = [];
+    // Fork: also on reloads without a zone change (e.g. a job change), which added the same
+    // sets again.
+    this.playerStateTracker.ClearTriggerSets();
 
     this.ignoreZone = this.options.IgnoreContentTypes.includes(this.contentType) ||
       this.options.IgnoreZoneIds.includes(this.zoneId);
@@ -846,7 +908,9 @@ export class DamageTracker {
         if (this.zoneName.search(Regexes.parse(zoneRegex)) < 0)
           continue;
       } else {
-        return;
+        // Fork: skip only this set (a user file without a zone dropped every set after it).
+        console.error(`Trigger set without zoneId or zoneRegex: ${set.filename ?? '???'}`);
+        continue;
       }
 
       if (this.options.Debug) {

@@ -17,7 +17,7 @@ const triggerSet: OopsyTriggerSet<Data> = {
     'ValigarmandaEx Susurrant Breath': '8FC8', // conal
     'ValigarmandaEx Slithering Strike': '8FCC', // point-blank AOE
     'ValigarmandaEx Strangling Coil': '8FD0', // donut
-    'ValigarmandaEx Scourge of Thunder': '8FEA', // lightning spreads
+    // Fork: 8FEA Scourge of Thunder is a spread on everyone (shareWarn below), not avoidable.
     // fire + adds mini-phase
     'ValigarmandaEx Volcanic Drop Big': '8FE6', // half-room lava puddle
     'ValigarmandaEx Volcanic Drop Puddle': '8FE4', // small lava puddle
@@ -39,6 +39,7 @@ const triggerSet: OopsyTriggerSet<Data> = {
     'ValigarmandaEx Deep Freeze': '1036', // Not moving during Freezing Dust
   },
   shareWarn: {
+    'ValigarmandaEx Scourge of Thunder': '8FEA', // lightning spreads
     // fire + adds mini-phase
     'ValigarmandaEx Mountain Fire Tower': '9019', // solo tank tower
     // storm phase

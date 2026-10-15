@@ -116,6 +116,12 @@ export class MistakeCollector implements MistakeObserver {
     } else if (obj.type === msgSyncResponseType) {
       if (typeof obj.timestamp !== 'number')
         return;
+      // Fork: only history from an overlay that was there before this one is of use.  Responses
+      // to a newer overlay's request reach every overlay, and replaced their own history.
+      if (obj.timestamp >= this.creationTime) {
+        this.DebugPrint(`OnBroadcastMessage: ignoring (newer overlay): ${obj.timestamp}`);
+        return;
+      }
       // If we have data from further in the past, don't overwrite with partial future data.
       if (this.latestSyncTimestamp && this.latestSyncTimestamp <= obj.timestamp) {
         this.DebugPrint(`OnBroadcastMessage: ignoring (past data): ${obj.timestamp}`);

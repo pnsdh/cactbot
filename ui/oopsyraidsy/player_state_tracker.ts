@@ -30,8 +30,12 @@ const emptyId = 'E0000000';
 const timestampFieldIdx = 1;
 const dummyPartyEntry: Party = { id: emptyId, name: '???', worldId: 0, job: 0, inParty: true };
 
-// TODO: add this to effect_id.ts?
-const raiseEffectId = '94';
+// How long after their HP went to 0 a player's WasDefeated line comes, at most (it's ~2s).
+const kMaxDefeatedDelayMs = 5000;
+
+// Effects players get upon coming back to life: Weakness, Brink of Death, Transcendent (two ids).
+// TODO: add these to effect_id.ts?
+const revivedEffectIds = ['2B', '2C', '1A2', 'A58'];
 
 const getTimestamp = (splitLine: string[]): number => {
   const timestampField = splitLine[timestampFieldIdx];
@@ -56,6 +60,8 @@ export type TrackedLineEvent = {
   mistake?: OopsyMistakeType;
   // Override the text from the splitLine with explicit text (e.g. solo/share mistake).
   mistakeText?: string;
+  // The hit that took the target to 0 HP when it landed (see OnHp).
+  fatal?: boolean;
   splitLine: string[];
 };
 
@@ -84,6 +90,8 @@ export class PlayerStateTracker {
   private triggerSets: ProcessedOopsyTriggerSet[] = [];
   private partyIds: Set<string> = new Set();
   private deadIds: Set<string> = new Set();
+  // When players' HP went to 0, which is when they die: their WasDefeated line comes ~2s later.
+  private zeroHpTimes: { [id: string]: number } = {};
   // `combatantPartyInfo` is the combatant info we get from AddedCombatant lines, which could be
   // party members, pets, NPCs, etc. `currPartyInfo` is a subset of the objects in
   // `combatantPartyInfo` (direct assignment, so we don't have to separately maintain), and contains
@@ -194,8 +202,11 @@ export class PlayerStateTracker {
 
   private Reset(): void {
     // Deliberately do not clear currPartyInfo/combatantPartyInfo here.
+    // Fork: buffs still being collected at a wipe were reported after it (the dead included).
+    this.missedBuffCollector.Reset();
     this.petIdToOwnerId = {};
     this.deadIds.clear();
+    this.zeroHpTimes = {};
     this.trackedEvents = [];
     this.baseTime = undefined;
   }
@@ -322,7 +333,7 @@ export class PlayerStateTracker {
     // on dead non-party members.
     // TODO: maybe oopsy should only report party failures?
     if (IsPlayerId(targetId)) {
-      this.trackedEvents.push({
+      this.TrackEvent({
         timestamp: getTimestamp(splitLine),
         type: 'Ability',
         targetId: targetId,
@@ -361,9 +372,9 @@ export class PlayerStateTracker {
       this.nextPruneTimestamp = timestamp + this.cleanupWindowMs;
     }
 
-    // Upon coming back to life, players get Transcendent / Weakness / Brink of Death.
-    // However, they also get a Raise effect prior to coming back to life.
-    if (effectId !== raiseEffectId)
+    // Fork: only these, as dead players get other effects too (e.g. a mechanic's marker), and the
+    // Raise effect comes before coming back to life.  HP above 0 also tells (see OnHp).
+    if (revivedEffectIds.includes(effectId.toUpperCase()))
       this.deadIds.delete(targetId);
 
     // Keep track of active buffs in case they have a very long duration and fall outside the
@@ -376,7 +387,7 @@ export class PlayerStateTracker {
     };
 
     (this.trackedEffectMap[targetId] ??= {})[effectId] = event;
-    this.trackedEvents.push(event);
+    this.TrackEvent(event);
 
     const buff = this.effectIdToBuff[effectId.toUpperCase()];
     if (buff)
@@ -392,7 +403,7 @@ export class PlayerStateTracker {
     if (effectId === undefined)
       return;
 
-    this.trackedEvents.push({
+    this.TrackEvent({
       timestamp: getTimestamp(splitLine),
       type: 'LosesEffect',
       targetId: targetId,
@@ -425,7 +436,7 @@ export class PlayerStateTracker {
     const text = Translate(this.options.DisplayLanguage, reason.text);
     if (text === undefined)
       return;
-    this.trackedEvents.push({
+    this.TrackEvent({
       timestamp: timestamp,
       type: 'DeathReason',
       targetId: targetId,
@@ -440,12 +451,48 @@ export class PlayerStateTracker {
     if (targetId === undefined || !IsPlayerId(targetId))
       return;
 
-    this.trackedEvents.push({
+    this.TrackEvent({
       timestamp: timestamp,
       type: 'Mistake',
       targetId: targetId,
       mistakeEvent: mistake,
     });
+  }
+
+  // HP from EffectResult (37) and StatusEffect (38) lines, which have the same first fields.
+  // Players die when their HP goes to 0, about 2s before their WasDefeated line: buffs in
+  // between missed them because they were dead.  On an EffectResult line, it is when the hit
+  // with this sequence landed: the killing blow, which may not be the last hit resolved.
+  OnHp(splitLine: string[]): void {
+    const fields = logDefinitions.NetworkEffectResult.fields;
+    const id = splitLine[fields.id];
+    const hp = splitLine[fields.currentHp];
+    if (id === undefined || hp === undefined || hp === '' || !IsPlayerId(id))
+      return;
+
+    if (hp !== '0') {
+      this.deadIds.delete(id);
+      delete this.zeroHpTimes[id];
+      return;
+    }
+    if (this.zeroHpTimes[id] !== undefined)
+      return;
+    this.zeroHpTimes[id] = getTimestamp(splitLine);
+    if (this.IsInParty(id))
+      this.deadIds.add(id);
+
+    if (splitLine[fields.type] !== logDefinitions.NetworkEffectResult.type)
+      return;
+    const sequence = splitLine[fields.sequenceId];
+    for (let i = this.trackedEvents.length - 1; i >= 0; i--) {
+      const event = this.trackedEvents[i];
+      if (event?.type !== 'Ability' || event.targetId !== id)
+        continue;
+      if (event.splitLine[logDefinitions.Ability.fields.sequence] === sequence) {
+        event.fatal = true;
+        break;
+      }
+    }
   }
 
   // Returns an event for why this person died.
@@ -459,6 +506,11 @@ export class PlayerStateTracker {
       this.deadIds.add(targetId);
 
     const timestamp = getTimestamp(splitLine);
+    // The death itself, when HP went to 0, if seen.
+    const zeroHpTime = this.zeroHpTimes[targetId];
+    const deathTimestamp = zeroHpTime !== undefined && timestamp - zeroHpTime < kMaxDefeatedDelayMs
+      ? zeroHpTime
+      : timestamp;
     const firstTimestamp = timestamp - this.eventWindowMs;
     const events = this.trackedEvents.filter((event) => {
       return event.timestamp >= firstTimestamp && event.targetId === targetId;
@@ -503,14 +555,14 @@ export class PlayerStateTracker {
     const reportData: DeathReportData = {
       lang: this.options.DisplayLanguage,
       baseTimestamp: this.baseTime,
-      deathTimestamp: timestamp,
+      deathTimestamp: deathTimestamp,
       targetId: targetId,
       targetName: targetName,
       events: events,
     };
 
     const mistake = DeathReport.generateMistake(reportData);
-    this.collector.OnMistakeObj(timestamp, mistake);
+    this.collector.OnMistakeObj(deathTimestamp, mistake);
   }
 
   OnHoTDoT(_line: string, splitLine: string[]): void {
@@ -518,7 +570,7 @@ export class PlayerStateTracker {
     if (targetId === undefined || !this.IsInParty(targetId))
       return;
 
-    this.trackedEvents.push({
+    this.TrackEvent({
       timestamp: getTimestamp(splitLine),
       type: 'HoTDoT',
       targetId: targetId,
@@ -526,7 +578,7 @@ export class PlayerStateTracker {
     });
   }
 
-  OnWipe(_line: string, _splitLine: string[]): void {
+  OnWipe(): void {
     this.Reset();
   }
 
@@ -567,7 +619,7 @@ export class PlayerStateTracker {
     // `this.trackedEvents` informs a target in a death report that they were missed by a source.
     if (collected.buff.type === 'heal' || collected.buff.type === 'mitigation') {
       for (const targetId of missedIds) {
-        this.trackedEvents.push({
+        this.TrackEvent({
           timestamp: getTimestamp(collected.splitLine),
           type: 'abilityId' in collected.buff ? 'MissedAbility' : 'MissedEffect',
           targetId: targetId,
@@ -626,6 +678,15 @@ export class PlayerStateTracker {
         tc: `有${missedNames.length}人沒受到 ${collected.buffName}`,
       },
     });
+  }
+
+  // Fork: kept in time order, as some come late (death reasons from delayed triggers, missed
+  // buffs added when their collection ends), so that death reports show them in place.
+  private TrackEvent(event: TrackedEvent): void {
+    let i = this.trackedEvents.length;
+    while (i > 0 && (this.trackedEvents[i - 1]?.timestamp ?? 0) > event.timestamp)
+      i--;
+    this.trackedEvents.splice(i, 0, event);
   }
 
   private PruneTrackedEvents(timestamp: number) {
