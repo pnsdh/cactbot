@@ -67,7 +67,7 @@ const defaultOopsyConfigOptions: OopsyConfigOptions = {
   MinimumTimeForOverwrittenMit: 2,
   MinimumTimeForOverwrittenDamage: 2,
   DamageDownMistakes: true,
-  DamageDownMaxPlayers: 2,
+  DamageDownMaxPlayers: 0,
 };
 
 export interface OopsyOptions

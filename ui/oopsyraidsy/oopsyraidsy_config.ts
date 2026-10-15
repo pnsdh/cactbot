@@ -509,11 +509,13 @@ const templateOptions: OptionsTemplate = {
     {
       id: 'DamageDownMaxPlayers',
       name: {
-        en: 'Most players getting Damage Down at once to show it (more: someone else\'s failure)',
-        ko: '주는 피해량 감소를 실수로 표시할 최대 인원 (더 많이 받으면 누군가의 실패로 보고 표시 안 함)',
+        en: 'Most players getting Damage Down at once for it to be theirs ' +
+          '(0=auto: all alive but one or fewer is someone\'s failure)',
+        ko: '주는 피해량 감소를 각자 실수로 볼 최대 인원 ' +
+          '(0=자동: 살아 있는 사람 중 안 받은 사람이 1명 이하면 누군가의 실패)',
       },
       type: 'integer',
-      default: 2,
+      default: 0,
     },
   ],
 };

@@ -107,6 +107,12 @@ const kDamageDownIds = new Set([
 // Fork: Damage Downs given by one ability within this time are one event.
 const kDamageDownWindowMs = 500;
 
+// Fork: by default (no player count option), at least this many getting it at once, with at
+// most this many alive not getting it (e.g. invulnerable or out of range), is someone's failure
+// applied to everyone: the one who failed isn't known.
+const kDamageDownMinGroup = 3;
+const kDamageDownGroupMissing = 1;
+
 // Fork: getting it again from the same ability within this (e.g. every tick) is not repeated.
 const kDamageDownRepeatMs = 5000;
 
@@ -706,14 +712,18 @@ export class DamageTracker {
   ): void {
     if (this.damageDowns.get(id) === event)
       this.damageDowns.delete(id);
-    // More than the option's players at once is someone's failure applied to many: shown once,
-    // on nobody.  So is everyone alive getting it (e.g. the one or two left when others are
-    // dead), but not shown.
+    // Someone's failure applied to everyone (see kDamageDownMinGroup), or to more players than
+    // the option's when set: shown once, on nobody.  Not shown at all when only the one or two
+    // left alive got it.
     const count = event.targets.size;
     const maxPlayers = this.options.DamageDownMaxPlayers;
-    if (count <= maxPlayers && event.alive > 0 && count >= event.alive)
+    const known = event.alive > 0;
+    const group = maxPlayers > 0
+      ? count > maxPlayers
+      : known && count >= kDamageDownMinGroup && count >= event.alive - kDamageDownGroupMissing;
+    if (!group && known && count >= event.alive)
       return;
-    if (count > maxPlayers) {
+    if (group) {
       const key = `group:${id}`;
       const last = this.damageDownLast.get(key);
       this.damageDownLast.set(key, event.time);
