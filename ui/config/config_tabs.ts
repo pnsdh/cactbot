@@ -14,77 +14,54 @@ import {
 // or light theme.  The sections are the ones CactbotConfigurator.buildUI makes; this only moves
 // and relabels them.
 
-type SectionText = { title: LocaleText; desc?: LocaleText };
+// Overlay names stay in English, as in OverlayPlugin and cactbot's docs; the tag above each title
+// says what the overlay is for.
+type SectionText = { title: string; tag: string; desc?: LocaleText };
 
 const kSections: { [group: string]: SectionText } = {
   general: {
-    title: {
-      en: 'General',
-      de: 'Allgemein',
-      fr: 'Général',
-      ja: '一般',
-      cn: '常规',
-      ko: '일반',
-      tc: '一般',
-    },
+    title: 'General',
+    tag: 'ALL OVERLAYS',
     desc: {
       en: 'Settings shared by all cactbot overlays.',
       ko: '모든 오버레이에 공통으로 쓰이는 설정입니다.',
     },
   },
   raidboss: {
-    title: {
-      en: 'Raidboss',
-      ja: 'レイドボス',
-      ko: '레이드보스',
-    },
+    title: 'Raidboss',
+    tag: 'TIMELINE · ALERTS',
     desc: {
       en: 'How timelines and trigger alerts are shown, and the output of each trigger.',
       ko: '타임라인과 트리거 알람의 표시 방식, 트리거별 출력입니다.',
     },
   },
   jobs: {
-    title: {
-      en: 'Jobs',
-      de: 'Jobs',
-      fr: 'Jobs',
-      ja: 'ジョブ',
-      cn: '职业',
-      ko: '직업',
-      tc: '職業',
-    },
+    title: 'Jobs',
+    tag: 'JOB GAUGES · BUFFS',
     desc: {
       en: 'Job gauges, buffs and procs.',
       ko: '직업 게이지, 버프, 프록 표시 설정입니다.',
     },
   },
   eureka: {
-    title: {
-      en: 'Eureka',
-      ja: 'エウレカ',
-      ko: '유레카',
-    },
+    title: 'Eureka',
+    tag: 'FIELD OPERATIONS',
     desc: {
-      en: 'Notorious monster tracking in field operations.',
-      ko: '특수 필드 탐색의 마물 알림 설정입니다.',
+      en: 'Notorious monster tracking in field operations such as Eureka.',
+      ko: '에우레카 같은 특수 필드 탐색의 마물 알림 설정입니다.',
     },
   },
   oopsyraidsy: {
-    title: {
-      en: 'Oopsy',
-      ko: '실수 감지',
-    },
+    title: 'Oopsyraidsy',
+    tag: 'MISTAKES · DEATH REPORTS',
     desc: {
       en: 'Mistakes and death reports.',
       ko: '실수와 사망 원인 기록 설정입니다.',
     },
   },
   radar: {
-    title: {
-      en: 'Radar',
-      ja: 'レーダー',
-      ko: '레이더',
-    },
+    title: 'Radar',
+    tag: 'HUNT RADAR',
     desc: {
       en: 'Hunt mob radar.',
       ko: '마물 레이더 설정입니다.',
@@ -160,9 +137,9 @@ const kTriggersView: LocaleText = {
 const kTriggerGroups = ['raidboss', 'oopsyraidsy'];
 const kMaxTriggerResults = 40;
 
-const groupTitle = (group: string, translate: (text: LocaleText) => string): string => {
+const groupTitle = (group: string): string => {
   const text = kSections[group];
-  return text !== undefined ? translate(text.title) : group;
+  return text?.title ?? group;
 };
 
 // Trigger search results: a list of buttons that open the trigger in its list.
@@ -193,8 +170,8 @@ const renderTriggerResults = (
     const where = document.createElement('span');
     where.classList.add('config-hit-where');
     where.textContent = hit.trigger !== undefined
-      ? `${hit.file.title} · ${groupTitle(hit.file.group, translate)}`
-      : [hit.file.type, groupTitle(hit.file.group, translate)].filter((x) => x).join(' · ');
+      ? `${hit.file.title} · ${groupTitle(hit.file.group)}`
+      : [hit.file.type, groupTitle(hit.file.group)].filter((x) => x).join(' · ');
     button.append(name, where);
     const preview = hit.trigger?.preview;
     if (preview !== undefined && preview !== '') {
@@ -399,14 +376,14 @@ export const buildSectionTabs = (
     if (!anchor || !header || group === '')
       continue;
     const text = kSections[group];
-    const title = text !== undefined ? translate(text.title) : group;
+    const title = text?.title ?? group;
 
     // A section is a page of its own now, not a collapsible block.
     anchor.onclick = null;
     section.classList.remove('collapsed');
     section.dataset.group = group;
     header.textContent = title;
-    header.dataset.eyebrow = group.toUpperCase();
+    header.dataset.eyebrow = text?.tag ?? group.toUpperCase();
     if (text?.desc !== undefined) {
       const desc = document.createElement('p');
       desc.classList.add('config-section-desc');

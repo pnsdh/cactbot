@@ -356,13 +356,13 @@ const templateOptions: OptionsTemplate = {
       // Fork: skins of the live list and death report (ui/oopsyraidsy/skins).
       id: 'Skin',
       name: {
-        en: 'Oopsy Skin',
-        de: 'Oopsy Skin',
-        fr: 'Oopsy Skin',
-        ja: 'Oopsyのスキン',
-        cn: 'Oopsy皮肤',
-        ko: 'Oopsy 스킨',
-        tc: 'Oopsy皮膚',
+        en: 'Oopsyraidsy Skin',
+        de: 'Oopsyraidsy Skin',
+        fr: 'Oopsyraidsy Skin',
+        ja: 'Oopsyraidsyのスキン',
+        cn: 'Oopsyraidsy皮肤',
+        ko: 'Oopsyraidsy 스킨',
+        tc: 'Oopsyraidsy皮膚',
       },
       type: 'select',
       options: {

@@ -5,7 +5,7 @@
 [cactbot](https://github.com/OverlayPlugin/cactbot)에 한국 서버용 트리거와 스킨을 더한 포크입니다. 본가 업데이트는 자동으로 반영됩니다.
 
 * 절 요성난무(P1~P5) 트리거·타임라인을 한국 서버 공략에 맞춰 따로 작성했습니다.
-* 알람·타임라인과 웁시용 `cbkr` 스킨을 제공합니다.
+* 알람·타임라인과 Oopsyraidsy용 `cbkr` 스킨을 제공합니다.
 
 문의·버그 제보는 [디스코드](https://discord.gg/R75tq68bA9)로 해 주세요.
 
@@ -49,7 +49,7 @@ ACT, FFXIV ACT Plugin, OverlayPlugin이 필요합니다. 없다면 해루봇이�
     | 실수 기록 | `Cactbot OopsyRaidsy` |
 
 1. 위치와 크기를 맞춘 뒤 `General` 탭에서 잠금(`Lock Overlay`)과 클릭 통과(`Enable Clickthrough`)를 체크합니다.
-1. 스킨을 쓰려면 `Cactbot Config`에서 `Raidboss 스킨`, `Oopsy 스킨`을 `cbkr`로 바꿉니다.
+1. 스킨을 쓰려면 `Cactbot Config`에서 `Raidboss 스킨`, `Oopsyraidsy 스킨`을 `cbkr`로 바꿉니다.
 
 기존 cactbot 오버레이는 본가 파일을 가리키므로 지우고 새로 만듭니다. 위치를 참고하려면 표시(`Show Overlay`)만 꺼 두었다가 나중에 지웁니다.
 
