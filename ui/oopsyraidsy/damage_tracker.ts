@@ -78,8 +78,59 @@ const latePullText = {
   tc: '晚開',
 };
 
+// How long to wait for a hit that may be the pull to land (see PullWatch).
+const kPullHitLandTimeoutMs = 3000;
+
 // Internal trigger id for early pull
 export const earlyPullTriggerId = 'General Early Pull';
+
+// The first hit to land among some.  A hit is resolved (Ability line) some time before it lands
+// (its EffectResult line, ~0.5-1.7s later), and it is landing that pulls; the first to land may
+// not be the first resolved.
+class PullWatch {
+  // Resolved hits that haven't landed yet, by target id and sequence.
+  public hits = new Map<string, { puller: string; resolved: number }>();
+  // When the first landed.  Also set, without a puller, when that can't be known.
+  public time?: number;
+  public puller?: string;
+  public reported = false;
+
+  get done(): boolean {
+    return this.time !== undefined;
+  }
+
+  Reset(): void {
+    this.hits.clear();
+    this.time = undefined;
+    this.puller = undefined;
+    this.reported = false;
+  }
+
+  Add(key: string, puller: string, resolved: number): void {
+    if (!this.hits.has(key))
+      this.hits.set(key, { puller: puller, resolved: resolved });
+  }
+
+  Land(time: number, puller?: string): void {
+    this.hits.clear();
+    this.time = time;
+    this.puller = puller;
+  }
+
+  // Training dummies whose HP doesn't go down get no EffectResult line for damage, so when
+  // their hits land is unknown (the resolve time can be well over a second earlier, depending
+  // on the action): after a while, or at once when known to be one, give up.  Whether it did.
+  GiveUpIfLate(now: number, force: boolean): boolean {
+    // The first one in is the first resolved.
+    for (const first of this.hits.values()) {
+      if (!force && now - first.resolved < kPullHitLandTimeoutMs)
+        return false;
+      this.Land(first.resolved);
+      return true;
+    }
+    return false;
+  }
+}
 
 const isOopsyMistake = (x: OopsyMistake | OopsyDeathReason): x is OopsyMistake => 'type' in x;
 
@@ -105,8 +156,16 @@ export class DamageTracker {
   private wipeCactbotEcho: CactbotBaseRegExp<'GameLog'>;
   private wipeEndEcho: CactbotBaseRegExp<'GameLog'>;
   private combatState = new CombatState(this);
+  // When the countdown ended, a log timestamp like the pulls' times.  A pull is reported once
+  // both are known.
   private engageTime?: number;
-  private firstPuller?: string;
+  // When the current countdown ends, from its Countdown line.  While set, the engage chat line
+  // is ignored: it has no milliseconds and arrives late, by a varying amount.
+  private countdownEngageTime?: number;
+  // The pull (anyone's first hit to land), and the player's own first hit to land, shown too
+  // when someone else pulled.
+  private partyPull = new PullWatch();
+  private myPull = new PullWatch();
   private lastTimestamp = 0;
   // logReplayMode - if using oopsy_viewer, we need to handle delays/suppresses differently
   public logReplayMode = false;
@@ -218,23 +277,94 @@ export class DamageTracker {
 
   private OnEngage(timestamp: number) {
     this.engageTime = timestamp;
+    this.CheckPulls();
+  }
 
-    if (this.firstPuller === undefined || !this.combatState.startTime)
+  private CheckPulls(): void {
+    this.ReportPull(this.partyPull);
+    // The player's own first hit, unless it was the pull, already reported.
+    if (this.partyPull.done && this.partyPull.puller !== this.me)
+      this.ReportPull(this.myPull);
+  }
+
+  private ReportPull(pull: PullWatch): void {
+    if (pull.reported || this.engageTime === undefined || pull.time === undefined)
+      return;
+    pull.reported = true;
+    // Combat started, but when the hit landed is unknown.
+    if (pull.puller === undefined)
       return;
 
-    const seconds = (timestamp - this.combatState.startTime) / 1000;
-    if (seconds >= this.options.MinimumTimeForPullMistake) {
-      const mistakeStr = Translate(this.options.DisplayLanguage, earlyPullText) ?? '';
-      const text = `${mistakeStr} (${seconds.toFixed(1)}s)`;
-      if (IsTriggerEnabled(this.options, earlyPullTriggerId)) {
-        this.playerStateTracker.OnMistakeObj(timestamp, {
-          type: 'pull',
-          name: this.firstPuller,
-          blame: this.firstPuller,
-          text: text,
-        });
-      }
+    const seconds = (pull.time - this.engageTime) / 1000;
+    if (Math.abs(seconds) < this.options.MinimumTimeForPullMistake)
+      return;
+    if (!IsTriggerEnabled(this.options, earlyPullTriggerId))
+      return;
+    const early = seconds < 0;
+    const pullText = early ? earlyPullText : latePullText;
+    const mistakeStr = Translate(this.options.DisplayLanguage, pullText) ?? '';
+    this.playerStateTracker.OnMistakeObj(early ? this.engageTime : pull.time, {
+      type: 'pull',
+      name: pull.puller,
+      blame: pull.puller,
+      text: `${mistakeStr} (${Math.abs(seconds).toFixed(2)}s)`,
+    });
+  }
+
+  // A countdown started: whatever comes next is a new pull.
+  private ResetPull(): void {
+    this.combatState.Reset();
+    this.partyPull.Reset();
+    this.myPull.Reset();
+    this.engageTime = undefined;
+  }
+
+  // The countdown ends its whole seconds after this line, which has the same clock and
+  // millisecond precision as the lines of the hits that pull.
+  private OnCountdown(splitLine: string[]): void {
+    const fields = logDefinitions.Countdown.fields;
+    // Non-zero: the countdown didn't start (one already running, already in combat, ...).
+    // Right after a patch, before the opcode is updated, other packets come out as nonsense
+    // Countdown lines, also with non-zero results.
+    if (splitLine[fields.result] !== '00')
+      return;
+    const seconds = parseInt(splitLine[fields.countdownTime] ?? '');
+    if (isNaN(seconds) || seconds <= 0 || seconds > 30)
+      return;
+
+    this.ResetPull();
+    const engageTime = this.lastTimestamp + seconds * 1000;
+    this.countdownEngageTime = engageTime;
+    this.OnRequestTimestampCallback(engageTime, () => {
+      // Cancelled or replaced by another countdown since.
+      if (this.countdownEngageTime !== engageTime)
+        return;
+      this.OnEngage(engageTime);
+    });
+  }
+
+  private OnEffectResult(splitLine: string[]): void {
+    const fields = logDefinitions.NetworkEffectResult.fields;
+    const key = `${splitLine[fields.id] ?? ''}:${splitLine[fields.sequenceId] ?? ''}`;
+    // Full HP after the hit: a training dummy whose HP doesn't go down, whose hits only get
+    // this line when they apply a status, so it tells nothing about which landed first.
+    const hp = splitLine[fields.currentHp];
+    const fullHp = hp !== undefined && hp !== '' && hp === splitLine[fields.maxHp];
+
+    let landed = false;
+    // The party's first, as the same hit may be both.
+    for (const pull of [this.partyPull, this.myPull]) {
+      const hit = pull.hits.get(key);
+      if (hit === undefined)
+        continue;
+      if (fullHp)
+        pull.GiveUpIfLate(this.lastTimestamp, true);
+      else
+        pull.Land(this.lastTimestamp, hit.puller);
+      landed = true;
     }
+    if (landed)
+      this.CheckPulls();
   }
 
   private UpdateLastTimestamp(splitLine: string[]): void {
@@ -255,6 +385,9 @@ export class DamageTracker {
     // Ignore game log lines, which don't track milliseconds.
     if (type !== logDefinitions.GameLog.type) {
       this.UpdateLastTimestamp(splitLine);
+      const gaveUp = this.partyPull.GiveUpIfLate(this.lastTimestamp, false);
+      if (this.myPull.GiveUpIfLate(this.lastTimestamp, false) || gaveUp)
+        this.CheckPulls();
       let timestampCallback = this.timestampCallbacks[0];
       while (timestampCallback) {
         if (this.lastTimestamp < timestampCallback.timestamp)
@@ -268,15 +401,30 @@ export class DamageTracker {
 
     switch (type) {
       case logDefinitions.GameLog.type:
-        if (this.countdownEngageRegex.test(line)) {
-          // It would be ideal if we could use the log timestamp, but many early/late pulls are <1s,
-          // and the accuracy of game log lines is also at most 1s off from real time.
-          this.OnEngage(Date.now());
+        if (this.countdownEngageRegex.test(line) && this.countdownEngageTime === undefined) {
+          // Only without a Countdown line (e.g. its opcode not yet updated after a patch).
+          // This line's own timestamp has no milliseconds: use the latest other line's, which is
+          // late by however long this one took to be read from the game.
+          this.OnEngage(this.lastTimestamp);
         }
-        if (this.countdownStartRegex.test(line) || this.countdownCancelRegex.test(line))
-          this.combatState.Reset();
+        if (this.countdownStartRegex.test(line))
+          this.ResetPull();
+        if (this.countdownCancelRegex.test(line)) {
+          this.ResetPull();
+          this.countdownEngageTime = undefined;
+        }
         if (this.wipeCactbotEcho.test(line) || this.wipeEndEcho.test(line))
           this.Wipe(this.lastTimestamp);
+        break;
+      case logDefinitions.Countdown.type:
+        this.OnCountdown(splitLine);
+        break;
+      case logDefinitions.CountdownCancel.type:
+        this.ResetPull();
+        this.countdownEngageTime = undefined;
+        break;
+      case logDefinitions.NetworkEffectResult.type:
+        this.OnEffectResult(splitLine);
         break;
       case logDefinitions.ChangeZone.type:
         {
@@ -333,7 +481,12 @@ export class DamageTracker {
   }
 
   private OnAbilityEvent(line: string, splitLine: string[]): void {
-    if (this.firstPuller !== undefined || this.combatState.startTime)
+    // From the first hit (unless combat started otherwise), hits are candidates for the pull
+    // until one lands, and the player's own for their first until one lands.
+    const forParty = !this.partyPull.done &&
+      (this.partyPull.hits.size > 0 || !this.combatState.startTime);
+    const forMe = !this.myPull.done && (forParty || this.partyPull.done);
+    if (!forParty && !forMe)
       return;
 
     // This is kind of obnoxious to have to regex match every ability line that's already split.
@@ -362,32 +515,24 @@ export class DamageTracker {
     if (!kAttackFlags.includes(lowByte))
       return;
 
-    // Start combat first prior to sending a late pull mistake,
-    // as starting a new combat can reset the live list.
-    this.combatState.StartCombat(this.lastTimestamp);
+    const sequence = splitLine[logDefinitions.Ability.fields.sequence] ?? '';
+    const key = `${matches.targetId}:${sequence}`;
 
-    if (IsPlayerId(matches.sourceId))
-      this.firstPuller = matches.source;
-    else if (IsPlayerId(matches.targetId))
-      this.firstPuller = matches.target;
-    else
-      this.firstPuller = '???';
+    if (forParty) {
+      // Start combat first prior to sending a pull mistake,
+      // as starting a new combat can reset the live list.
+      if (this.partyPull.hits.size === 0)
+        this.combatState.StartCombat(this.lastTimestamp);
 
-    if (this.engageTime) {
-      const seconds = (Date.now() - this.engageTime) / 1000;
-      if (seconds >= this.options.MinimumTimeForPullMistake) {
-        const mistakeStr = Translate(this.options.DisplayLanguage, latePullText) ?? '';
-        const text = `${mistakeStr} (${seconds.toFixed(1)}s)`;
-        if (IsTriggerEnabled(this.options, earlyPullTriggerId)) {
-          this.playerStateTracker.OnMistakeObj(this.lastTimestamp, {
-            type: 'pull',
-            name: this.firstPuller,
-            blame: this.firstPuller,
-            text: text,
-          });
-        }
-      }
+      let puller = '???';
+      if (IsPlayerId(matches.sourceId))
+        puller = matches.source;
+      else if (IsPlayerId(matches.targetId))
+        puller = matches.target;
+      this.partyPull.Add(key, puller, this.lastTimestamp);
     }
+    if (forMe && IsPlayerId(matches.sourceId) && matches.source === this.me)
+      this.myPull.Add(key, this.me, this.lastTimestamp);
   }
 
   OnStartEncounter(timestamp: number): void {
@@ -396,8 +541,10 @@ export class DamageTracker {
 
   OnStopEncounter(timestamp: number): void {
     this.playerStateTracker.OnStopEncounter(timestamp);
-    this.firstPuller = undefined;
+    this.partyPull.Reset();
+    this.myPull.Reset();
     this.engageTime = undefined;
+    this.countdownEngageTime = undefined;
   }
 
   OnTrigger(trigger: LooseOopsyTrigger, execMatches: RegExpExecArray, timestamp: number): void {
