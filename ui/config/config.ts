@@ -25,6 +25,7 @@ import {
 import defaultOptions, { ConfigOptions } from './config_options';
 import { tagOptionRow } from './config_rows';
 import { applyStoredTheme, applyTheme, buildSectionTabs } from './config_tabs';
+import { setTriggerBrowserContext } from './config_triggers';
 
 // Load other config files
 import './general_config';
@@ -375,6 +376,10 @@ export class CactbotConfigurator {
       (this.contents[group] ??= []).push(template);
 
     applyTheme(this.getStringOption('general', 'ConfigTheme', 'dark'));
+    setTriggerBrowserContext({
+      translate: (text) => this.translate(text),
+      readSaved: (group, path) => this._getOptionLeafHelper(group, path),
+    });
     this.buildButterBar();
 
     const container = document.getElementById('container');

@@ -8,6 +8,7 @@ import {
   ConfigProcessedFile,
   ConfigProcessedFileMap,
 } from '../config/config';
+import { buildTriggerBrowser, registerTriggerFile } from '../config/config_triggers';
 
 import { generateBuffTriggerIds } from './buff_map';
 import oopsyFileData from './data/oopsy_manifest.txt';
@@ -135,7 +136,21 @@ class OopsyConfigurator {
 
         triggerDetails.appendChild(this.buildTriggerOptions(id, triggerDiv));
       }
+
+      // Fork: for the config page's trigger browser (config_triggers.ts).
+      registerTriggerFile(
+        this.optionKey,
+        triggerContainer,
+        info.title,
+        info.type,
+        Object.entries(info.triggers).map(([id, trigger]) => ({
+          id: id,
+          text: [id, trigger?.comment?.[this.base.lang] ?? trigger?.comment?.en ?? '']
+            .join(' ').toLowerCase(),
+        })),
+      );
     }
+    buildTriggerBrowser(this.optionKey, container);
   }
 
   buildTriggerOptions(id: string, labelDiv: HTMLElement): HTMLElement {

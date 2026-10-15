@@ -31,13 +31,17 @@ import {
   CactbotConfigurator,
   ConfigLooseTrigger,
   ConfigLooseTriggerSet,
+  ConfigProcessedFile,
   ConfigProcessedFileMap,
 } from '../config/config';
+import { buildTriggerBrowser, registerTriggerFile, TriggerEntry } from '../config/config_triggers';
 
 import raidbossFileData from './data/raidboss_manifest.txt';
 import { RaidbossTriggerField, RaidbossTriggerOutput } from './popup-text';
 import raidbossOptions, { RaidbossOptions } from './raidboss_options';
 import { TimelineParser } from './timeline_parser';
+
+type RaidbossFileInfo = ConfigProcessedFile<ConfigLooseTriggerSet>;
 
 const kOptionKeys = {
   output: 'Output',
@@ -661,9 +665,15 @@ class RaidbossConfigurator {
 
       const headerDiv = document.createElement('div');
       headerDiv.classList.add('trigger-file-header');
+      // Fork: a file's trigger rows are built when it is first opened (see buildTriggers):
+      // building all of them up front took most of the config page's load time.
+      let buildTriggers: (() => void) | undefined;
       headerDiv.onclick = () => {
         triggerContainer.classList.toggle('collapsed');
+        buildTriggers?.();
+        buildTriggers = undefined;
       };
+      this.registerTriggerFile(info, triggerContainer);
 
       const parts = [info.title, info.type, info.prefix];
       for (const part of parts) {
@@ -757,6 +767,40 @@ class RaidbossConfigurator {
         continue;
       }
 
+      buildTriggers = () => this.buildTriggerRows(key, info, triggerOptions);
+    }
+    buildTriggerBrowser('raidboss', container);
+  }
+
+  // Fork: lets the config page's trigger browser show and search this file (config_triggers.ts).
+  registerTriggerFile(info: RaidbossFileInfo, triggerContainer: HTMLElement): void {
+    const severities = ['alarm', 'alert', 'info'] as const;
+    const triggers: TriggerEntry[] = [];
+    for (const [trigId, trig] of Object.entries(info.triggers ?? {})) {
+      // As buildTriggerRows skips them.
+      if (!this.base.developerOptions && !triggerOutputFunctions.some((func) => func in trig))
+        continue;
+      const outputs = Object.values(trig.configOutput ?? {});
+      const strings = Object.values(trig.outputStrings ?? {}).map((s) =>
+        typeof s === 'string' ? s : this.base.translate(s)
+      );
+      const comment = trig.comment?.[this.base.lang] ?? trig.comment?.en ?? '';
+      const severity = severities.find((s) => trig.configOutput?.[`${s}Text`] !== undefined);
+      triggers.push({
+        id: trigId,
+        text: [trigId, ...outputs, ...strings, comment].join(' ').toLowerCase(),
+        preview: severity !== undefined ? trig.configOutput?.[`${severity}Text`] : outputs[0],
+        severity: severity,
+      });
+    }
+    if (info.triggerSet.overriddenByFile !== undefined)
+      triggers.length = 0;
+    registerTriggerFile('raidboss', triggerContainer, info.title, info.type, triggers);
+  }
+
+  buildTriggerRows(key: string, info: RaidbossFileInfo, triggerOptions: HTMLElement): void {
+    // A block to keep this loop's code where it was in buildUI, for merging upstream changes.
+    {
       for (const [trigId, trig] of Object.entries(info.triggers ?? {})) {
         // Don't construct triggers that won't show anything.
         let hasOutputFunc = false;

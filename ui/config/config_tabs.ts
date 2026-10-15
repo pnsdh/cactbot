@@ -2,6 +2,12 @@ import { Lang, langToLocale } from '../../resources/languages';
 import { LocaleText } from '../../types/trigger';
 
 import { arrangeSection } from './config_rows';
+import {
+  revealTrigger,
+  searchTriggers,
+  setTriggerBrowserContext,
+  triggerCount,
+} from './config_triggers';
 
 // Fork: the config page shows one overlay's options at a time, picked from tabs across the top
 // (the page sits next to OverlayPlugin's own list, so a second sidebar would crowd it), in a dark
@@ -121,22 +127,104 @@ export const applyStoredTheme = (): void => {
 };
 
 const kSearchPlaceholder: LocaleText = {
-  en: 'Search settings',
-  ko: '설정 검색',
+  en: 'Search settings and triggers',
+  ko: '설정·트리거 검색',
 };
 
 const kNoResults: LocaleText = {
-  en: 'No matching settings.',
-  ko: '일치하는 설정이 없습니다.',
+  en: 'Nothing matches.',
+  ko: '일치하는 설정이나 트리거가 없습니다.',
 };
 
-// Searches option names and descriptions in every section at once: sections, cards and rows
-// without a match are hidden while there is a query.  Trigger lists are not searched.
+const kTriggerResults: LocaleText = {
+  en: 'Triggers',
+  ko: '트리거',
+};
+
+const kMoreResults: LocaleText = {
+  en: '${n} more: narrow the search to see them.',
+  ko: '${n}개 더 있습니다. 검색어를 더 자세히 적어 주세요.',
+};
+
+const kSettingsView: LocaleText = {
+  en: 'Settings',
+  ko: '설정',
+};
+
+const kTriggersView: LocaleText = {
+  en: 'Triggers',
+  ko: '트리거',
+};
+
+// Sections with a trigger list (config_triggers.ts) switch between it and their options.
+const kTriggerGroups = ['raidboss', 'oopsyraidsy'];
+const kMaxTriggerResults = 40;
+
+const groupTitle = (group: string, translate: (text: LocaleText) => string): string => {
+  const text = kSections[group];
+  return text !== undefined ? translate(text.title) : group;
+};
+
+// Trigger search results: a list of buttons that open the trigger in its list.
+const renderTriggerResults = (
+  results: HTMLElement,
+  query: string,
+  translate: (text: LocaleText) => string,
+): boolean => {
+  results.replaceChildren();
+  if (query === '')
+    return false;
+  const { hits, total } = searchTriggers(query, kMaxTriggerResults);
+  if (hits.length === 0)
+    return false;
+
+  const title = document.createElement('h2');
+  title.classList.add('config-card-title');
+  title.textContent = `${translate(kTriggerResults)} · ${total.toLocaleString()}`;
+  const list = document.createElement('div');
+  list.classList.add('config-hits');
+  for (const hit of hits) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.classList.add('config-hit');
+    const name = document.createElement('span');
+    name.classList.add('config-hit-name');
+    name.textContent = hit.trigger?.id ?? hit.file.title;
+    const where = document.createElement('span');
+    where.classList.add('config-hit-where');
+    where.textContent = hit.trigger !== undefined
+      ? `${hit.file.title} · ${groupTitle(hit.file.group, translate)}`
+      : [hit.file.type, groupTitle(hit.file.group, translate)].filter((x) => x).join(' · ');
+    button.append(name, where);
+    const preview = hit.trigger?.preview;
+    if (preview !== undefined && preview !== '') {
+      const pill = document.createElement('span');
+      pill.classList.add('config-hit-preview', `config-${hit.trigger?.severity ?? 'info'}`);
+      pill.textContent = preview;
+      button.appendChild(pill);
+    }
+    button.onclick = () => revealTrigger(hit);
+    list.appendChild(button);
+  }
+  results.append(list, title);
+  if (total > hits.length) {
+    const more = document.createElement('p');
+    more.classList.add('config-hits-more');
+    more.textContent = translate(kMoreResults).replace('${n}', (total - hits.length).toString());
+    list.appendChild(more);
+  }
+  return true;
+};
+
+// Searches option names and descriptions in every section at once (sections, cards and rows
+// without a match are hidden while there is a query), and triggers (listed below them).
 const buildSearch = (
   scroller: HTMLElement,
   translate: (text: LocaleText) => string,
   sections: () => { section: HTMLElement }[],
-): { box: HTMLElement; clear: () => void } => {
+): { box: HTMLElement; results: HTMLElement; clear: () => void } => {
+  const results = document.createElement('div');
+  results.classList.add('config-card', 'config-trigger-results');
   const box = document.createElement('label');
   box.classList.add('config-search');
   const input = document.createElement('input');
@@ -149,15 +237,18 @@ const buildSearch = (
   box.append(input, key);
 
   const empty = document.createElement('p');
-  empty.classList.add('config-no-results');
+  empty.classList.add('config-no-results', 'config-hidden');
   empty.textContent = translate(kNoResults);
   scroller.prepend(empty);
 
+  let searching = false;
   const run = () => {
     const query = input.value.trim().toLowerCase();
-    const searching = query !== '';
+    if (query === '' && !searching)
+      return;
+    searching = query !== '';
     document.documentElement.classList.toggle('config-searching', searching);
-    let anyHit = false;
+    let anyHit = renderTriggerResults(results, query, translate);
     for (const { section } of sections()) {
       let sectionHit = false;
       for (const card of section.querySelectorAll<HTMLElement>('.config-card')) {
@@ -210,8 +301,47 @@ const buildSearch = (
     input.value = '';
     run();
   };
-  run();
-  return { box: box, clear: clear };
+  return { box: box, results: results, clear: clear };
+};
+
+type ShowView = (view: 'settings' | 'triggers') => void;
+
+// The switch between a section's options and its trigger list.
+const buildViewSwitch = (
+  section: HTMLElement,
+  group: string,
+  translate: (text: LocaleText) => string,
+): ShowView => {
+  const storage = `cactbot-config-view-${group}`;
+  const bar = document.createElement('div');
+  bar.classList.add('config-view-switch');
+  bar.setAttribute('role', 'tablist');
+  const settings = document.createElement('button');
+  settings.type = 'button';
+  settings.textContent = translate(kSettingsView);
+  const triggers = document.createElement('button');
+  triggers.type = 'button';
+  triggers.textContent = translate(kTriggersView);
+  const count = document.createElement('span');
+  count.classList.add('config-view-count');
+  const n = triggerCount(group);
+  if (n > 0)
+    count.textContent = n.toLocaleString();
+  triggers.appendChild(count);
+  bar.append(settings, triggers);
+
+  const show = (view: 'settings' | 'triggers') => {
+    section.dataset.view = view;
+    settings.classList.toggle('config-active', view === 'settings');
+    triggers.classList.toggle('config-active', view === 'triggers');
+    storageSet(storage, view);
+  };
+  settings.onclick = () => show('settings');
+  triggers.onclick = () => show('triggers');
+  section.classList.add('config-has-triggers');
+  section.querySelector('.config-section-desc')?.after(bar);
+  show(storageGet(storage) === 'triggers' ? 'triggers' : 'settings');
+  return show;
 };
 
 export const buildSectionTabs = (
@@ -234,7 +364,9 @@ export const buildSectionTabs = (
   scroller.classList.add('config-scroll');
 
   const tabs = new Map<string, { tab: HTMLButtonElement; section: HTMLElement }>();
+  const views = new Map<string, ShowView>();
   const search = buildSearch(scroller, translate, () => [...tabs.values()]);
+  let shown: string | undefined;
   const select = (group: string) => {
     search.clear();
     for (const [key, { tab, section }] of tabs) {
@@ -244,9 +376,18 @@ export const buildSectionTabs = (
       tab.tabIndex = active ? 0 : -1;
       section.classList.toggle('config-active', active);
     }
-    scroller.scrollTop = 0;
+    // Not on the first one: that would lay out the whole page before it shows.
+    if (shown !== undefined && shown !== group)
+      scroller.scrollTop = 0;
+    shown = group;
     storageSet(kTabStorageKey, group);
   };
+  setTriggerBrowserContext({
+    showTriggers: (group) => {
+      select(group);
+      views.get(group)?.('triggers');
+    },
+  });
 
   const sections = [...container.children].filter((e): e is HTMLElement =>
     e instanceof HTMLElement && e.classList.contains('overlay-container')
@@ -273,6 +414,8 @@ export const buildSectionTabs = (
       anchor.after(desc);
     }
     arrangeSection(section, group, translate);
+    if (kTriggerGroups.includes(group))
+      views.set(group, buildViewSwitch(section, group, translate));
 
     const tab = document.createElement('button');
     tab.classList.add('config-tab');
@@ -301,6 +444,7 @@ export const buildSectionTabs = (
   });
 
   bar.appendChild(search.box);
+  scroller.appendChild(search.results);
   container.prepend(bar, scroller);
   const saved = storageGet(kTabStorageKey);
   const first = [...tabs.keys()][0];
