@@ -99,6 +99,16 @@ const triggerSet: OopsyTriggerSet<Data> = {
       },
     },
   ],
+  // Fork: for the source names in the triggers above (names from Korean logs).
+  timelineReplace: [
+    {
+      locale: 'ko',
+      replaceSync: {
+        'Stray Geist': '헤매는 유령',
+        'Träumerei': '트로이메라이',
+      },
+    },
+  ],
 };
 
 export default triggerSet;

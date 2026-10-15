@@ -13,7 +13,7 @@ const triggerSet: OopsyTriggerSet<Data> = {
     'Valigarmanda Strangling Coil': '8D40', // large donut AoE
     'Valigarmanda Eruption': '8D5F', // baited AoE puddles
     // storm phase
-    'Valigarmanda Thunderous Breath': '8D50', // conal; not on elevated tile
+    // Fork: 8D50 Thunderous Breath hits everyone (logs: all 8 in 8 of 9 casts), as 8FE3 in EX.
     'Valigarmanda Blighted Bolt (personal)': '8D4D', // puddle on you; not on ground tile
     'Valigarmanda Blighted Bolt (feather)': '8D4E', // hit by feather circle AoE
     'Valigarmanda Arcane Lightning': '9859', // line cleaves from spheres

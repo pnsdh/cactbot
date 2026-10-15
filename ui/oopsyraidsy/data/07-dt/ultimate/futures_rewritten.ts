@@ -4,10 +4,18 @@ import { OopsyData } from '../../../../../types/data';
 import { OopsyTriggerSet } from '../../../../../types/oopsy';
 import { GetShareMistakeText, GetSoloMistakeText } from '../../../oopsy_common';
 
-export type Data = OopsyData;
+export interface Data extends OopsyData {
+  // Fork: when each player last got a stack mistake (see FRU Mark of Mortality).
+  fruStackFailTime: { [targetId: string]: number };
+}
 
 const triggerSet: OopsyTriggerSet<Data> = {
   zoneId: ZoneId.FuturesRewrittenUltimate,
+  initData: () => {
+    return {
+      fruStackFailTime: {},
+    };
+  },
   damageWarn: {
     'FRU P1 Cyclonic Break': '9CD2', // P1 Cyclonic Break follow-up
     'FRU P1 Burnt Strike Boss 1': '9CC1', // P1 Burnt Strike (fire, by Fatebreaker)
@@ -49,16 +57,15 @@ const triggerSet: OopsyTriggerSet<Data> = {
   damageFail: {
     'FRU P1 Unmitigated Explosion': '9CC4', // P1 tower fail
     'FRU P5 Unmitigated Explosion': '9D81', // P5 tower fail
-    'FRU Refulgent Fate Tether Break': '9D17', // P2, P4 tether break
+    // Fork: 9D17 Refulgent Fate tether break is a trigger below: every tether source hits
+    // everyone (up to ~40 hits on players per break).
   },
   gainsEffectWarn: {
     'FRU Damage Down': 'B5F',
     'FRU Bleeding': 'C05', // standing in the puddle.
     'FRU Doom': '9D4',
   },
-  gainsEffectFail: {
-    'FRU Mark of Mortality': '1114', // stack fail debuff
-  },
+  // Fork: 1114 Mark of Mortality is a trigger below, not to repeat FRU Stack Mistakes.
   shareWarn: {
     'FRU P1 Sinsmite Spread': '9CD5', // P1 spread during Cyclonic Break
     'FRU P1 Sinbound Thunder III Spread': '9CE0', // P1 spread during Utopian Sky
@@ -121,17 +128,51 @@ const triggerSet: OopsyTriggerSet<Data> = {
       netRegex: NetRegexes.ability({
         id: ['9CDF', '9CE7', '9CDC', '9D19', '9D55', '9D4F'],
       }),
-      mistake: (_data, matches) => {
+      mistake: (data, matches) => {
         const expected = matches.id === '9D55' ? 5 : 4; // Unholy Darkness = 5, others = 4
         const actual = parseFloat(matches.targetCount);
         if (actual >= expected || actual === 0) {
           return;
         }
+        data.fruStackFailTime[matches.targetId] = new Date(matches.timestamp).getTime();
         const ability = matches.ability;
         const text = actual === 1
           ? GetSoloMistakeText(ability)
           : GetShareMistakeText(ability, actual);
         return { type: 'fail', blame: matches.target, text: text };
+      },
+    },
+    {
+      // Fork: once per break rather than for every hit of every tether source on everyone.
+      id: 'FRU Refulgent Fate Tether Break',
+      type: 'Ability',
+      netRegex: NetRegexes.ability({ id: '9D17' }),
+      condition: (data, matches) => data.IsPlayerId(matches.targetId),
+      suppressSeconds: 5,
+      mistake: (_data, matches) => {
+        return { type: 'fail', text: matches.ability };
+      },
+    },
+    {
+      // Fork: the stack fail debuff, unless the player already got a stack mistake for it
+      // (same moment as the debuff; checked a little later, as either line can come first).
+      id: 'FRU Mark of Mortality',
+      type: 'GainsEffect',
+      netRegex: NetRegexes.gainsEffect({ effectId: '1114' }),
+      delaySeconds: 0.5,
+      mistake: (data, matches) => {
+        const stackFail = data.fruStackFailTime[matches.targetId];
+        if (
+          stackFail !== undefined &&
+          Math.abs(new Date(matches.timestamp).getTime() - stackFail) < 2000
+        )
+          return;
+        return {
+          type: 'fail',
+          blame: matches.target,
+          reportId: matches.targetId,
+          text: matches.effect,
+        };
       },
     },
     {

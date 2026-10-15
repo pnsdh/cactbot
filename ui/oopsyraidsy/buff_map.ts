@@ -426,8 +426,9 @@ export const missedAbilityBuffMap: readonly MissableAbility[] = [
   {
     id: 'Pneuma',
     type: 'heal',
-    // 5EFE on enemies, and 6CB6 on friendlies.
-    abilityId: '6CB6',
+    // 5EFE on enemies, and 6B84 on friendlies.
+    // Fork: was 6CB6, never seen in logs; the heal on party members is 6B84 (Action.csv Pneuma).
+    abilityId: '6B84',
   },
   {
     id: 'Philosophia',

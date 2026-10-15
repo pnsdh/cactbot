@@ -113,7 +113,8 @@ const triggerSet: OopsyTriggerSet<Data> = {
   },
   gainsEffectWarn: {
     // Prishe
-    'Jeuno First Walk Prishe Thornbite': 'DBD', // Touching thorns during Auroral Uppercut
+    // Fork: DBD (a nameless effect) goes on 22-24 players at once in every cast in logs: not
+    // Thornbite.  Left out until the real effect is known.
 
     // Fafnir
     'Jeuno First Walk Fafnir Burns': 'BF9', // Standing in dragon breath

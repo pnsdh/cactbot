@@ -25,7 +25,22 @@ export interface Data extends OopsyData {
     [targetId: string]: AbilityTracker;
   };
   partyDamageTracker: AbilityTracker;
+  // Fork: the cast last reported as an overwrite (see FirstOverwriteOfCast).
+  lastOverwriteCast?: string;
 }
+
+// Fork: a cast hitting several enemies (e.g. Reprisal on two bosses) has a line for each, and
+// may overwrite on each: reported once.
+const FirstOverwriteOfCast = (
+  data: Data,
+  matches: { sourceId: string; id: string; timestamp: string },
+): boolean => {
+  const cast = `${matches.sourceId}:${matches.id}:${matches.timestamp}`;
+  if (data.lastOverwriteCast === cast)
+    return false;
+  data.lastOverwriteCast = cast;
+  return true;
+};
 
 const raiseAbilityIds = [
   '7D', // raise
@@ -36,6 +51,7 @@ const raiseAbilityIds = [
   '478D', // angel whisper
   '7423', // variant raise
   '7426', // variant raise II
+  'BFAE', // occult raise (Fork)
 ];
 
 const targetMitAbilityIdToDuration: { [id: string]: number } = {
@@ -323,7 +339,7 @@ const triggerSet: OopsyTriggerSet<Data> = {
           const diff = newTime - lastTime;
           const leeway =
             (duration * 1000 - diff) > data.options.MinimumTimeForOverwrittenMit * 1000;
-          if (diff < duration * 1000 && leeway) {
+          if (diff < duration * 1000 && leeway && FirstOverwriteOfCast(data, matches)) {
             const lastSourceShort = data.party.member(lastSource).toString();
             return {
               type: 'heal',
@@ -404,7 +420,7 @@ const triggerSet: OopsyTriggerSet<Data> = {
           const diff = newTime - lastTime;
           const leeway =
             (duration * 1000 - diff) > data.options.MinimumTimeForOverwrittenDamage * 1000;
-          if (diff < duration * 1000 && leeway) {
+          if (diff < duration * 1000 && leeway && FirstOverwriteOfCast(data, matches)) {
             const lastSourceShort = data.party.member(lastSource).toString();
             return {
               type: 'warn',
