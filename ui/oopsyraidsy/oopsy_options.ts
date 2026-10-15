@@ -53,6 +53,8 @@ type OopsyConfigOptions = {
   DeathReportSide: DeathReportSide;
   MinimumTimeForOverwrittenMit: number;
   MinimumTimeForOverwrittenDamage: number;
+  DamageDownMistakes: boolean;
+  DamageDownMaxPlayers: number;
 };
 
 const defaultOopsyConfigOptions: OopsyConfigOptions = {
@@ -64,6 +66,8 @@ const defaultOopsyConfigOptions: OopsyConfigOptions = {
   DeathReportSide: 'left',
   MinimumTimeForOverwrittenMit: 2,
   MinimumTimeForOverwrittenDamage: 2,
+  DamageDownMistakes: true,
+  DamageDownMaxPlayers: 2,
 };
 
 export interface OopsyOptions

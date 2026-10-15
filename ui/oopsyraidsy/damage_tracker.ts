@@ -107,9 +107,6 @@ const kDamageDownIds = new Set([
 // Fork: Damage Downs given by one ability within this time are one event.
 const kDamageDownWindowMs = 500;
 
-// Fork: more players than this getting it at once is someone's failure applied to many.
-const kDamageDownMaxBlamed = 2;
-
 // Fork: getting it again from the same ability within this (e.g. every tick) is not repeated.
 const kDamageDownRepeatMs = 5000;
 
@@ -649,6 +646,8 @@ export class DamageTracker {
   // gave it to everyone, and it isn't theirs.  Abilities and statuses that this zone's triggers
   // already report are left to them.
   private OnDamageDown(splitLine: string[]): void {
+    if (!this.options.DamageDownMistakes)
+      return;
     const fields = logDefinitions.Ability.fields;
     const id = splitLine[fields.id] ?? '';
     const targetId = splitLine[fields.targetId] ?? '';
@@ -702,7 +701,9 @@ export class DamageTracker {
       this.damageDowns.delete(id);
     // Not when everyone alive got it either (e.g. the one or two left when others are dead).
     const count = event.targets.size;
-    if (count > kDamageDownMaxBlamed || event.alive > 0 && count >= event.alive)
+    // More than the option's players at once is someone's failure applied to many.
+    const maxPlayers = this.options.DamageDownMaxPlayers;
+    if (count > maxPlayers || event.alive > 0 && count >= event.alive)
       return;
     for (const [targetId, target] of event.targets) {
       const key = `${targetId}:${id}`;

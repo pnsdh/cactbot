@@ -496,6 +496,25 @@ const templateOptions: OptionsTemplate = {
       type: 'float',
       default: 2,
     },
+    {
+      // Fork: see DamageTracker.OnDamageDown.
+      id: 'DamageDownMistakes',
+      name: {
+        en: 'Show getting Damage Down from an enemy ability as a mistake',
+        ko: '적의 기술로 주는 피해량 감소를 받으면 실수로 표시',
+      },
+      type: 'checkbox',
+      default: true,
+    },
+    {
+      id: 'DamageDownMaxPlayers',
+      name: {
+        en: 'Most players getting Damage Down at once to show it (more: someone else\'s failure)',
+        ko: '주는 피해량 감소를 실수로 표시할 최대 인원 (더 많이 받으면 누군가의 실패로 보고 표시 안 함)',
+      },
+      type: 'integer',
+      default: 2,
+    },
   ],
 };
 
