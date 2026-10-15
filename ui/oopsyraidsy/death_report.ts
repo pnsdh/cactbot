@@ -48,6 +48,11 @@ const processAbilityLine = (splitLine: string[]) => {
   };
 };
 
+const isDamage = (event: TrackedLineEvent): boolean => {
+  const ability = processAbilityLine(event.splitLine);
+  return ability.isAttack && ability.amount > 0;
+};
+
 export type ParsedDeathReportLine = {
   timestamp: number;
   timestampStr: string;
@@ -84,11 +89,28 @@ export class DeathReport {
 
   // Generates an OopsyMistake that represents this DeathReport.
   public static generateMistake(data: DeathReportData): OopsyMistake {
+    // Fork: the hit that took HP to 0 when it landed, if known.  Hits land some time after they
+    // are resolved, so the last one resolved before the death may have landed after it.
+    const fatal = data.events.find((event) => event.type === 'Ability' && event.fatal);
+
     // Walk backward through events until we find the last damage or a death reason.
     for (let i = data.events.length - 1; i >= 0; i--) {
       const event = data.events[i];
       if (!event)
         break;
+      if (fatal !== undefined && event.type === 'Ability') {
+        if (event !== fatal)
+          continue;
+        // Not damage, e.g. an effect that kills: just its name.
+        if (!isDamage(fatal)) {
+          return {
+            type: 'death',
+            name: data.targetName,
+            text: event.splitLine[logDefinitions.Ability.fields.ability] ?? '???',
+            report: data,
+          };
+        }
+      }
       if (event.type === 'DeathReason') {
         return {
           type: 'death',
@@ -151,6 +173,11 @@ export class DeathReport {
     let lastCertainHp: number | undefined = undefined;
     let currentHp: number | undefined = undefined;
     let deathReasonIdx: number | undefined = undefined;
+    // Fork: the hit known to have killed (see generateMistake) gets the death icon, rather than
+    // guessing from the hp, if it is damage (only those get a line).
+    const knownFatal = this.events.some((event) => {
+      return event.type === 'Ability' && event.fatal === true && isDamage(event);
+    });
 
     for (const event of this.events) {
       let parsed: ParsedDeathReportLine | undefined = undefined;
@@ -177,7 +204,7 @@ export class DeathReport {
         deathReasonIdx !== undefined
       ) {
         // Found damage after a DeathReason, remove previous DeathReason.
-        this.parsedReportLines.splice(deathReasonIdx);
+        this.parsedReportLines.splice(deathReasonIdx, 1);
         deathReasonIdx = undefined;
       } else if (event.type === 'DeathReason') {
         // Found a new DeathReason, track this index in case it needs to be removed.
@@ -205,11 +232,15 @@ export class DeathReport {
       if (currentHp !== undefined && parsed.amount !== undefined) {
         // If this attack killed somebody (or this is overkill), set an icon unless there's
         // already a mistake icon set.  Don't do this for belated heals because it looks weird.
-        if (parsed.amount < 0 && currentHp + parsed.amount <= 0)
+        const fatal = knownFatal
+          ? event.type === 'Ability' && event.fatal === true
+          : currentHp + parsed.amount <= 0;
+        if (parsed.amount < 0 && fatal)
           parsed.icon ??= 'death';
 
         // TODO: maybe use max hp here to clamp this?
-        currentHp += parsed.amount;
+        // Fork: not below 0, e.g. for the hits resolved before the killing blow landed.
+        currentHp = Math.max(0, currentHp + parsed.amount);
       }
 
       this.parsedReportLines.push(parsed);

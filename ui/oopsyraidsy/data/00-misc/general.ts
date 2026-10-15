@@ -62,7 +62,7 @@ const partyMitAbilityIdToDuration: { [id: string]: number } = {
   '650C': 20, // expedient
   '409A': 20, // fey/seraphic illumination (order)
   'E1D': 5, // collective unconscious
-  '9087': 15, // sun sign
+  '90A7': 15, // sun sign
   '5EEA': 15, // kerachole
   '5EF6': 20, // holos
   '5EF7': 15, // panhaima

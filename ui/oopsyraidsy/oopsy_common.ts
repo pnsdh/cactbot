@@ -16,9 +16,13 @@ export const kFlagInstantDeath = '36'; // Always 36 ?
 export const kAttackFlags = ['01', '03', '05', '06', kFlagInstantDeath];
 export const kHealFlags = ['04'];
 
+// The low byte of the flags is one of kAttackFlags.  The field has no leading zero, so it can
+// be one character, e.g. '3' (seen on some boss attacks, such as R9S Dead Wake).
+const kAttackFlagsShort = kAttackFlags.filter((f) => f.startsWith('0')).map((f) => f.slice(1));
+
 // TODO: should we include damage != 0 here?
 export const damageFields = {
-  flags: `[^|]*(?:${kAttackFlags.join('|')})(?=\\|)`,
+  flags: `(?:[^|]*(?:${kAttackFlags.join('|')})|[${kAttackFlagsShort.join('')}])(?=\\|)`,
 };
 
 export const playerTargetFields = {
@@ -101,7 +105,8 @@ export const FormatNumber = (value: number): string => value.toLocaleString('en-
 export const GetFormattedTime = (baseTime: number | undefined, time: number): string => {
   if (!baseTime)
     return '';
-  const totalSeconds = Math.floor((time - baseTime) / 1000);
+  // Fork: not negative (e.g. something logged just before the start), which showed as -1:0-1.
+  const totalSeconds = Math.max(0, Math.floor((time - baseTime) / 1000));
   const seconds = totalSeconds % 60;
   const minutes = Math.floor(totalSeconds / 60);
   return `${minutes}:${seconds < 10 ? `0${seconds}` : seconds}`;
