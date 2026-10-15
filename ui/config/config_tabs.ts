@@ -89,6 +89,72 @@ const storageSet = (key: string, value: string): void => {
   }
 };
 
+// The page's scale, as CSS zoom (the page can't set the browser's own zoom).  CSS zoom doesn't
+// change what media queries see, so the layouts for narrow windows use classes set from the
+// width the page really has.
+const kZoomStorageKey = 'cactbot-config-zoom';
+const kZoomSteps = [0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2];
+let zoom = 1;
+
+const updateWidthClasses = (): void => {
+  const width = window.innerWidth / zoom;
+  const root = document.documentElement.classList;
+  root.toggle('config-w600', width <= 600);
+  root.toggle('config-w480', width <= 480);
+};
+
+export const applyZoom = (value: string): void => {
+  const n = parseFloat(value);
+  zoom = isFinite(n) && n >= 0.5 && n <= 3 ? n : 1;
+  document.documentElement.style.setProperty('zoom', zoom === 1 ? '' : zoom.toString());
+  storageSet(kZoomStorageKey, zoom.toString());
+  updateWidthClasses();
+};
+
+if (typeof window !== 'undefined')
+  window.addEventListener('resize', updateWidthClasses);
+
+// Ctrl+wheel and Ctrl+plus/minus/0 change the scale option (instead of the browser's zoom, which
+// is forgotten), through its select so that it is saved as any other change.
+const handleZoomKeys = (): void => {
+  const step = (direction: number | undefined) => {
+    const select = document.querySelector<HTMLSelectElement>(
+      '.option-input-container[data-option-id="ConfigZoom"] select',
+    );
+    const index = kZoomSteps.findIndex((s) => s >= zoom - 0.001);
+    const next = direction === undefined
+      ? 1
+      : kZoomSteps[Math.max(0, Math.min(kZoomSteps.length - 1, index + direction))] ?? 1;
+    if (select === null) {
+      applyZoom(next.toString());
+      return;
+    }
+    select.value = next.toString();
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  };
+  document.addEventListener('wheel', (e) => {
+    if (!e.ctrlKey)
+      return;
+    e.preventDefault();
+    step(e.deltaY < 0 ? 1 : -1);
+  }, { passive: false });
+  document.addEventListener('keydown', (e) => {
+    if (!e.ctrlKey)
+      return;
+    const direction = e.key === '+' || e.key === '='
+      ? 1
+      : e.key === '-'
+      ? -1
+      : e.key === '0'
+      ? undefined
+      : null;
+    if (direction === null)
+      return;
+    e.preventDefault();
+    step(direction);
+  });
+};
+
 // 'dark' (the default), 'light' or 'system'.
 export const applyTheme = (theme: string): void => {
   const value = theme === 'light' || theme === 'system' ? theme : 'dark';
@@ -101,6 +167,9 @@ export const applyStoredTheme = (): void => {
   const theme = storageGet(kThemeStorageKey);
   if (theme !== null)
     applyTheme(theme);
+  const zoom = storageGet(kZoomStorageKey);
+  if (zoom !== null)
+    applyZoom(zoom);
 };
 
 const kSearchPlaceholder: LocaleText = {
@@ -379,6 +448,7 @@ export const buildSectionTabs = (
 ): void => {
   document.documentElement.lang = langToLocale(lang);
   document.documentElement.classList.add('config-tabs');
+  handleZoomKeys();
 
   const bar = document.createElement('nav');
   bar.classList.add('config-tab-bar');

@@ -148,5 +148,27 @@ UserConfig.registerOptions('general', {
       },
       default: 'dark',
     },
+    // Fork: the config page's scale (also Ctrl+wheel there; see config_tabs.ts).
+    {
+      id: 'ConfigZoom',
+      name: {
+        en: 'Config page scale',
+        ko: '설정 화면 배율',
+      },
+      type: 'select',
+      options: {
+        en: {
+          '80%': '0.8',
+          '90%': '0.9',
+          '100%': '1',
+          '110%': '1.1',
+          '125%': '1.25',
+          '150%': '1.5',
+          '175%': '1.75',
+          '200%': '2',
+        },
+      },
+      default: '1',
+    },
   ],
 });

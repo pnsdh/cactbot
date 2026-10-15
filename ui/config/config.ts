@@ -24,7 +24,7 @@ import {
 
 import defaultOptions, { ConfigOptions } from './config_options';
 import { tagOptionRow } from './config_rows';
-import { applyStoredTheme, applyTheme, buildSectionTabs } from './config_tabs';
+import { applyStoredTheme, applyTheme, applyZoom, buildSectionTabs } from './config_tabs';
 import { setTriggerBrowserContext } from './config_triggers';
 
 // Load other config files
@@ -376,6 +376,7 @@ export class CactbotConfigurator {
       (this.contents[group] ??= []).push(template);
 
     applyTheme(this.getStringOption('general', 'ConfigTheme', 'dark'));
+    applyZoom(this.getStringOption('general', 'ConfigZoom', '1'));
     // Best effort: the save goes out as a message right away.
     window.addEventListener('beforeunload', () => void this.flushPendingSave());
     setTriggerBrowserContext({
@@ -597,6 +598,8 @@ export class CactbotConfigurator {
     void this.saveConfigData();
     if (group === 'general' && finalArg === 'ConfigTheme' && typeof value === 'string')
       applyTheme(value);
+    if (group === 'general' && finalArg === 'ConfigZoom' && typeof value === 'string')
+      applyZoom(value);
   }
 
   buildButterBar(): void {

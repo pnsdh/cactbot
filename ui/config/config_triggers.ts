@@ -1,6 +1,8 @@
 import { SavedConfigEntry } from '../../types/event';
 import { LocaleText } from '../../types/trigger';
 
+import { addTooltipsIn } from './config_rows';
+
 // Fork: a browser over the trigger lists that raidboss_config.ts and oopsyraidsy_config.ts build
 // (expansion > file > trigger rows): expansions and content types as chips, files as cards that
 // open in place, and trigger search for config_tabs.ts.  Those build the lists as before and
@@ -42,6 +44,9 @@ const kChangedOnly: LocaleText = { en: 'Changed only', ko: '변경한 것만' };
 const kTriggerCount: LocaleText = { en: '${n} triggers', ko: '트리거 ${n}' };
 const kChangedCount: LocaleText = { en: '${n} changed', ko: '변경 ${n}' };
 const kNoFiles: LocaleText = { en: 'Nothing to show.', ko: '표시할 전투가 없습니다.' };
+const kUserFiles: LocaleText = { en: 'User files', ko: '사용자 파일' };
+const kContentType: LocaleText = { en: 'Content', ko: '콘텐츠' };
+const kOtherType: LocaleText = { en: 'Other', ko: '기타' };
 
 const files: { [group: string]: TriggerFile[] } = {};
 const browsers: { [group: string]: { showFile: (file: TriggerFile) => void } } = {};
@@ -153,6 +158,8 @@ const makeKeyboardButton = (element: HTMLElement): void => {
   });
 };
 
+const isUserSection = (label: string): boolean => /[\\/]|\.js$/.test(label);
+
 // Finds a trigger's row in an open file, as either config builds it.
 const findTriggerRow = (file: TriggerFile, id: string): HTMLElement | undefined => {
   for (const row of file.container.querySelectorAll<HTMLElement>('.trigger')) {
@@ -174,6 +181,17 @@ export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void 
 
   const fileOf = new Map<HTMLElement, TriggerFile>(list.map((f) => [f.container, f]));
   const changed = new Map<TriggerFile, number>();
+  // A user file's section is its path: its cards say which file they are from.
+  const userFileOf = new Map<HTMLElement, string>();
+  for (const container of expansions) {
+    const label = container.querySelector('.trigger-expansion-header')?.textContent ?? '';
+    if (!isUserSection(label))
+      continue;
+    for (const child of container.children) {
+      if (child instanceof HTMLElement && child.classList.contains('trigger-file-container'))
+        userFileOf.set(child, label.split(/[\\/]/).pop() ?? label);
+    }
+  }
   for (const file of list) {
     const header = file.container.querySelector<HTMLElement>(':scope > .trigger-file-header');
     if (header === null)
@@ -188,7 +206,7 @@ export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void 
       const count = file.triggers.length > 0
         ? format(kTriggerCount, file.triggers.length)
         : undefined;
-      const parts = [file.type, count];
+      const parts = [file.type ?? userFileOf.get(file.container), count];
       meta.textContent = parts.filter((p) => p !== undefined).join(' · ');
       if (n > 0) {
         const span = document.createElement('span');
@@ -216,12 +234,81 @@ export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void 
   )
     makeKeyboardButton(header);
 
+  // Fights' own options explain themselves in tooltips, as top level options do.
+  for (const file of list)
+    addTooltipsIn(file.container, context.translate);
+
+  // Expansions (one per section; user files are put together) are tabs of a kind, content types
+  // are filters within one, and "changed only" is a switch of its own on the right.
+  type Expansion = { label: string; key: string; containers: HTMLElement[] };
+  const groups: Expansion[] = [];
+  let userGroup: Expansion | undefined;
+  for (const container of expansions) {
+    const label = container.querySelector('.trigger-expansion-header')?.textContent ?? '';
+    container.classList.remove('collapsed');
+    if (isUserSection(label)) {
+      if (userGroup === undefined) {
+        userGroup = { label: context.translate(kUserFiles), key: 'user', containers: [] };
+        groups.push(userGroup);
+      }
+      userGroup.containers.push(container);
+      continue;
+    }
+    groups.push({ label: label, key: label, containers: [container] });
+  }
+
+  const filesIn = (expansion: Expansion) =>
+    expansion.containers.flatMap((c) =>
+      [...c.children].filter((e): e is HTMLElement =>
+        e instanceof HTMLElement && e.classList.contains('trigger-file-container')
+      )
+    );
+
+  // Within an expansion, files are put together by content type under headings.
+  const headings: { heading: HTMLElement; type: string | undefined; files: HTMLElement[] }[] = [];
+  for (const container of expansions) {
+    const byType = new Map<string | undefined, HTMLElement[]>();
+    for (
+      const file of [...container.children].filter((e): e is HTMLElement =>
+        e instanceof HTMLElement && e.classList.contains('trigger-file-container')
+      )
+    ) {
+      const t = fileOf.get(file)?.type;
+      byType.set(t, [...byType.get(t) ?? [], file]);
+    }
+    if (byType.size < 2)
+      continue;
+    for (const [t, files] of byType) {
+      const heading = document.createElement('div');
+      heading.classList.add('config-type-heading');
+      heading.textContent = t ?? context.translate(kOtherType);
+      const n = document.createElement('span');
+      n.textContent = files.length.toString();
+      heading.appendChild(n);
+      container.append(heading, ...files);
+      headings.push({ heading: heading, type: t, files: files });
+    }
+  }
+
   const toolbar = document.createElement('div');
   toolbar.classList.add('config-trigger-toolbar');
   const expansionRow = document.createElement('div');
-  expansionRow.classList.add('config-chips');
+  expansionRow.classList.add('config-segments');
   const typeRow = document.createElement('div');
   typeRow.classList.add('config-chips');
+  const typeChips = document.createElement('div');
+  typeChips.classList.add('config-chips-list');
+  const typeLabel = document.createElement('span');
+  typeLabel.classList.add('config-chips-label');
+  typeLabel.textContent = context.translate(kContentType);
+  const changedToggle = document.createElement('button');
+  changedToggle.type = 'button';
+  changedToggle.classList.add('config-changed-toggle');
+  changedToggle.setAttribute('role', 'switch');
+  const knob = document.createElement('span');
+  knob.classList.add('config-mini-switch');
+  changedToggle.append(knob, context.translate(kChangedOnly));
+  typeRow.append(typeLabel, typeChips, changedToggle);
   const empty = document.createElement('div');
   empty.classList.add('config-trigger-empty');
   empty.textContent = context.translate(kNoFiles);
@@ -229,20 +316,16 @@ export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void 
   groupDiv.prepend(toolbar);
   groupDiv.appendChild(empty);
 
-  let current = expansions[0];
+  let current = groups[0];
   let type: string | undefined;
   let changedOnly = false;
 
-  const filesIn = (expansion: HTMLElement) =>
-    [...expansion.children].filter((e): e is HTMLElement =>
-      e instanceof HTMLElement && e.classList.contains('trigger-file-container')
-    );
-
   const apply = () => {
     let shown = 0;
-    for (const expansion of expansions) {
+    for (const expansion of groups) {
       const active = expansion === current;
-      expansion.classList.toggle('config-active', active);
+      for (const container of expansion.containers)
+        container.classList.toggle('config-active', active);
       if (!active)
         continue;
       for (const container of filesIn(expansion)) {
@@ -254,11 +337,18 @@ export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void 
           shown++;
       }
     }
+    // Headings only when all types show, and only over files that do.
+    for (const { heading, files } of headings) {
+      const any = files.some((f) => !f.classList.contains('config-filter-miss'));
+      heading.classList.toggle('config-hidden', type !== undefined || !any);
+    }
+    changedToggle.classList.toggle('config-active', changedOnly);
+    changedToggle.setAttribute('aria-checked', changedOnly ? 'true' : 'false');
     empty.classList.toggle('config-hidden', shown > 0);
   };
 
   const buildTypeChips = () => {
-    typeRow.replaceChildren();
+    typeChips.replaceChildren();
     const counts = new Map<string, number>();
     const containers = current !== undefined ? filesIn(current) : [];
     for (const container of containers) {
@@ -282,33 +372,26 @@ export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void 
         buildTypeChips();
         apply();
       };
-      typeRow.appendChild(chip);
+      typeChips.appendChild(chip);
     }
-    const changedChip = makeChip(context.translate(kChangedOnly));
-    changedChip.classList.add('config-chip-toggle');
-    changedChip.classList.toggle('config-active', changedOnly);
-    changedChip.onclick = () => {
-      changedOnly = !changedOnly;
-      changedChip.classList.toggle('config-active', changedOnly);
-      apply();
-    };
-    typeRow.appendChild(changedChip);
+    typeRow.classList.toggle('config-chips-single', counts.size < 2);
+  };
+  changedToggle.onclick = () => {
+    changedOnly = !changedOnly;
+    apply();
   };
 
-  const expansionChips = new Map<HTMLElement, HTMLButtonElement>();
-  const selectExpansion = (expansion: HTMLElement) => {
+  const expansionChips = new Map<Expansion, HTMLButtonElement>();
+  const selectExpansion = (expansion: Expansion) => {
     current = expansion;
     for (const [e, chip] of expansionChips)
       chip.classList.toggle('config-active', e === expansion);
-    const label = expansion.querySelector('.trigger-expansion-header')?.textContent ?? '';
-    storageSet(storageKey(group), label);
+    storageSet(storageKey(group), expansion.key);
     buildTypeChips();
     apply();
   };
-  for (const expansion of expansions) {
-    const label = expansion.querySelector('.trigger-expansion-header')?.textContent ?? '';
-    expansion.classList.remove('collapsed');
-    const chip = makeChip(label);
+  for (const expansion of groups) {
+    const chip = makeChip(expansion.label);
     chip.onclick = () => selectExpansion(expansion);
     expansionChips.set(expansion, chip);
     expansionRow.appendChild(chip);
@@ -316,11 +399,9 @@ export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void 
 
   // The last saved expansion, or else the latest one ("x.x" in its name).
   const saved = storageGet(storageKey(group));
-  const labelOf = (e: HTMLElement) =>
-    e.querySelector('.trigger-expansion-header')?.textContent ?? '';
-  const initial = expansions.find((e) => saved !== null && labelOf(e) === saved) ??
-    [...expansions].reverse().find((e) => /\d\.x\)/.test(labelOf(e))) ??
-    expansions[0];
+  const initial = groups.find((e) => saved !== null && e.key === saved) ??
+    [...groups].reverse().find((e) => /\d\.x\)/.test(e.label)) ??
+    groups[0];
   if (initial !== undefined)
     selectExpansion(initial);
 
@@ -332,7 +413,7 @@ export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void 
 
   browsers[group] = {
     showFile: (file: TriggerFile) => {
-      const expansion = expansions.find((e) => e.contains(file.container));
+      const expansion = groups.find((e) => e.containers.some((c) => c.contains(file.container)));
       type = undefined;
       changedOnly = false;
       if (expansion !== undefined)
@@ -405,7 +486,8 @@ export const revealTrigger = (hit: TriggerHit): void => {
   row.scrollIntoView({ block: 'start' });
   const scroller = row.closest('.config-scroll');
   if (scroller !== null && header !== null)
-    scroller.scrollTop -= header.getBoundingClientRect().height + 8;
+    // offsetHeight, unlike rects, is in the page's own pixels whatever its scale.
+    scroller.scrollTop -= header.offsetHeight + 8;
   const details = row.nextElementSibling;
   flash(details instanceof HTMLElement ? [row, details] : [row]);
 };

@@ -35,8 +35,8 @@
   --cfg-text: #e9edf5;
   --cfg-muted: #8b93a6;
   --cfg-faint: #5d6476;
-  --cfg-accent: #b9c9ff;
-  --cfg-accent-bg: rgb(185 201 255 / 12%);
+  --cfg-accent: #8aa6ff;
+  --cfg-accent-bg: rgb(138 166 255 / 16%);
   --cfg-accent-ink: #0e1014;
   --cfg-knob: #fff;
   --cfg-knob-on: #10131a;
@@ -416,7 +416,9 @@ a:hover {
 /* A card of rows: each row is a name cell and a control cell sharing a line. */
 .overlay-options {
   margin: 0;
-  grid-template-columns: 1fr auto;
+
+  /* Names keep room even next to the widest controls (a fight's own options can be long). */
+  grid-template-columns: minmax(140px, 1fr) auto;
   grid-gap: 0;
   background-color: var(--cfg-surface);
   border: 1px solid var(--cfg-line);
@@ -469,25 +471,38 @@ a:hover {
   gap: 8px;
 }
 
+/* "Default <value>": a small text button, so it isn't taken for a reload button. */
 .config-ctl > .config-reset {
-  display: grid;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 180px;
+  height: 24px;
+  padding: 0 9px 0 7px;
+  border: 1px solid var(--cfg-line);
+  border-radius: 99px;
   background: none;
-  color: var(--cfg-faint);
+  color: var(--cfg-muted);
+  font-size: 11.5px;
+  font-weight: 560;
+  white-space: nowrap;
+}
+
+.config-ctl > .config-reset > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .config-ctl > .config-reset:hover {
-  background-color: var(--cfg-hover);
+  border-color: var(--cfg-accent);
+  background-color: var(--cfg-accent-bg);
   color: var(--cfg-text);
 }
 
 .config-reset svg {
-  width: 14px;
-  height: 14px;
+  flex: none;
+  width: 12px;
+  height: 12px;
   fill: none;
   stroke: currentcolor;
   stroke-width: 2;
@@ -495,10 +510,11 @@ a:hover {
   stroke-linejoin: round;
 }
 
-/* A number box with its unit. */
+/* A number box with its unit; all the same width, so a card's boxes line up. */
 .config-num {
   display: inline-flex;
   align-items: center;
+  width: 112px;
   height: 30px;
   border: 1px solid var(--cfg-line-strong);
   border-radius: 7px;
@@ -517,7 +533,9 @@ a:hover {
 
 .config-num input[type="text"],
 .config-num input[type="text"]:focus {
-  width: 58px;
+  flex: 1;
+  min-width: 0;
+  width: auto;
   height: 28px;
   padding: 0 8px;
   border: none;
@@ -534,7 +552,7 @@ a:hover {
 }
 
 .config-range {
-  width: 130px;
+  width: 120px;
   margin: 0;
   accent-color: var(--cfg-accent);
   cursor: pointer;
@@ -1309,131 +1327,350 @@ button:hover {
   }
 }
 
-/* ===== Small windows ===== */
+/* ===== Control widths ===== */
 
-@media (max-width: 600px) {
-  .config-tab-bar {
-    position: relative;
-    padding-left: 10px;
-  }
-
-  .config-logo {
-    display: none;
-  }
-
-  /* Search is an icon that opens over the tabs. */
-  .config-search {
-    flex: 0 0 32px;
-    justify-content: center;
-    gap: 0;
-    min-width: 32px;
-    padding: 0;
-  }
-
-  .config-search input[type="text"].config-search-input {
-    width: 0;
-    opacity: 0;
-  }
-
-  .config-search kbd {
-    display: none;
-  }
-
-  /* A query left in the box: a dot on the icon, so the tabs stay usable. */
-  .config-search.config-has-query::after {
-    content: "";
-    position: absolute;
-    top: 5px;
-    right: 5px;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background-color: var(--cfg-accent);
-  }
-
-  .config-search.config-has-query {
-    position: relative;
-  }
-
-  .config-search.config-has-query:focus-within::after {
-    display: none;
-  }
-
-  .config-search:focus-within {
-    position: absolute;
-    top: 8px;
-    left: 10px;
-    right: 10px;
-    z-index: 3;
-    width: auto;
-    justify-content: flex-start;
-    gap: 7px;
-    padding: 0 10px;
-  }
-
-  .config-search:focus-within input[type="text"].config-search-input {
-    width: auto;
-    opacity: 1;
-  }
-
-  .config-tabs .overlay-container,
-  .config-trigger-results {
-    padding-left: 12px;
-    padding-right: 12px;
-  }
-
-  #butter-bar {
-    max-width: calc(100vw - 24px);
-  }
-
-  .reload-text {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
+/* Controls of a kind have one width, so a card's controls line up; long choices are cut. */
+.option-input-container select {
+  width: 220px;
+  max-width: 100%;
+  min-width: 0;
+  text-overflow: ellipsis;
 }
 
-@media (max-width: 480px) {
-  /* Names above their controls. */
-  .overlay-options,
-  .trigger-file-options {
-    grid-template-columns: minmax(0, 1fr);
-  }
+input[type="text"].input-string-field {
+  width: 220px;
+}
 
-  .overlay-options > .option-input-container {
-    justify-items: start;
-    padding-top: 0;
-    border-top: none;
-  }
+/* ===== Descriptions ===== */
 
-  .config-range {
-    width: 96px;
-  }
+.config-help {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 15px;
+  height: 15px;
+  margin-left: 7px;
+  border: 1px solid var(--cfg-faint);
+  border-radius: 50%;
+  color: var(--cfg-muted);
+  font-family: var(--cfg-font-accent);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: help;
+  transition: border-color 140ms, color 140ms, background-color 140ms;
+}
 
-  .trigger-file-options > .trigger-details {
-    padding-top: 6px;
-    border-top: none;
-  }
+.config-help:hover,
+.config-help:focus-visible {
+  border-color: var(--cfg-accent);
+  background-color: var(--cfg-accent-bg);
+  color: var(--cfg-text);
+  outline: none;
+}
 
-  .config-trigger-browser .trigger-file-container > .overlay-options,
-  .config-trigger-browser .trigger-file-options,
-  .config-trigger-browser .timeline-edit-container {
-    margin-left: 10px;
-    margin-right: 10px;
-  }
+.config-tooltip {
+  position: fixed;
+  z-index: 20;
+  max-width: 320px;
+  padding: 9px 12px;
+  border: 1px solid var(--cfg-line-strong);
+  border-radius: 8px;
+  background-color: var(--cfg-surface-2);
+  box-shadow: var(--cfg-shadow);
+  color: var(--cfg-text);
+  font-size: 12.5px;
+  font-weight: 450;
+  line-height: 1.55;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-3px);
+  transition: opacity 140ms, transform 140ms, visibility 0s 140ms;
+}
 
-  /* config.css sets these widths with !important. */
-  .timeline-add-container .timeline-add-row-time {
-    width: 56px !important;
-  }
+.config-tooltip.config-tooltip-shown {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition: opacity 140ms, transform 140ms;
+}
 
-  .timeline-add-container .timeline-add-row-text {
-    width: 150px !important;
-  }
+.config-tooltip p {
+  margin: 0;
+}
 
-  .timeline-add-container .timeline-add-row-duration {
-    width: 40px !important;
-  }
+.config-tooltip p + p {
+  margin-top: 6px;
+  color: var(--cfg-muted);
+}
+
+/* ===== Trigger browser filters ===== */
+
+/* Expansions: one connected group of buttons. */
+.config-segments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--cfg-line-strong);
+  border-radius: 9px;
+  background-color: var(--cfg-surface-2);
+}
+
+.config-segments > .config-chip {
+  height: 28px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--cfg-muted);
+  font-weight: 560;
+  transition: background-color 160ms, color 160ms;
+}
+
+.config-segments > .config-chip:hover {
+  background-color: var(--cfg-hover);
+  color: var(--cfg-text);
+}
+
+.config-segments > .config-chip.config-active {
+  background-color: var(--cfg-accent);
+  color: var(--cfg-accent-ink);
+}
+
+/* Content types: a labeled row of small chips, with the "changed only" switch at its end. */
+.config-trigger-toolbar > .config-chips {
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
+.config-chips-label {
+  flex: none;
+  margin-right: 4px;
+  color: var(--cfg-faint);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.config-chips-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-width: 0;
+}
+
+.config-chips-list > .config-chip {
+  height: 26px;
+  padding: 0 11px;
+  border-radius: 99px;
+  background: none;
+  color: var(--cfg-muted);
+  font-size: 12px;
+  font-weight: 560;
+  transition: background-color 160ms, border-color 160ms, color 160ms;
+}
+
+.config-chips-list > .config-chip:hover {
+  background: none;
+  color: var(--cfg-text);
+}
+
+.config-chips-list > .config-chip.config-active {
+  border-color: var(--cfg-accent);
+  background-color: var(--cfg-accent-bg);
+  color: var(--cfg-text);
+}
+
+.config-chips-single > .config-chips-label,
+.config-chips-single > .config-chips-list {
+  display: none;
+}
+
+.config-trigger-toolbar .config-changed-toggle {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 26px;
+  margin-left: auto;
+  padding: 0 4px 0 12px;
+  border: none;
+  background: none;
+  color: var(--cfg-muted);
+  font-size: 12px;
+  font-weight: 560;
+}
+
+.config-trigger-toolbar .config-changed-toggle:hover {
+  background: none;
+  color: var(--cfg-text);
+}
+
+.config-mini-switch {
+  flex: none;
+  width: 26px;
+  height: 15px;
+  border-radius: 99px;
+  background-color: var(--cfg-line-strong);
+  background-image: radial-gradient(circle at 7.5px 50%, var(--cfg-knob) 4.5px, transparent 5.5px);
+  background-repeat: no-repeat;
+  transition: background-color 200ms, background-position 220ms var(--cfg-ease);
+}
+
+.config-changed-toggle.config-active {
+  color: var(--cfg-text);
+}
+
+.config-changed-toggle.config-active .config-mini-switch {
+  background-color: var(--cfg-accent);
+  background-image: radial-gradient(circle at 7.5px 50%, var(--cfg-knob-on) 4.5px, transparent 5.5px);
+  background-position: 11px 0;
+}
+
+/* Content type headings among the file cards. */
+.config-type-heading {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 10px 0 0 2px;
+  color: var(--cfg-muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.config-type-heading:first-child {
+  margin-top: 0;
+}
+
+.config-type-heading > span {
+  color: var(--cfg-faint);
+  font-family: var(--cfg-font-accent);
+  font-size: 11px;
+}
+
+/* ===== Small windows ===== */
+
+/* config-w600 and config-w480 are set on html from the page's width over its scale. */
+.config-w600 .config-tab-bar {
+  position: relative;
+  padding-left: 10px;
+}
+
+.config-w600 .config-logo {
+  display: none;
+}
+
+/* Search is an icon that opens over the tabs. */
+.config-w600 .config-search {
+  flex: 0 0 32px;
+  justify-content: center;
+  gap: 0;
+  min-width: 32px;
+  padding: 0;
+}
+
+.config-w600 .config-search input[type="text"].config-search-input {
+  width: 0;
+  opacity: 0;
+}
+
+.config-w600 .config-search kbd {
+  display: none;
+}
+
+/* A query left in the box: a dot on the icon, so the tabs stay usable. */
+.config-w600 .config-search.config-has-query::after {
+  content: "";
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--cfg-accent);
+}
+
+.config-w600 .config-search.config-has-query {
+  position: relative;
+}
+
+.config-w600 .config-search.config-has-query:focus-within::after {
+  display: none;
+}
+
+.config-w600 .config-search:focus-within {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  right: 10px;
+  z-index: 3;
+  width: auto;
+  justify-content: flex-start;
+  gap: 7px;
+  padding: 0 10px;
+}
+
+.config-w600 .config-search:focus-within input[type="text"].config-search-input {
+  width: auto;
+  opacity: 1;
+}
+
+.config-w600.config-tabs .overlay-container,
+.config-w600 .config-trigger-results {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+.config-w600 #butter-bar {
+  max-width: calc(100vw - 24px);
+}
+
+.config-w600 .reload-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Names above their controls. */
+.config-w480 .overlay-options,
+.config-w480 .trigger-file-options {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.config-w480 .overlay-options > .option-input-container {
+  justify-items: start;
+  padding-top: 0;
+  border-top: none;
+}
+
+.config-w480 .config-range {
+  width: 96px;
+}
+
+.config-w480 .trigger-file-options > .trigger-details {
+  padding-top: 6px;
+  border-top: none;
+}
+
+.config-w480 .config-trigger-browser .trigger-file-container > .overlay-options,
+.config-w480 .config-trigger-browser .trigger-file-options,
+.config-w480 .config-trigger-browser .timeline-edit-container {
+  margin-left: 10px;
+  margin-right: 10px;
+}
+
+/* config.css sets these widths with !important. */
+.config-w480 .timeline-add-container .timeline-add-row-time {
+  width: 56px !important;
+}
+
+.config-w480 .timeline-add-container .timeline-add-row-text {
+  width: 150px !important;
+}
+
+.config-w480 .timeline-add-container .timeline-add-row-duration {
+  width: 40px !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
