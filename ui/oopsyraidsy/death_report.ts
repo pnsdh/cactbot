@@ -48,6 +48,17 @@ const processAbilityLine = (splitLine: string[]) => {
   };
 };
 
+// The last hit marked as killing, as the events can also hold an earlier death's (raised and
+// killed again within the report's window).
+const lastFatal = (events: TrackedEvent[]): TrackedLineEvent | undefined => {
+  for (let i = events.length - 1; i >= 0; i--) {
+    const event = events[i];
+    if (event?.type === 'Ability' && event.fatal === true)
+      return event;
+  }
+  return undefined;
+};
+
 const isDamage = (event: TrackedLineEvent): boolean => {
   const ability = processAbilityLine(event.splitLine);
   return ability.isAttack && ability.amount > 0;
@@ -91,7 +102,7 @@ export class DeathReport {
   public static generateMistake(data: DeathReportData): OopsyMistake {
     // Fork: the hit that took HP to 0 when it landed, if known.  Hits land some time after they
     // are resolved, so the last one resolved before the death may have landed after it.
-    const fatal = data.events.find((event) => event.type === 'Ability' && event.fatal);
+    const fatal = lastFatal(data.events);
 
     // Walk backward through events until we find the last damage or a death reason.
     for (let i = data.events.length - 1; i >= 0; i--) {
@@ -219,6 +230,9 @@ export class DeathReport {
         // If we haven't seen any log lines with hp yet, try to set it as an initial guess.
         currentHp = parsed.currentHp;
         lastCertainHp = parsed.currentHp;
+      } else if (parsed.currentHp === undefined) {
+        // Fork: a line without hp (a missed buff, a death reason, a mistake) keeps the guess for
+        // the next lines (dropping it made the next hit show its own unadjusted hp).
       } else if (parsed.currentHp !== lastCertainHp) {
         // If we see a new hp value, then this is likely valid.
         currentHp = lastCertainHp = parsed.currentHp;

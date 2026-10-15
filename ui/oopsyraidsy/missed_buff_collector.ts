@@ -34,6 +34,11 @@ export class MissedBuffCollector {
   ) {
   }
 
+  // Fork: forgets the buffs being collected; their pending expiry callbacks then do nothing.
+  Reset(): void {
+    this.buffs = {};
+  }
+
   // TODO: call something like this on zone change, etc?
   ExpireBuffsIfNeeded(timestamp: number): void {
     for (const buffList of Object.values(this.buffs)) {

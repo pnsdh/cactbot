@@ -202,6 +202,8 @@ export class PlayerStateTracker {
 
   private Reset(): void {
     // Deliberately do not clear currPartyInfo/combatantPartyInfo here.
+    // Fork: buffs still being collected at a wipe were reported after it (the dead included).
+    this.missedBuffCollector.Reset();
     this.petIdToOwnerId = {};
     this.deadIds.clear();
     this.zeroHpTimes = {};
@@ -331,7 +333,7 @@ export class PlayerStateTracker {
     // on dead non-party members.
     // TODO: maybe oopsy should only report party failures?
     if (IsPlayerId(targetId)) {
-      this.trackedEvents.push({
+      this.TrackEvent({
         timestamp: getTimestamp(splitLine),
         type: 'Ability',
         targetId: targetId,
@@ -385,7 +387,7 @@ export class PlayerStateTracker {
     };
 
     (this.trackedEffectMap[targetId] ??= {})[effectId] = event;
-    this.trackedEvents.push(event);
+    this.TrackEvent(event);
 
     const buff = this.effectIdToBuff[effectId.toUpperCase()];
     if (buff)
@@ -401,7 +403,7 @@ export class PlayerStateTracker {
     if (effectId === undefined)
       return;
 
-    this.trackedEvents.push({
+    this.TrackEvent({
       timestamp: getTimestamp(splitLine),
       type: 'LosesEffect',
       targetId: targetId,
@@ -434,7 +436,7 @@ export class PlayerStateTracker {
     const text = Translate(this.options.DisplayLanguage, reason.text);
     if (text === undefined)
       return;
-    this.trackedEvents.push({
+    this.TrackEvent({
       timestamp: timestamp,
       type: 'DeathReason',
       targetId: targetId,
@@ -449,7 +451,7 @@ export class PlayerStateTracker {
     if (targetId === undefined || !IsPlayerId(targetId))
       return;
 
-    this.trackedEvents.push({
+    this.TrackEvent({
       timestamp: timestamp,
       type: 'Mistake',
       targetId: targetId,
@@ -568,7 +570,7 @@ export class PlayerStateTracker {
     if (targetId === undefined || !this.IsInParty(targetId))
       return;
 
-    this.trackedEvents.push({
+    this.TrackEvent({
       timestamp: getTimestamp(splitLine),
       type: 'HoTDoT',
       targetId: targetId,
@@ -617,7 +619,7 @@ export class PlayerStateTracker {
     // `this.trackedEvents` informs a target in a death report that they were missed by a source.
     if (collected.buff.type === 'heal' || collected.buff.type === 'mitigation') {
       for (const targetId of missedIds) {
-        this.trackedEvents.push({
+        this.TrackEvent({
           timestamp: getTimestamp(collected.splitLine),
           type: 'abilityId' in collected.buff ? 'MissedAbility' : 'MissedEffect',
           targetId: targetId,
@@ -676,6 +678,15 @@ export class PlayerStateTracker {
         tc: `有${missedNames.length}人沒受到 ${collected.buffName}`,
       },
     });
+  }
+
+  // Fork: kept in time order, as some come late (death reasons from delayed triggers, missed
+  // buffs added when their collection ends), so that death reports show them in place.
+  private TrackEvent(event: TrackedEvent): void {
+    let i = this.trackedEvents.length;
+    while (i > 0 && (this.trackedEvents[i - 1]?.timestamp ?? 0) > event.timestamp)
+      i--;
+    this.trackedEvents.splice(i, 0, event);
   }
 
   private PruneTrackedEvents(timestamp: number) {

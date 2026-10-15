@@ -238,7 +238,8 @@ export class DamageTracker {
       inCombat: this.inCombat,
       IsImmune: (targetId?: string) => {
         // 52 = hallowed, 199 = holmgang, 32A = living, 32B = walking, 72C = bolide
-        const invulnIds = ['52', '199', '32A', '32B', '72C'];
+        // Fork: CB7 = undead rebirth (living dead's 7.0 follow-up, HP can't drop below 1)
+        const invulnIds = ['52', '199', '32A', '32B', '72C', 'CB7'];
         if (this.playerStateTracker.HasEffect(targetId, invulnIds))
           return true;
         return false;
@@ -328,6 +329,10 @@ export class DamageTracker {
     this.countedDown = true;
   }
 
+  private CountingDown(): boolean {
+    return this.countdownEngageTime !== undefined && this.lastTimestamp < this.countdownEngageTime;
+  }
+
   private CancelCountdown(): void {
     this.ResetPull();
     this.countdownEngageTime = undefined;
@@ -350,6 +355,10 @@ export class DamageTracker {
     this.ResetPull();
     const engageTime = this.lastTimestamp + seconds * 1000;
     this.countdownEngageTime = engageTime;
+    // Fork: the encounter starts now (its time base at the end of the countdown), so mistakes
+    // during the countdown (e.g. a pre-pull mitigation missing someone) stay with this pull:
+    // starting it at the first hit cleared them from the live list.
+    this.combatState.StartCombat(engageTime);
     this.OnRequestTimestampCallback(engageTime, () => {
       // Cancelled or replaced by another countdown since.
       if (this.countdownEngageTime !== engageTime)
@@ -434,7 +443,9 @@ export class DamageTracker {
       case logDefinitions.GameLog.type:
         if (this.countdownEngageRegex.test(line))
           this.OnEngageLine();
-        if (this.countdownStartRegex.test(line))
+        // Unless already done for this countdown from its Countdown line (which also started
+        // the encounter, see OnCountdown).
+        if (this.countdownStartRegex.test(line) && !this.CountingDown())
           this.ResetPull();
         if (this.countdownCancelRegex.test(line))
           this.CancelCountdown();
@@ -446,6 +457,20 @@ export class DamageTracker {
         break;
       case logDefinitions.CountdownCancel.type:
         this.CancelCountdown();
+        break;
+      case logDefinitions.InCombat.type:
+        // Fork: log replays get no in combat events (live, these come from OverlayPlugin):
+        // without this, pulls without a countdown after a kill merged into one.
+        if (this.logReplayMode) {
+          const fields = logDefinitions.InCombat.fields;
+          this.OnInCombatChangedEvent({
+            type: 'onInCombatChangedEvent',
+            detail: {
+              inACTCombat: splitLine[fields.inACTCombat] === '1',
+              inGameCombat: splitLine[fields.inGameCombat] === '1',
+            },
+          });
+        }
         break;
       case logDefinitions.NetworkEffectResult.type:
         this.OnEffectResult(splitLine);
@@ -653,7 +678,8 @@ export class DamageTracker {
         const ret = ValueOrFunction(trigger.deathReason, matches);
         if (ret !== null && typeof ret === 'object' && !Array.isArray(ret)) {
           if (!isOopsyMistake(ret))
-            this.playerStateTracker.OnDeathReason(timestamp, ret);
+            // Fork: at the time it applies (e.g. when a doom runs out), not when it was seen.
+            this.playerStateTracker.OnDeathReason(timestamp + delaySeconds * 1000, ret);
         }
       }
       if ('run' in trigger)
@@ -837,6 +863,9 @@ export class DamageTracker {
     this.triggers = [];
     // Fork: only this zone's initData (this list used to keep every zone's of the session).
     this.dataInitializers = [];
+    // Fork: also on reloads without a zone change (e.g. a job change), which added the same
+    // sets again.
+    this.playerStateTracker.ClearTriggerSets();
 
     this.ignoreZone = this.options.IgnoreContentTypes.includes(this.contentType) ||
       this.options.IgnoreZoneIds.includes(this.zoneId);
@@ -879,7 +908,9 @@ export class DamageTracker {
         if (this.zoneName.search(Regexes.parse(zoneRegex)) < 0)
           continue;
       } else {
-        return;
+        // Fork: skip only this set (a user file without a zone dropped every set after it).
+        console.error(`Trigger set without zoneId or zoneRegex: ${set.filename ?? '???'}`);
+        continue;
       }
 
       if (this.options.Debug) {
