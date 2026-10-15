@@ -135,17 +135,19 @@
   display: inline-block;
 }
 
-/* Fake bars for helping with move/resize. */
-#timeline-resize-helper {
-  width: 100%;
+/* The helpers are made like the real timeline and alerts so that skins style them the same way;
+   a skin's rules for those must not show them while locked. */
+:root:not(.resize-handle) .resize-helper {
+  display: none !important;
 }
 
-#timeline-resize-helper .resize-helper-bar {
-  border: 1px solid black;
-  padding: 0 0.2em;
-  vertical-align: middle;
-  height: var(--timeline-bar-height, 18px);
-  margin-bottom: 2;
+/* Timer bars for helping with move/resize, as wide as the real timeline. */
+.resize-handle #timeline-container > .resize-helper {
+  display: block;
+}
+
+#timeline-resize-helper {
+  width: 100%;
 }
 
 .timeline-grid {
