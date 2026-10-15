@@ -296,12 +296,12 @@ export class DamageTracker {
     });
   }
 
-  // Training dummies and the like get no EffectResult line: after a while, the first hit
-  // resolved counts as the pull.
-  private CheckPendingPullHits(): void {
+  // Training dummies and the like get no EffectResult line for damage: after a while (or at once
+  // when known to be one), the first hit resolved counts as the pull.
+  private CheckPendingPullHits(now = false): void {
     // The first one in is the first resolved.
     for (const first of this.pendingPullHits.values()) {
-      if (this.lastTimestamp - first.resolved >= kPullHitLandTimeoutMs)
+      if (now || this.lastTimestamp - first.resolved >= kPullHitLandTimeoutMs)
         this.OnPull(first.resolved, first.puller);
       return;
     }
@@ -367,8 +367,16 @@ export class DamageTracker {
           const hit = this.pendingPullHits.get(
             `${splitLine[fields.id] ?? ''}:${splitLine[fields.sequenceId] ?? ''}`,
           );
-          if (hit !== undefined)
-            this.OnPull(this.lastTimestamp, hit.puller);
+          if (hit === undefined)
+            break;
+          // Full HP after the hit: a training dummy, whose hits only get this line when they
+          // apply a status, so it tells nothing about which landed first.
+          const hp = splitLine[fields.currentHp];
+          if (hp !== undefined && hp !== '' && hp === splitLine[fields.maxHp]) {
+            this.CheckPendingPullHits(true);
+            break;
+          }
+          this.OnPull(this.lastTimestamp, hit.puller);
         }
         break;
       case logDefinitions.ChangeZone.type:
