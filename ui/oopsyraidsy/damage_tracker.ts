@@ -81,9 +81,6 @@ const latePullText = {
 // How long to wait for a hit that may be the pull to land (see PullWatch).
 const kPullHitLandTimeoutMs = 3000;
 
-// How much earlier than the time from its Countdown line a countdown can end on screen.
-const kMaxOwnCountdownLeadMs = 1000;
-
 // How far behind the latest line's time a line can be and still not be taken as the time.
 const kMaxTimestampLagMs = 2000;
 
@@ -166,7 +163,7 @@ export class DamageTracker {
   // both are known.
   private engageTime?: number;
   // When the current countdown ends, from its Countdown line.  While set, the engage chat line
-  // only counts when it comes first (see OnEngageLine).
+  // is ignored (see OnEngageLine).
   private countdownEngageTime?: number;
   // The pull (anyone's first hit to land), and the player's own first hit to land, shown too
   // when someone else pulled.
@@ -352,28 +349,19 @@ export class DamageTracker {
     const engageTime = this.lastTimestamp + seconds * 1000;
     this.countdownEngageTime = engageTime;
     this.OnRequestTimestampCallback(engageTime, () => {
-      // Cancelled or replaced by another countdown since, or the engage line came first.
-      if (this.countdownEngageTime !== engageTime || this.engageTime !== undefined)
+      // Cancelled or replaced by another countdown since.
+      if (this.countdownEngageTime !== engageTime)
         return;
       this.OnEngage(engageTime);
     });
   }
 
-  // The engage chat line is shown when the countdown ends on screen, and processed some time
-  // after: the latest line's time then is when it ended at the latest.  It has no milliseconds
-  // of its own.
+  // Only without a Countdown line (e.g. its opcode not yet updated after a patch).  The engage
+  // chat line has no milliseconds of its own: the latest line's time when it is processed is
+  // within ~0.1s of the Countdown line's (measured on logs having both).
   private OnEngageLine(): void {
-    if (this.engageTime !== undefined)
+    if (this.engageTime !== undefined || this.countdownEngageTime !== undefined)
       return;
-    // Without a Countdown line (e.g. its opcode not yet updated after a patch), or before the
-    // time from it: a player's own countdown starts on their screen before the Countdown line
-    // comes back, so it ends ~0.2s (up to ~0.6s) earlier.  Others' end within a few ms of it.
-    const countdownEnd = this.countdownEngageTime;
-    if (countdownEnd !== undefined) {
-      const early = countdownEnd - this.lastTimestamp;
-      if (early <= 0 || early > kMaxOwnCountdownLeadMs)
-        return;
-    }
     this.OnEngage(this.lastTimestamp);
   }
 
