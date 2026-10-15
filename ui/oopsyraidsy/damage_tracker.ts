@@ -84,6 +84,58 @@ const kPullHitLandTimeoutMs = 3000;
 // How far behind the latest line's time a line can be and still not be taken as the time.
 const kMaxTimestampLagMs = 2000;
 
+// Fork: the Damage Down statuses (Status sheet, all named Damage Down).
+const kDamageDownIds = new Set([
+  '3E',
+  'D7',
+  '274',
+  '2B8',
+  '3F8',
+  '442',
+  '82C',
+  '964',
+  '9DA',
+  'B5F',
+  'C5E',
+  'CE8',
+  'F7C',
+  '1112',
+  '1113',
+  '11A2',
+]);
+
+// Fork: Damage Downs given by one ability within this time are one event.
+const kDamageDownWindowMs = 500;
+
+// Fork: by default (no player count option), at least this many getting it at once, with at
+// most this many alive not getting it (e.g. invulnerable or out of range), is someone's failure
+// applied to everyone: the one who failed isn't known.
+const kDamageDownMinGroup = 3;
+const kDamageDownGroupMissing = 1;
+
+// Fork: getting it again from the same ability within this (e.g. every tick) is not repeated.
+const kDamageDownRepeatMs = 5000;
+
+// Fork: for abilities without a name in the log (e.g. _rsv_ names).
+const damageDownText = {
+  en: 'Damage Down',
+  de: 'Schaden -',
+  fr: 'Malus de dégâts',
+  ja: 'ダメージ低下',
+  cn: '伤害降低',
+  ko: '주는 피해량 감소',
+  tc: '傷害降低',
+};
+
+// Fork: Damage Downs that one ability gave around the same time, by player id.
+type DamageDownEvent = {
+  ability: string;
+  time: number;
+  // Party members alive when it was given.
+  alive: number;
+  targets: Map<string, { name: string; blamed: boolean }>;
+};
+
 // Internal trigger id for early pull
 export const earlyPullTriggerId = 'General Early Pull';
 
@@ -176,6 +228,16 @@ export class DamageTracker {
   // logReplayMode - if using oopsy_viewer, we need to handle delays/suppresses differently
   public logReplayMode = false;
   private triggerSuppress: { [triggerId: string]: number } = {};
+  // Fork: Damage Downs from abilities (see OnDamageDown): the ones being gathered by ability id,
+  // when each player last got one (by player and ability id, and by player id), the ability and
+  // status ids this zone's triggers already report, its damageFail ids, and whether the
+  // current line gives one.
+  private damageDowns = new Map<string, DamageDownEvent>();
+  private damageDownLast = new Map<string, number>();
+  private damageDownSkipIds = new Set<string>();
+  private damageDownSkipEffects = new Set<string>();
+  private damageDownFailIds = new Set<string>();
+  private lineGivesDamageDown = false;
   private data: OopsyData;
   private timestampCallbacks: {
     timestamp: number;
@@ -416,6 +478,7 @@ export class DamageTracker {
     const line = e.rawLine;
     const splitLine = e.line;
     const type = splitLine[logDefinitions.None.fields.type];
+    this.lineGivesDamageDown = false;
 
     // Fork: except leaving the zone, which log replays only know from this line.
     if (this.ignoreZone && type !== logDefinitions.ChangeZone.type)
@@ -499,6 +562,7 @@ export class DamageTracker {
       case logDefinitions.Ability.type:
       case logDefinitions.NetworkAOEAbility.type:
         this.OnAbilityEvent(line, splitLine);
+        this.OnDamageDown(splitLine);
         this.playerStateTracker.OnAbility(line, splitLine);
         break;
       case logDefinitions.WasDefeated.type:
@@ -585,6 +649,156 @@ export class DamageTracker {
     }
     if (forMe && IsPlayerId(matches.sourceId) && matches.source === this.me)
       this.myPull.Add(key, this.me, this.lastTimestamp);
+  }
+
+  // Fork: an enemy ability giving a player Damage Down means they failed something (stood in
+  // it, or did a mechanic wrong), unless many got it from it at once: then someone's failure
+  // gave it to everyone, and it isn't theirs.  Hits that give it are this rule's alone, also
+  // for abilities in damageWarn/damageFail (those only report hits without it), so the same
+  // mistake counts the same everywhere.  Abilities that this zone's share, solo or own
+  // triggers report, and statuses that its gainsEffect lists report, are left to them.
+  private OnDamageDown(splitLine: string[]): void {
+    if (!this.options.DamageDownMistakes)
+      return;
+    const fields = logDefinitions.Ability.fields;
+    const id = splitLine[fields.id] ?? '';
+    const targetId = splitLine[fields.targetId] ?? '';
+    if (
+      IsPlayerId(splitLine[fields.sourceId]) || !IsPlayerId(targetId) ||
+      this.damageDownSkipIds.has(id)
+    )
+      return;
+
+    // Effect type 0E: the target gains the status in the value's high 16 bits.  14: it was
+    // given but didn't take (e.g. invulnerable): not blamed, but counted as getting it.
+    let gives: boolean | undefined;
+    for (let i = fields.flags; i < fields.targetCurrentHp; i += 2) {
+      const effectType = parseInt(splitLine[i] ?? '', 16) & 0xFF;
+      if (effectType !== 0x0E && effectType !== 0x14)
+        continue;
+      const effectId = (parseInt(splitLine[i + 1] ?? '', 16) >>> 16).toString(16).toUpperCase();
+      if (kDamageDownIds.has(effectId) && !this.damageDownSkipEffects.has(effectId))
+        gives = gives === true || effectType === 0x0E;
+    }
+    if (gives === undefined)
+      return;
+    this.lineGivesDamageDown = true;
+
+    let event = this.damageDowns.get(id);
+    if (!event) {
+      const ability = splitLine[fields.ability] ?? '';
+      const newEvent = {
+        ability: ability.startsWith('_rsv_') || ability.startsWith('unknown_')
+          ? Translate(this.options.DisplayLanguage, damageDownText) ?? ''
+          : ability,
+        time: this.lastTimestamp,
+        alive: this.playerStateTracker.AliveCount(),
+        targets: new Map<string, { name: string; blamed: boolean }>(),
+      };
+      this.damageDowns.set(id, newEvent);
+      this.OnRequestTimestampCallback(
+        this.lastTimestamp + kDamageDownWindowMs,
+        () => this.ReportDamageDowns(id, newEvent),
+      );
+      event = newEvent;
+    }
+    const blamed = event.targets.get(targetId)?.blamed === true || gives;
+    event.targets.set(targetId, { name: splitLine[fields.target] ?? '', blamed: blamed });
+  }
+
+  private ReportDamageDowns(
+    id: string,
+    event: DamageDownEvent,
+  ): void {
+    if (this.damageDowns.get(id) === event)
+      this.damageDowns.delete(id);
+    // Someone's failure applied to everyone (see kDamageDownMinGroup), or to more players than
+    // the option's when set: shown once, on nobody.  Not shown at all when only the one or two
+    // left alive got it.
+    const count = event.targets.size;
+    const maxPlayers = this.options.DamageDownMaxPlayers;
+    const known = event.alive > 0;
+    const group = maxPlayers > 0
+      ? count > maxPlayers
+      : known && count >= kDamageDownMinGroup && count >= event.alive - kDamageDownGroupMissing;
+    if (!group && known && count >= event.alive)
+      return;
+    if (group) {
+      const key = `group:${id}`;
+      const last = this.damageDownLast.get(key);
+      this.damageDownLast.set(key, event.time);
+      if (last !== undefined && event.time - last < kDamageDownRepeatMs)
+        return;
+      this.playerStateTracker.OnMistakeObj(event.time, {
+        type: 'fail',
+        text: {
+          en: `${event.ability} (${count} players)`,
+          de: `${event.ability} (${count} Spieler)`,
+          fr: `${event.ability} (${count} joueurs)`,
+          ja: `${event.ability} (${count}人)`,
+          cn: `${event.ability} (${count}人)`,
+          ko: `${event.ability} (${count}명)`,
+          tc: `${event.ability} (${count}人)`,
+        },
+      });
+      return;
+    }
+    for (const [targetId, target] of event.targets) {
+      const key = `${targetId}:${id}`;
+      const last = this.damageDownLast.get(key);
+      this.damageDownLast.set(key, event.time);
+      if (!target.blamed || last !== undefined && event.time - last < kDamageDownRepeatMs)
+        continue;
+      // Once for several abilities giving it at the same moment (e.g. overlapping towers).
+      const lastAny = this.damageDownLast.get(targetId);
+      if (lastAny !== undefined && event.time - lastAny < kDamageDownWindowMs)
+        continue;
+      this.damageDownLast.set(targetId, event.time);
+      this.playerStateTracker.OnMistakeObj(event.time, {
+        // As the zone's triggers have it, for abilities in its damageFail.
+        type: this.damageDownFailIds.has(id) ? 'fail' : 'warn',
+        blame: target.name,
+        reportId: targetId,
+        triggerType: 'Damage',
+        text: event.ability,
+      });
+    }
+  }
+
+  // Fork: the ability and status ids that a trigger set reports itself, and its damageFail ids
+  // (see OnDamageDown).
+  private SkipDamageDowns(set: ProcessedOopsyTriggerSet): void {
+    for (const id of Object.values(set.damageFail ?? {}))
+      this.damageDownFailIds.add(id);
+    const maps = [
+      set.shareWarn,
+      set.shareFail,
+      set.soloWarn,
+      set.soloFail,
+    ];
+    for (const map of maps) {
+      for (const id of Object.values(map ?? {}))
+        this.damageDownSkipIds.add(id);
+    }
+    for (const map of [set.gainsEffectWarn, set.gainsEffectFail]) {
+      for (const id of Object.values(map ?? {}))
+        this.damageDownSkipEffects.add(id);
+    }
+    for (const trigger of set.triggers ?? []) {
+      // Loose triggers are typed as 'None'.
+      const type: string | undefined = trigger.type;
+      if (type !== 'Ability' || !trigger.netRegex)
+        continue;
+      const regexes: (RegExp | string)[] = Array.isArray(trigger.netRegex)
+        ? trigger.netRegex
+        : [trigger.netRegex];
+      for (const regex of regexes) {
+        const source = typeof regex === 'string' ? regex : regex.source;
+        const ids = /\(\?<id>([^)]*)\)/.exec(source)?.[1] ?? '';
+        for (const id of ids.match(/[0-9A-F]{2,}/g) ?? [])
+          this.damageDownSkipIds.add(id);
+      }
+    }
   }
 
   OnStartEncounter(timestamp: number): void {
@@ -759,6 +973,9 @@ export class DamageTracker {
         type: 'Ability',
         netRegex: NetRegexes.ability({ id: id, ...playerDamageFields }),
         mistake: (_data, matches) => {
+          // Fork: a hit giving Damage Down is OnDamageDown's (run for this line already).
+          if (this.lineGivesDamageDown)
+            return;
           return {
             type: type,
             blame: matches.target,
@@ -866,6 +1083,11 @@ export class DamageTracker {
     // Fork: also on reloads without a zone change (e.g. a job change), which added the same
     // sets again.
     this.playerStateTracker.ClearTriggerSets();
+    this.damageDowns.clear();
+    this.damageDownLast.clear();
+    this.damageDownSkipIds.clear();
+    this.damageDownSkipEffects.clear();
+    this.damageDownFailIds.clear();
 
     this.ignoreZone = this.options.IgnoreContentTypes.includes(this.contentType) ||
       this.options.IgnoreZoneIds.includes(this.zoneId);
@@ -940,6 +1162,7 @@ export class DamageTracker {
 
       for (const trigger of set.triggers ?? [])
         this.ProcessTrigger(trigger, set);
+      this.SkipDamageDowns(set);
 
       this.playerStateTracker.PushTriggerSet(set);
     }

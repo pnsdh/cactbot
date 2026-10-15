@@ -60,8 +60,9 @@ const triggerSet: OopsyTriggerSet<Data> = {
     // Fork: 9D17 Refulgent Fate tether break is a trigger below: every tether source hits
     // everyone (up to ~40 hits on players per break).
   },
+  // Fork: no Damage Down (B5F) here: oopsy reports it from the ability that gives it (only to
+  // the one or two who got it, not to everyone when someone's failure gave it to all).
   gainsEffectWarn: {
-    'FRU Damage Down': 'B5F',
     'FRU Bleeding': 'C05', // standing in the puddle.
     'FRU Doom': '9D4',
   },

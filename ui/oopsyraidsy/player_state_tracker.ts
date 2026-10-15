@@ -413,6 +413,16 @@ export class PlayerStateTracker {
     delete this.trackedEffectMap[targetId]?.[effectId];
   }
 
+  // Fork: how many party members are alive (0 if the party isn't known).
+  AliveCount(): number {
+    let count = 0;
+    for (const id of this.partyIds) {
+      if (!this.deadIds.has(id))
+        count++;
+    }
+    return count;
+  }
+
   HasEffect(targetId: string | undefined, effectId: string | string[] | undefined): boolean {
     if (targetId === undefined || effectId === undefined)
       return false;
