@@ -78,10 +78,6 @@ const t = {
       '<p>타임라인은 전투 진행(보스 패턴 등)에 따라 구간 사이를 건너뛰므로, 시간은 전투 경과 시간이 아니라 타임라인 파일 안의 위치(초)입니다.</p><p>구간 목록이나 ‹ › 버튼으로 다른 구간으로 이동할 수 있습니다.</p><p>문구 칸에서 ↑ ↓와 Enter로 위아래 항목으로 옮겨 가고, Esc로 고치기 전으로 되돌립니다.</p>',
   },
   start: { en: 'Start', ko: '시작' },
-  dupNote: {
-    en: 'Entry ${i} of ${n} with this name.',
-    ko: '같은 이름 ${n}개 중 ${i}번째입니다.',
-  },
   twin: {
     en: 'Another entry has this time and name, so edits apply to both.',
     ko: '같은 시각에 같은 이름의 항목이 하나 더 있어 편집이 함께 적용됩니다.',
@@ -326,7 +322,14 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
   };
 
   // Kept as the entries are rebuilt.
-  const filters = { query: '', onlyEdited: false };
+  const kChangedStorageKey = 'cactbot-config-timeline-changed';
+  let onlyEdited = false;
+  try {
+    onlyEdited = window.localStorage.getItem(kChangedStorageKey) === '1';
+  } catch {
+    // Off then.
+  }
+  const filters = { query: '', onlyEdited: onlyEdited };
   let layer: Layer = '';
   try {
     layer = window.localStorage.getItem(kLayerStorageKey) ?? '';
@@ -757,12 +760,6 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
         notes.push({ text: format(t.renamed, { text: baseText(e) }), warn: false });
       if (hiddenByName(e))
         notes.push({ text: tr(t.hiddenByName), warn: true });
-      const same = isAdded(e) ? [] : sameName.get(e.name) ?? [];
-      if (same.length > 1)
-        notes.push({
-          text: format(t.dupNote, { i: same.indexOf(e) + 1, n: same.length }),
-          warn: false,
-        });
       if (hasTwin(e))
         notes.push({ text: tr(t.twin), warn: false });
       if (isJob && !isOwnAdded(e) && !isEmpty(edit(e)))
@@ -988,7 +985,11 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
           current = mine.highlight === kNoHighlight ? '' : highlightId(mine.highlight);
         for (const { button, value } of picks)
           button.classList.toggle('config-active', value === current);
-        pickName.textContent = highlightName(effective(e));
+        // The chosen color's name (the "none" chip says itself).
+        const chosen = effective(e);
+        pickName.textContent = chosen.highlight === undefined || chosen.highlight === kNoHighlight
+          ? ''
+          : highlightName(chosen);
       };
       const pick = (button: HTMLButtonElement, value: string | undefined) => {
         button.onclick = () => {
@@ -1022,6 +1023,12 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
         swatch.style.backgroundColor = p.color;
         swatch.title = colorName(p);
         swatch.setAttribute('aria-label', colorName(p));
+        // Its name while pointed at, as the colors have no text of their own.
+        const preview = () => pickName.textContent = colorName(p);
+        swatch.addEventListener('mouseenter', preview);
+        swatch.addEventListener('focus', preview);
+        swatch.addEventListener('mouseleave', show);
+        swatch.addEventListener('blur', show);
         pick(swatch, p.id);
       }
       pop.appendChild(pickName);
@@ -1256,6 +1263,11 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
     };
     editedOnly.onclick = () => {
       filters.onlyEdited = !filters.onlyEdited;
+      try {
+        window.localStorage.setItem(kChangedStorageKey, filters.onlyEdited ? '1' : '0');
+      } catch {
+        // Only this page then.
+      }
       editedOnly.classList.toggle('config-active', filters.onlyEdited);
       editedOnly.setAttribute('aria-checked', filters.onlyEdited ? 'true' : 'false');
       filter();
