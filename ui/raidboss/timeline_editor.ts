@@ -904,6 +904,10 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
     const updateCount = () => {
       const n = events.filter(isEdited).length;
       count.textContent = n > 0 ? n.toString() : '';
+      // The edited layer's count in its list too.
+      const option = [...layerSelect.options].find((o) => o.value === layer);
+      if (option !== undefined)
+        option.text = withCount(layer);
     };
     updateCount();
 

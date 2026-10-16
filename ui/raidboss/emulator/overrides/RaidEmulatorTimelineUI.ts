@@ -3,6 +3,7 @@ import { LooseTimelineTrigger } from '../../../../types/trigger';
 import { PopupText } from '../../popup-text';
 import { RaidbossOptions } from '../../raidboss_options';
 import { TimelineUI } from '../../timeline';
+import { highlightColor } from '../../timeline_entries';
 import { Event } from '../../timeline_parser';
 import RaidEmulator from '../data/RaidEmulator';
 
@@ -154,6 +155,13 @@ export default class RaidEmulatorTimelineUI extends TimelineUI {
     };
 
     bar.forceRemoveAt = bar.start + bar.duration;
+
+    // Fork: a highlighted entry (see timeline_entries.ts) in its color.
+    const highlight = highlightColor(e.highlight, e.highlightColor);
+    if (highlight !== undefined) {
+      $progBar.style.backgroundColor = highlight;
+      $progLeft.style.fontWeight = 'bold';
+    }
 
     if (this.options.KeepExpiredTimerBarsForSeconds)
       bar.forceRemoveAt += this.options.KeepExpiredTimerBarsForSeconds * 1000;

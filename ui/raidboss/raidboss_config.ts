@@ -834,8 +834,10 @@ class RaidbossConfigurator {
       );
       const comment = trig.comment?.[this.base.lang] ?? trig.comment?.en ?? '';
       // What it says: its output, or else (with output strings) the first of them.
+      // With output strings, its color only when it says them in one way.
+      const fields = severities.filter((s) => `${s}Text` in trig);
       const severity = severities.find((s) => trig.configOutput?.[`${s}Text`] !== undefined) ??
-        severities.find((s) => `${s}Text` in trig);
+        (fields.length === 1 ? fields[0] : undefined);
       const said = severity !== undefined ? trig.configOutput?.[`${severity}Text`] : outputs[0];
       triggers.push({
         id: trigId,
