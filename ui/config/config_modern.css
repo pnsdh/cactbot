@@ -468,7 +468,7 @@ html:not(.config-classic) {
   justify-items: end;
 }
 
-/* Flex rather than config.css's grid, so the changed mark sits after the name. */
+/* Text rather than config.css's grid: its ⓘ follows its last word (see below). */
 :root:not(.config-classic) .option-name {
   display: block;
   font-weight: 560;
@@ -496,7 +496,8 @@ html:not(.config-classic) {
   max-width: 100%;
 }
 
-/* Narrowing, the default's button goes first (down to its icon), then the list. */
+/* Narrowing, lists and boxes give way (the default's button is short, its value in its tooltip;
+   in narrow windows only its icon). */
 :root:not(.config-classic) .option-input-container .config-ctl > select,
 :root:not(.config-classic) .option-input-container .config-ctl > input[type="text"].input-string-field {
   flex: 0 1 300px;
@@ -581,6 +582,10 @@ html:not(.config-classic) {
 :root:not(.config-classic) .config-range {
   width: 120px;
   margin: 0;
+
+  /* A slider gives way too, next to its box and the default's button. */
+  flex: 0 1 120px;
+  min-width: 56px;
   accent-color: var(--cfg-accent);
   cursor: pointer;
 }
@@ -1466,6 +1471,12 @@ html:not(.config-classic) {
   visibility: visible;
   transform: none;
   transition: opacity 140ms, transform 140ms;
+}
+
+/* A name or a value only (setTip): nothing to point at in it, and it often lies over the next
+   row's buttons, which stay usable. */
+:root:not(.config-classic) .config-tooltip.config-tooltip-plain {
+  pointer-events: none;
 }
 
 :root:not(.config-classic) .config-tooltip p {

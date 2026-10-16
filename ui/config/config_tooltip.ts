@@ -79,6 +79,7 @@ const show = (target: HTMLElement): void => {
     return;
   const tip = getBox();
   tip.innerHTML = html;
+  tip.classList.toggle('config-tooltip-plain', !contents.has(target));
   owner = target;
   tip.classList.add('config-tooltip-shown');
   place(target, tip);
@@ -110,6 +111,12 @@ const openFor = (target: HTMLElement): void => {
 // `text` is plain text; an empty one shows nothing.
 export const setTip = (target: HTMLElement, text: string): void => {
   target.setAttribute(kTipAttribute, text);
+  if (owner === target && box !== undefined) {
+    if (text === '')
+      hide();
+    else
+      box.innerHTML = escapeText(text);
+  }
 };
 
 const tipOf = (node: EventTarget | null): HTMLElement | undefined => {
@@ -132,7 +139,7 @@ export const setTooltip = (target: HTMLElement, content: Content): void => {
   target.addEventListener('blur', scheduleHide);
 };
 
-// Scrolling or clicking elsewhere closes it; Escape too.
+// Scrolling closes it; Escape too.
 if (typeof document !== 'undefined') {
   const enter = (e: Event) => {
     const target = tipOf(e.target);
