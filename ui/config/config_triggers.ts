@@ -1,7 +1,7 @@
 import { SavedConfigEntry } from '../../types/event';
 import { LocaleText } from '../../types/trigger';
 
-import { setDefault } from './config_dirty';
+import { DefaultValue, setDefault } from './config_dirty';
 import { addTooltipsIn } from './config_rows';
 
 // Fork: a browser over the trigger lists that raidboss_config.ts and oopsyraidsy_config.ts build
@@ -29,7 +29,7 @@ export type TriggerFile = {
 };
 
 // A saved config path, and the default its value is compared with (without one, see isChange).
-export type FileSetting = { path: string[]; default?: string };
+export type FileSetting = { path: string[]; default?: DefaultValue };
 
 type Context = {
   translate: (text: LocaleText) => string;
@@ -114,7 +114,9 @@ const changedCount = (file: TriggerFile): number =>
   file.triggers.filter((t) => isChange(context.readSaved(file.group, ['triggers', t.id]))).length +
   file.settings.filter((s) => {
     const saved = context.readSaved(file.group, s.path);
-    return s.default !== undefined ? differs(saved, s.default) : isChange(saved);
+    if (s.default === undefined)
+      return isChange(saved);
+    return differs(saved, typeof s.default === 'function' ? s.default() : s.default);
   }).length;
 
 const format = (text: LocaleText, n: number): string =>

@@ -8,10 +8,11 @@ import { SavedConfig, SavedConfigEntry } from '../../types/event';
 const kBaselineStorageKey = 'cactbot-config-baseline';
 
 // Defaults of top level options (group/id) and of a fight's own settings (group/path), from
-// config_rows.ts and config_triggers.ts.
-const defaults = new Map<string, string>();
+// config_rows.ts and config_triggers.ts.  A function for a default that follows another option.
+export type DefaultValue = string | (() => string);
+const defaults = new Map<string, DefaultValue>();
 
-export const setDefault = (group: string, path: string[], value: string): void => {
+export const setDefault = (group: string, path: string[], value: DefaultValue): void => {
   defaults.set([group, ...path].join('/'), value);
 };
 
@@ -31,7 +32,8 @@ const sameValue = (value: string, def: string): boolean => {
 const isDefault = (group: string, path: string[], value: SavedConfigEntry): boolean => {
   if (value === '')
     return true;
-  const def = defaults.get([group, ...path].join('/'));
+  const known = defaults.get([group, ...path].join('/'));
+  const def = typeof known === 'function' ? known() : known;
   if (def !== undefined && typeof value !== 'object')
     return sameValue(value.toString(), def);
   // A trigger's own output setting.

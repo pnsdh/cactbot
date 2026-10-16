@@ -786,11 +786,13 @@ class RaidbossConfigurator {
     if (setId !== undefined) {
       settings.push({
         path: [kOptionKeys.triggerSets, setId, kOptionKeys.output],
-        default: this.base.getStringOption(
-          'raidboss',
-          defaultAlertOutput.id,
-          defaultAlertOutput.default.toString(),
-        ),
+        // The general alert output as it is now.
+        default: () =>
+          this.base.getStringOption(
+            'raidboss',
+            defaultAlertOutput.id,
+            defaultAlertOutput.default.toString(),
+          ),
       });
       for (const opt of info.triggerSet.config ?? []) {
         settings.push({
@@ -2604,8 +2606,10 @@ const templateOptions: OptionsTemplate = {
         ko: '전체 소리 크기',
       },
       comment: {
-        en: 'Multiplies the volumes below: at 100% each sound plays at its own volume.',
-        ko: '아래 소리 크기들에 곱해지는 배율입니다. 100%면 각 소리가 정해진 크기 그대로 납니다.',
+        en:
+          'Multiplies the volumes below: at 100% each sound plays at its own volume. Sounds only: text to speech is as loud as set in ACT (its sound options, or a TTS plugin).',
+        ko:
+          '아래 소리 크기들에 곱해지는 배율입니다. 100%면 각 소리가 정해진 크기 그대로 납니다. 효과음에만 적용되고, TTS 음성 크기는 ACT의 사운드 설정(또는 TTS 플러그인)에서 정합니다.',
       },
       type: 'float',
       default: 1,
