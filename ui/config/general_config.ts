@@ -141,7 +141,7 @@ UserConfig.registerOptions('general', {
         },
         ko: {
           '새 디자인': 'modern',
-          '예전 cactbot 화면': 'classic',
+          '기존 cactbot 화면': 'classic',
         },
       },
       default: 'modern',

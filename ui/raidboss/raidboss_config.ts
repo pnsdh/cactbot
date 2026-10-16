@@ -772,6 +772,9 @@ class RaidbossConfigurator {
         continue;
       }
 
+      // Fork: the rest of this loop, making the file's trigger rows, is in buildTriggerRows, run
+      // when the file is first opened.  Upstream code added at the end of this loop belongs there
+      // (or here, if it mustn't wait for the rows).
       buildTriggers = () => this.buildTriggerRows(key, info, triggerOptions);
     }
     buildTriggerBrowser('raidboss', container);

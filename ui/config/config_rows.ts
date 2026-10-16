@@ -158,7 +158,6 @@ const kDescLinks = ['Coverage'];
 
 const kOtherTitle: LocaleText = { en: 'Other', ko: '기타' };
 const kTriggersTitle: LocaleText = { en: 'Triggers', ko: '트리거' };
-const kResetTitle: LocaleText = { en: 'Reset to the default', ko: '기본값으로 되돌리기' };
 const kDefault: LocaleText = { en: 'Default', ko: '기본값' };
 const kOn: LocaleText = { en: 'on', ko: '켜짐' };
 const kOff: LocaleText = { en: 'off', ko: '꺼짐' };
@@ -527,7 +526,6 @@ const addReset = (
   const reset = document.createElement('button');
   reset.type = 'button';
   reset.classList.add('config-reset');
-  reset.title = translate(kResetTitle);
   const shownDefault = describeDefault(id, type, defaultValue, control, translate);
   const label = document.createElement('span');
   label.textContent = shownDefault !== ''

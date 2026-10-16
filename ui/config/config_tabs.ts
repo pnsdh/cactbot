@@ -48,7 +48,7 @@ const kSections: { [group: string]: SectionText } = {
     tag: 'FIELD OPERATIONS',
     desc: {
       en: 'Notorious monster tracking in field operations such as Eureka.',
-      ko: '에우레카 같은 특수 필드 탐색의 마물 알림 설정입니다.',
+      ko: '에우레카 같은 특수 필드 임무의 마물 알림 설정입니다.',
     },
   },
   oopsyraidsy: {

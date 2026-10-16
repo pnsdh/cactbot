@@ -45,6 +45,7 @@ const kChangedOnly: LocaleText = { en: 'Changed only', ko: '변경한 것만' };
 const kTriggerCount: LocaleText = { en: '${n} triggers', ko: '트리거 ${n}' };
 const kChangedCount: LocaleText = { en: '${n} changed', ko: '변경 ${n}' };
 const kNoFiles: LocaleText = { en: 'Nothing to show.', ko: '표시할 전투가 없습니다.' };
+const kNoChanged: LocaleText = { en: 'No fight has changes.', ko: '변경한 전투가 없습니다.' };
 const kUserFiles: LocaleText = { en: 'User files', ko: '사용자 파일' };
 const kContentType: LocaleText = { en: 'Content', ko: '콘텐츠' };
 const kOtherType: LocaleText = { en: 'Other', ko: '기타' };
@@ -386,6 +387,7 @@ export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void 
     }
     changedToggle.classList.toggle('config-active', changedOnly);
     changedToggle.setAttribute('aria-checked', changedOnly ? 'true' : 'false');
+    empty.textContent = context.translate(changedOnly ? kNoChanged : kNoFiles);
     empty.classList.toggle('config-hidden', shown > 0);
   };
 
