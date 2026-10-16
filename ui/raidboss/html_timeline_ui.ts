@@ -149,47 +149,31 @@ export class HTMLTimelineUI extends TimelineUI {
   }
 
   protected override AddDebugInstructions(): void {
-    // Helper for positioning/resizing when unlocked.
+    const lang = this.lang in timelineInstructions ? this.lang : 'en';
+    const instructions = timelineInstructions[lang];
+
+    // Helper for positioning/resizing when locked.
     const helper = document.getElementById('timeline-resize-helper');
-    if (helper) {
-      // The language (and skin) classes are needed for the helper's size before any timeline
-      // loads too.
-      const root = document.getElementById('timeline-container');
-      if (root) {
-        root.classList.add(`lang-${this.lang}`);
-        root.lang = langToLocale(this.lang);
-        if (this.options.Skin !== undefined)
-          root.classList.add(`skin-${this.options.Skin}`);
-      }
-      helper.style.gridTemplateRows = `repeat(${this.options.MaxNumberOfTimerBars}, min-content)`;
-      if (this.options.ReverseTimeline)
-        helper.classList.add('reversed');
-      // Built only while unlocked, as timer bars draw every frame, and not for a hidden timeline.
-      const isUnlocked = () =>
-        document.documentElement.classList.contains('resize-handle') &&
-        this.options.TimelineEnabled;
-      const update = () => this.ShowResizeHelper(helper, isUnlocked());
-      new MutationObserver(update).observe(document.documentElement, {
-        attributes: true,
-        attributeFilter: ['class'],
-      });
-      // The skin's and user's style sheets come after this (user_config.ts handleSkin): built
-      // again once each loads, as bars read some of their style only when made.
-      new MutationObserver((records) => {
-        for (const record of records) {
-          for (const node of record.addedNodes) {
-            if (!(node instanceof HTMLLinkElement))
-              continue;
-            node.addEventListener('load', () => {
-              if (this.resizeHelperTimer === undefined)
-                return;
-              this.ShowResizeHelper(helper, false);
-              update();
-            });
-          }
-        }
-      }).observe(document.head, { childList: true });
-      update();
+    if (!helper)
+      return;
+    // Fork: a helper of real timer bars instead (see SetUpResizeHelper).
+    if (this.SetUpResizeHelper(helper))
+      return;
+    const rows = Math.max(6, this.options.MaxNumberOfTimerBars);
+    helper.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+
+    for (let i = 0; i < this.options.MaxNumberOfTimerBars; ++i) {
+      const helperBar = document.createElement('div');
+      helperBar.classList.add('text');
+      helperBar.classList.add('resize-helper-bar');
+      helperBar.classList.add('timeline-bar-color');
+      if (i < 1)
+        helperBar.classList.add('soon');
+      if (i < instructions.length)
+        helperBar.innerText = instructions[i] ?? '';
+      else
+        helperBar.innerText = `${i + 1}`;
+      helper.appendChild(helperBar);
     }
 
     // For simplicity in code, always make debugElement valid,
@@ -197,6 +181,56 @@ export class HTMLTimelineUI extends TimelineUI {
     this.debugElement = document.getElementById('timeline-debug');
     if (!this.debugElement)
       this.debugElement = document.createElement('div');
+  }
+
+  // Fork: the helper for positioning/resizing when unlocked, of real timer bars (see
+  // ShowResizeHelper).  True when set up (then AddDebugInstructions is done).
+  private SetUpResizeHelper(helper: HTMLElement): boolean {
+    // The language (and skin) classes are needed for the helper's size before any timeline
+    // loads too.
+    const root = document.getElementById('timeline-container');
+    if (root) {
+      root.classList.add(`lang-${this.lang}`);
+      root.lang = langToLocale(this.lang);
+      if (this.options.Skin !== undefined)
+        root.classList.add(`skin-${this.options.Skin}`);
+    }
+    helper.style.gridTemplateRows = `repeat(${this.options.MaxNumberOfTimerBars}, min-content)`;
+    if (this.options.ReverseTimeline)
+      helper.classList.add('reversed');
+    // Built only while unlocked, as timer bars draw every frame, and not for a hidden timeline.
+    const isUnlocked = () =>
+      document.documentElement.classList.contains('resize-handle') &&
+      this.options.TimelineEnabled;
+    const update = () => this.ShowResizeHelper(helper, isUnlocked());
+    new MutationObserver(update).observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class'],
+    });
+    // The skin's and user's style sheets come after this (user_config.ts handleSkin): built
+    // again once each loads, as bars read some of their style only when made.
+    new MutationObserver((records) => {
+      for (const record of records) {
+        for (const node of record.addedNodes) {
+          if (!(node instanceof HTMLLinkElement))
+            continue;
+          node.addEventListener('load', () => {
+            if (this.resizeHelperTimer === undefined)
+              return;
+            this.ShowResizeHelper(helper, false);
+            update();
+          });
+        }
+      }
+    }).observe(document.head, { childList: true });
+    update();
+
+    // For simplicity in code, always make debugElement valid,
+    // however it does not exist in the raid emulator.
+    this.debugElement = document.getElementById('timeline-debug');
+    if (!this.debugElement)
+      this.debugElement = document.createElement('div');
+    return true;
   }
 
   // Fork: the helper is made of real timer bars counting down in a loop, so it shows the skin's
