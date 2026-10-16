@@ -148,17 +148,29 @@ const settingChanged = (file: TriggerFile, setting: FileSetting): boolean => {
 const changedTriggers = (file: TriggerFile): number =>
   file.triggers.filter((t) => isChange(context.readSaved(file.group, ['triggers', t.id]))).length;
 
-// What a page's tab has changed: timeline edits, or the set's options.
+const timelineOf = (file: TriggerFile): TimelineInfo | undefined => {
+  const container = file.container.querySelector<HTMLElement>(
+    ':scope > .timeline-edit-container:not(.config-trigger-group)',
+  );
+  return container !== null ? timelines.get(container) : undefined;
+};
+
+// What a page's tab has changed: each timeline edit (or, without a count of them, whether there
+// are any), or the set's options.
 const changedIn = (file: TriggerFile, tab: PageTab): number => {
   if (tab === 'triggers')
     return changedTriggers(file);
+  const timeline = tab === 'timeline' ? timelineOf(file) : undefined;
+  if (timeline !== undefined)
+    return timeline.edits();
   return file.settings.filter((s) =>
     (s.path[0] === 'timeline') === (tab === 'timeline') && settingChanged(file, s)
   ).length;
 };
 
+// A card's count, as its page's tabs add up.
 const changedCount = (file: TriggerFile): number =>
-  changedTriggers(file) + file.settings.filter((s) => settingChanged(file, s)).length;
+  changedIn(file, 'options') + changedIn(file, 'triggers') + changedIn(file, 'timeline');
 
 const format = (text: LocaleText, n: number): string =>
   context.translate(text).replace('${n}', n.toLocaleString());
@@ -784,9 +796,7 @@ export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void 
           n.textContent = size.toLocaleString();
           button.appendChild(n);
         }
-        const changed = tab === 'timeline' && timelineInfo !== undefined
-          ? timelineInfo.edits()
-          : changedIn(file, tab);
+        const changed = changedIn(file, tab);
         if (changed > 0) {
           const mark = document.createElement('span');
           mark.classList.add('config-page-tab-changed');
