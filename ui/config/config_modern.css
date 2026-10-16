@@ -1,0 +1,1782 @@
+/*
+ * Fork: the config page's look, over config.css.  Dark by default (html[data-theme], see
+ * config_tabs.ts).  Upstream OverlayPlugin draws this page with Chromium 95, so nothing here needs
+ * a newer browser to look right.  Every rule starts with :root:not(.config-classic) (or adds
+ * :not(.config-classic) to a class on html), so the original page (the config page style option)
+ * is left as it was.
+ */
+
+/* Rules follow the page from top to bottom rather than by specificity. */
+/* stylelint-disable no-descending-specificity */
+
+@font-face {
+  font-family: "Pretendard Variable";
+  font-weight: 45 920;
+  font-display: block;
+  src: url("../raidboss/skins/cbkr/PretendardVariable.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "cbkr Oxanium";
+  font-weight: 200 800;
+  font-display: block;
+  src: url("../raidboss/skins/cbkr/Oxanium-latin.woff2") format("woff2");
+}
+
+:root:not(.config-classic) {
+  --cfg-font: "Pretendard Variable", "Pretendard", "Malgun Gothic", sans-serif;
+  --cfg-font-accent: "cbkr Oxanium", "Pretendard Variable", sans-serif;
+  --cfg-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --cfg-bg: #0e1014;
+  --cfg-bar: #12151b;
+  --cfg-surface: #171a21;
+  --cfg-surface-2: #1d212a;
+  --cfg-hover: #232835;
+  --cfg-line: rgb(255 255 255 / 7%);
+  --cfg-line-strong: rgb(255 255 255 / 13%);
+  --cfg-scroll: rgb(255 255 255 / 30%);
+  --cfg-scroll-hover: rgb(255 255 255 / 46%);
+  --cfg-scroll-track: rgb(255 255 255 / 4%);
+  --cfg-text: #e9edf5;
+  --cfg-muted: #8b93a6;
+  --cfg-faint: #5d6476;
+  --cfg-accent: #8aa6ff;
+  --cfg-accent-bg: rgb(138 166 255 / 16%);
+  --cfg-accent-ink: #0e1014;
+  --cfg-knob: #fff;
+  --cfg-knob-on: #10131a;
+  --cfg-info: #74e8bd;
+  --cfg-alert: #fdd166;
+  --cfg-alarm: #ff7a7a;
+  --cfg-warn-bg: rgb(253 209 102 / 10%);
+  --cfg-shadow: 0 10px 30px rgb(0 0 0 / 35%);
+
+  color-scheme: dark;
+}
+
+:root:not(.config-classic)[data-theme="light"] {
+  --cfg-bg: #f4f5f8;
+  --cfg-bar: #eceef3;
+  --cfg-surface: #fff;
+  --cfg-surface-2: #f7f8fb;
+  --cfg-hover: #eef1f8;
+  --cfg-line: rgb(16 24 40 / 8%);
+  --cfg-line-strong: rgb(16 24 40 / 15%);
+  --cfg-scroll: rgb(16 24 40 / 30%);
+  --cfg-scroll-hover: rgb(16 24 40 / 46%);
+  --cfg-scroll-track: rgb(16 24 40 / 5%);
+  --cfg-text: #1a1f2b;
+  --cfg-muted: #636b7e;
+  --cfg-faint: #9aa1b2;
+  --cfg-accent: #3f5bd9;
+  --cfg-accent-bg: rgb(63 91 217 / 10%);
+  --cfg-accent-ink: #fff;
+  --cfg-knob-on: #fff;
+  --cfg-info: #128a5c;
+  --cfg-alert: #9a6a00;
+  --cfg-alarm: #d33b3b;
+  --cfg-warn-bg: rgb(176 120 0 / 9%);
+  --cfg-shadow: 0 8px 24px rgb(16 24 40 / 14%);
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not(.config-classic)[data-theme="system"] {
+    --cfg-bg: #f4f5f8;
+    --cfg-bar: #eceef3;
+    --cfg-surface: #fff;
+    --cfg-surface-2: #f7f8fb;
+    --cfg-hover: #eef1f8;
+    --cfg-line: rgb(16 24 40 / 8%);
+    --cfg-line-strong: rgb(16 24 40 / 15%);
+    --cfg-scroll: rgb(16 24 40 / 30%);
+    --cfg-scroll-hover: rgb(16 24 40 / 46%);
+    --cfg-scroll-track: rgb(16 24 40 / 5%);
+    --cfg-text: #1a1f2b;
+    --cfg-muted: #636b7e;
+    --cfg-faint: #9aa1b2;
+    --cfg-accent: #3f5bd9;
+    --cfg-accent-bg: rgb(63 91 217 / 10%);
+    --cfg-accent-ink: #fff;
+    --cfg-knob-on: #fff;
+    --cfg-info: #128a5c;
+    --cfg-alert: #9a6a00;
+    --cfg-alarm: #d33b3b;
+    --cfg-warn-bg: rgb(176 120 0 / 9%);
+    --cfg-shadow: 0 8px 24px rgb(16 24 40 / 14%);
+
+    color-scheme: light;
+  }
+}
+
+/* ===== Page ===== */
+
+html:not(.config-classic) {
+  overflow: hidden;
+  background-color: var(--cfg-bg);
+  color: var(--cfg-text);
+  font-family: var(--cfg-font);
+  font-size: 13px;
+  font-weight: 450;
+  letter-spacing: -0.005em;
+}
+
+:root:not(.config-classic) body {
+  height: 100%;
+}
+
+:root:not(.config-classic) #container {
+  margin: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+:root:not(.config-classic) ::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+/* Easy to find: ACT's light window is often right next to it. */
+:root:not(.config-classic) ::-webkit-scrollbar-thumb {
+  background-color: var(--cfg-scroll);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+  border-radius: 99px;
+}
+
+:root:not(.config-classic) ::-webkit-scrollbar-thumb:hover,
+:root:not(.config-classic) ::-webkit-scrollbar-thumb:active {
+  background-color: var(--cfg-scroll-hover);
+}
+
+:root:not(.config-classic) ::-webkit-scrollbar-track {
+  background-color: var(--cfg-scroll-track);
+}
+
+:root:not(.config-classic) ::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+:root:not(.config-classic) a {
+  color: var(--cfg-accent);
+  text-decoration: none;
+}
+
+:root:not(.config-classic) a:hover {
+  text-decoration: underline;
+}
+
+:root:not(.config-classic) :focus-visible {
+  outline: 2px solid var(--cfg-accent);
+  outline-offset: 2px;
+}
+
+/* ===== Tabs ===== */
+
+:root:not(.config-classic) .config-tab-bar {
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  height: 46px;
+  padding: 0 12px 0 14px;
+  background-color: var(--cfg-bar);
+  border-bottom: 1px solid var(--cfg-line);
+}
+
+/* The tabs keep their room: the search gives way first (down to its minimum). */
+:root:not(.config-classic) .config-tab-list {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+:root:not(.config-classic) .config-tab-list::-webkit-scrollbar {
+  height: 0;
+}
+
+:root:not(.config-classic) .config-logo {
+  flex: none;
+  align-self: center;
+  width: 24px;
+  height: 24px;
+  margin-right: 10px;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--cfg-accent), #7d8cff);
+  color: var(--cfg-accent-ink);
+  font-family: var(--cfg-font-accent);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+:root:not(.config-classic) .config-tab {
+  flex: none;
+  position: relative;
+  padding: 0 11px;
+  border: none;
+  background: none;
+  color: var(--cfg-muted);
+  font: inherit;
+  font-weight: 560;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 160ms;
+}
+
+:root:not(.config-classic) .config-tab:hover,
+:root:not(.config-classic) .config-tab.config-active {
+  color: var(--cfg-text);
+}
+
+:root:not(.config-classic) .config-tab::after {
+  content: "";
+  position: absolute;
+  left: 9px;
+  right: 9px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 2px;
+  background-color: var(--cfg-accent);
+  transform: scaleX(0);
+  transition: transform 220ms var(--cfg-ease);
+}
+
+:root:not(.config-classic) .config-tab.config-active::after {
+  transform: none;
+}
+
+:root:not(.config-classic) .config-tab:focus-visible {
+  outline-offset: -6px;
+}
+
+:root:not(.config-classic) .config-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: scroll;
+}
+
+/* ===== Sections ===== */
+
+.config-tabs:not(.config-classic) .overlay-container {
+  display: none;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 16px 18px 80px;
+}
+
+.config-tabs:not(.config-classic) .overlay-container.config-active {
+  display: block;
+  animation: config-section-in 220ms var(--cfg-ease);
+}
+
+@keyframes config-section-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.config-tabs:not(.config-classic) .overlay-header {
+  position: static;
+  display: block;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: default;
+  text-transform: none;
+  font-size: 20px;
+  font-weight: 720;
+  letter-spacing: -0.015em;
+  color: var(--cfg-text);
+}
+
+.config-tabs:not(.config-classic) .overlay-header::before {
+  content: attr(data-eyebrow);
+  display: block;
+  width: auto;
+  height: auto;
+  margin: 0 0 4px;
+  border: none;
+  font-family: var(--cfg-font-accent);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--cfg-accent);
+}
+
+:root:not(.config-classic) .config-section-desc {
+  margin: 3px 0 14px;
+  color: var(--cfg-muted);
+  font-size: 12.5px;
+}
+
+/* ===== Search ===== */
+
+:root:not(.config-classic) .config-search {
+  flex: 0 1000 240px;
+  min-width: 100px;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  margin-left: auto;
+  padding: 0 10px;
+  border: 1px solid var(--cfg-line-strong);
+  border-radius: 99px;
+  background-color: var(--cfg-surface);
+  cursor: text;
+  transition: border-color 160ms, box-shadow 160ms;
+}
+
+:root:not(.config-classic) .config-search::before {
+  content: "";
+  flex: none;
+  width: 14px;
+  height: 14px;
+  background-color: var(--cfg-muted);
+
+  /* Chromium 95 (upstream OverlayPlugin) only has the prefixed mask. */
+  /* stylelint-disable-next-line property-no-vendor-prefix */
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.6-3.6'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+:root:not(.config-classic) .config-search:focus-within {
+  border-color: var(--cfg-accent);
+  box-shadow: 0 0 0 3px var(--cfg-accent-bg);
+}
+
+:root:not(.config-classic) .config-search input[type="text"].config-search-input {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: none;
+  box-shadow: none;
+  text-align: left;
+  font-family: var(--cfg-font);
+  font-size: 13px;
+  font-weight: 450;
+}
+
+:root:not(.config-classic) .config-search kbd {
+  flex: none;
+  padding: 0 5px;
+  border: 1px solid var(--cfg-line-strong);
+  border-radius: 4px;
+  color: var(--cfg-faint);
+  font-family: var(--cfg-font-accent);
+  font-size: 10.5px;
+}
+
+:root:not(.config-classic) .config-search:focus-within kbd {
+  display: none;
+}
+
+.config-searching.config-tabs:not(.config-classic) .overlay-container {
+  display: block;
+  padding-bottom: 6px;
+  animation: none;
+}
+
+.config-searching:not(.config-classic) .config-section-desc,
+.config-searching:not(.config-classic) .config-card-tree,
+.config-searching:not(.config-classic) .config-tab.config-active::after {
+  display: none;
+}
+
+.config-searching:not(.config-classic) .overlay-container.config-search-empty,
+:root:not(.config-classic) .config-search-miss,
+:root:not(.config-classic) .config-hidden {
+  display: none !important;
+}
+
+:root:not(.config-classic) .config-no-results {
+  margin: 48px 16px;
+  text-align: center;
+  color: var(--cfg-muted);
+}
+
+/* ===== Cards ===== */
+
+/* The title comes after the rows in the page (so it can be hidden with no rows), above them on
+   screen. */
+:root:not(.config-classic) .config-card {
+  display: flex;
+  flex-direction: column-reverse;
+  margin-bottom: 18px;
+}
+
+:root:not(.config-classic) .config-card-title {
+  margin: 0 0 7px 4px;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  color: var(--cfg-muted);
+}
+
+:root:not(.config-classic) .config-card > .overlay-options:empty,
+:root:not(.config-classic) .config-card > .overlay-options:empty + .config-card-title {
+  display: none;
+}
+
+/* ===== Option rows ===== */
+
+/* A card of rows: each row is a name cell and a control cell sharing a line. */
+:root:not(.config-classic) .overlay-options {
+  margin: 0;
+
+  /* Names keep room even next to the widest controls (a fight's own options can be long). */
+  grid-template-columns: minmax(140px, 1fr) fit-content(55%);
+  grid-gap: 0;
+  background-color: var(--cfg-surface);
+  border: 1px solid var(--cfg-line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+/* Rows are one height whatever their control (a switch is lower than a list), with the name
+   and the control in the middle of it. */
+:root:not(.config-classic) .overlay-options > * {
+  box-sizing: border-box;
+  min-height: 54px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--cfg-line);
+  align-content: center;
+}
+
+/* Name cells: some come without config.css's grid (a fight's alert output). */
+:root:not(.config-classic) .overlay-options > div:not([class]) {
+  display: grid;
+}
+
+:root:not(.config-classic) .overlay-options > :nth-child(-n + 2) {
+  border-top-color: transparent;
+}
+
+/* Controls narrow with the window (rather than leave the card): see .config-ctl. */
+:root:not(.config-classic) .overlay-options > .option-input-container {
+  min-width: 0;
+  justify-items: end;
+}
+
+/* Text rather than config.css's grid: its ⓘ follows its last word (see below). */
+:root:not(.config-classic) .option-name {
+  display: block;
+  font-weight: 560;
+}
+
+/* A name's last word and its ⓘ, kept on one line. */
+:root:not(.config-classic) .config-name-tail {
+  white-space: nowrap;
+}
+
+:root:not(.config-classic) .option-name .config-help {
+  vertical-align: -2px;
+}
+
+/* Trigger lists are rows that span the card, so only the first has no line above. */
+:root:not(.config-classic) .config-card-tree .overlay-options > :nth-child(2) {
+  border-top-color: var(--cfg-line);
+}
+
+:root:not(.config-classic) .config-ctl {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Narrowing, lists and boxes give way (the default's button is short, its value in its tooltip;
+   in narrow windows only its icon). */
+:root:not(.config-classic) .option-input-container .config-ctl > select,
+:root:not(.config-classic) .option-input-container .config-ctl > input[type="text"].input-string-field {
+  flex: 0 1 300px;
+  min-width: 120px;
+}
+
+/* "Default <value>": a small text button, so it isn't taken for a reload button. */
+:root:not(.config-classic) .config-ctl > .config-reset {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 9px 0 7px;
+  border: 1px solid var(--cfg-line);
+  border-radius: 99px;
+  background: none;
+  color: var(--cfg-muted);
+  font-size: 11.5px;
+  font-weight: 560;
+  white-space: nowrap;
+}
+
+:root:not(.config-classic) .config-ctl > .config-reset:hover {
+  border-color: var(--cfg-accent);
+  background-color: var(--cfg-accent-bg);
+  color: var(--cfg-text);
+}
+
+:root:not(.config-classic) .config-reset svg {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* A number box with its unit; all the same width, so a card's boxes line up. */
+:root:not(.config-classic) .config-num {
+  display: inline-flex;
+  align-items: center;
+  width: 112px;
+  height: 30px;
+  border: 1px solid var(--cfg-line-strong);
+  border-radius: 7px;
+  background-color: var(--cfg-surface-2);
+  transition: border-color 140ms, box-shadow 140ms;
+}
+
+:root:not(.config-classic) .config-num:hover {
+  border-color: var(--cfg-faint);
+}
+
+:root:not(.config-classic) .config-num:focus-within {
+  border-color: var(--cfg-accent);
+  box-shadow: 0 0 0 3px var(--cfg-accent-bg);
+}
+
+:root:not(.config-classic) .config-num input[type="text"],
+:root:not(.config-classic) .config-num input[type="text"]:focus {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  height: 28px;
+  padding: 0 8px;
+  border: none;
+  background: none;
+  box-shadow: none;
+  text-align: right;
+}
+
+:root:not(.config-classic) .config-unit {
+  margin-left: -4px;
+  padding-right: 9px;
+  color: var(--cfg-muted);
+  font-size: 12px;
+}
+
+:root:not(.config-classic) .config-range {
+  width: 120px;
+  margin: 0;
+
+  /* A slider gives way too, next to its box and the default's button. */
+  flex: 0 1 120px;
+  min-width: 56px;
+  accent-color: var(--cfg-accent);
+  cursor: pointer;
+}
+
+:root:not(.config-classic) .comment {
+  margin: 3px 0 0;
+  max-width: 560px;
+  color: var(--cfg-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+:root:not(.config-classic) .comment > * {
+  margin-bottom: 0;
+}
+
+/* ===== Controls ===== */
+
+:root:not(.config-classic) input[type="text"],
+:root:not(.config-classic) select {
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--cfg-line-strong);
+  border-radius: 7px;
+  background-color: var(--cfg-surface-2);
+  color: var(--cfg-text);
+  font: inherit;
+  transition: border-color 140ms, box-shadow 140ms;
+}
+
+:root:not(.config-classic) input[type="text"] {
+  width: 64px;
+  font-family: var(--cfg-font-accent);
+  font-size: 13.5px;
+  font-weight: 560;
+}
+
+:root:not(.config-classic) input[type="text"].input-string-field,
+:root:not(.config-classic) .trigger-outputstring > input[type="text"],
+:root:not(.config-classic) .timeline-add-row-text,
+:root:not(.config-classic) .timeline-text-edit {
+  font-family: var(--cfg-font);
+  font-size: 13px;
+  font-weight: 450;
+}
+
+:root:not(.config-classic) input[type="text"]::placeholder {
+  color: var(--cfg-faint);
+}
+
+:root:not(.config-classic) select {
+  min-width: 150px;
+  padding-right: 28px;
+  appearance: none;
+  cursor: pointer;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--cfg-muted) 50%),
+    linear-gradient(135deg, var(--cfg-muted) 50%, transparent 50%);
+  background-position: calc(100% - 14px) 50%, calc(100% - 9px) 50%;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+}
+
+:root:not(.config-classic) input[type="text"]:hover,
+:root:not(.config-classic) select:hover {
+  border-color: var(--cfg-faint);
+}
+
+:root:not(.config-classic) input[type="text"]:focus,
+:root:not(.config-classic) select:focus {
+  outline: none;
+  border-color: var(--cfg-accent);
+  box-shadow: 0 0 0 3px var(--cfg-accent-bg);
+}
+
+:root:not(.config-classic) input:disabled,
+:root:not(.config-classic) select:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Checkboxes are switches: the knob is a background circle that slides. */
+:root:not(.config-classic) input[type="checkbox"] {
+  flex: none;
+  width: 36px;
+  height: 20px;
+  margin: 0;
+  border-radius: 99px;
+  appearance: none;
+  cursor: pointer;
+  background-color: var(--cfg-line-strong);
+  background-image: radial-gradient(circle at 10px 50%, var(--cfg-knob) 6.5px, transparent 7.5px);
+  background-position: 0 0;
+  background-repeat: no-repeat;
+  transition: background-color 200ms, background-position 220ms var(--cfg-ease);
+}
+
+:root:not(.config-classic) input[type="checkbox"]:checked {
+  background-color: var(--cfg-accent);
+  background-image: radial-gradient(circle at 10px 50%, var(--cfg-knob-on) 6.5px, transparent 7.5px);
+  background-position: 16px 0;
+}
+
+:root:not(.config-classic) input[type="checkbox"]:focus-visible {
+  outline-offset: 2px;
+}
+
+:root:not(.config-classic) input[type="submit"],
+:root:not(.config-classic) input[type="button"],
+:root:not(.config-classic) button {
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--cfg-line-strong);
+  border-radius: 7px;
+  background-color: var(--cfg-surface-2);
+  color: var(--cfg-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 140ms, border-color 140ms;
+}
+
+:root:not(.config-classic) input[type="submit"]:hover,
+:root:not(.config-classic) input[type="button"]:hover,
+:root:not(.config-classic) button:hover {
+  background-color: var(--cfg-hover);
+  border-color: var(--cfg-faint);
+}
+
+:root:not(.config-classic) .config-tab-bar .config-tab {
+  height: auto;
+  border: none;
+  border-radius: 0;
+  background: none;
+}
+
+/* A directory: the path, then the button. */
+:root:not(.config-classic) .overlay-options > .input-dir-container {
+  grid-template-columns: minmax(0, auto) auto;
+  gap: 10px;
+}
+
+/* Right to left so that a long path loses its start; the path itself stays left to right. */
+:root:not(.config-classic) .config-path {
+  max-width: 340px;
+  overflow: hidden;
+  color: var(--cfg-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: right;
+}
+
+/* ===== Trigger lists (raidboss, oopsy) ===== */
+
+:root:not(.config-classic) .trigger-expansion-container {
+  margin: 0;
+  padding: 0;
+}
+
+:root:not(.config-classic) .trigger-expansion-header,
+:root:not(.config-classic) .trigger-file-header,
+:root:not(.config-classic) .timeline-edit-header {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-weight: 650;
+  transition: background-color 140ms;
+}
+
+:root:not(.config-classic) .trigger-expansion-header:hover,
+:root:not(.config-classic) .trigger-file-header:hover,
+:root:not(.config-classic) .timeline-edit-header:hover {
+  background-color: var(--cfg-hover);
+}
+
+/* A chevron that points down when open. */
+:root:not(.config-classic) .trigger-expansion-header::before,
+:root:not(.config-classic) .trigger-file-header::before,
+:root:not(.config-classic) .timeline-edit-header::before,
+:root:not(.config-classic) .collapsed .trigger-expansion-header::before,
+:root:not(.config-classic) .collapsed .trigger-file-header::before,
+:root:not(.config-classic) .collapsed .timeline-edit-header::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  margin: 0 3px 3px;
+  border: solid var(--cfg-muted);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  transition: transform 200ms var(--cfg-ease);
+}
+
+:root:not(.config-classic) .collapsed .trigger-expansion-header::before,
+:root:not(.config-classic) .collapsed .trigger-file-header::before,
+:root:not(.config-classic) .collapsed .timeline-edit-header::before {
+  margin: 0 3px;
+  transform: rotate(-45deg);
+}
+
+:root:not(.config-classic) .trigger-file-container {
+  margin: 0;
+  border-top: 1px solid var(--cfg-line);
+}
+
+:root:not(.config-classic) .trigger-expansion-container:not(.collapsed) > .trigger-expansion-header {
+  border-bottom: 1px solid var(--cfg-line);
+}
+
+:root:not(.config-classic) .trigger-file-header {
+  grid-template-columns: auto 1fr auto auto;
+  justify-items: start;
+  padding-left: 32px;
+  font-weight: 560;
+}
+
+:root:not(.config-classic) .trigger-file-header-part {
+  margin: 0;
+}
+
+:root:not(.config-classic) .trigger-file-header-part:nth-child(n + 2) {
+  color: var(--cfg-muted);
+  font-size: 12px;
+  font-weight: 450;
+}
+
+:root:not(.config-classic) .trigger-file-container > .overlay-options,
+:root:not(.config-classic) .trigger-file-options,
+:root:not(.config-classic) .timeline-edit-container {
+  margin: 0 16px 12px 46px;
+}
+
+:root:not(.config-classic) .trigger-file-container > .overlay-options {
+  background-color: var(--cfg-surface-2);
+}
+
+:root:not(.config-classic) .timeline-edit-container {
+  border: 1px solid var(--cfg-line);
+  border-radius: 8px;
+}
+
+:root:not(.config-classic) .timeline-edit-header {
+  padding: 8px 12px;
+  font-weight: 560;
+}
+
+/* Each trigger is its name (and comment) over a list of its settings, which gets the width: what
+   it says, its output, and its output strings, which can be long. */
+:root:not(.config-classic) .trigger-file-options {
+  grid-template-columns: minmax(0, 1fr);
+  grid-gap: 0;
+  padding: 4px 0;
+}
+
+:root:not(.config-classic) .trigger-file-options > .trigger {
+  padding: 14px 0 8px;
+  border-top: 1px solid var(--cfg-line);
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+:root:not(.config-classic) .trigger-file-options > :first-child {
+  border-top-color: transparent;
+}
+
+:root:not(.config-classic) .trigger-file-options > .trigger > .comment {
+  max-width: none;
+  font-weight: 450;
+}
+
+:root:not(.config-classic) .trigger-file-options > .trigger-details {
+  grid-template-columns: 132px minmax(0, 1fr);
+  align-items: center;
+  padding: 0 0 14px;
+}
+
+:root:not(.config-classic) .trigger.disabled {
+  color: var(--cfg-faint);
+}
+
+:root:not(.config-classic) .trigger-details {
+  grid-gap: 6px 12px;
+  font-size: 12.5px;
+}
+
+:root:not(.config-classic) .trigger-details > .option-input-container {
+  justify-items: start;
+}
+
+:root:not(.config-classic) .trigger-label,
+:root:not(.config-classic) .trigger-outputstring-label {
+  color: var(--cfg-muted);
+  overflow-wrap: anywhere;
+}
+
+:root:not(.config-classic) .trigger-outputstring-label::before {
+  content: "";
+}
+
+:root:not(.config-classic) .trigger-details > .trigger-outputstring > input[type="text"] {
+  width: 100%;
+  max-width: 560px;
+}
+
+/* The source link on its own line at the end (config.css puts an empty cell before it). */
+:root:not(.config-classic) .trigger-details > div:empty {
+  display: none;
+}
+
+:root:not(.config-classic) .trigger-details > .trigger-source {
+  grid-column: 1 / -1;
+  justify-self: end;
+}
+
+:root:not(.config-classic) .trigger-source a {
+  font-size: 12px;
+}
+
+:root:not(.config-classic) .trigger-set-override-warning {
+  margin: 8px 0;
+  padding: 12px 14px;
+  color: var(--cfg-alert);
+  background-color: var(--cfg-warn-bg);
+  border: 1px solid var(--cfg-alert);
+  border-radius: 8px;
+}
+
+:root:not(.config-classic) .alarm-text {
+  color: var(--cfg-alarm);
+}
+
+:root:not(.config-classic) .alert-text {
+  color: var(--cfg-alert);
+}
+
+:root:not(.config-classic) .info-text {
+  color: var(--cfg-info);
+}
+
+:root:not(.config-classic) .regex-text,
+:root:not(.config-classic) .function-text {
+  color: var(--cfg-muted);
+}
+
+:root:not(.config-classic) .sound-text {
+  color: var(--cfg-accent);
+}
+
+/* Timeline editing. */
+:root:not(.config-classic) .timeline-scroller {
+  margin: 8px 12px 16px;
+  border: 1px solid var(--cfg-line);
+  border-radius: 8px;
+  background-color: var(--cfg-bg);
+  color: var(--cfg-muted);
+}
+
+:root:not(.config-classic) .timeline-listing-header,
+:root:not(.config-classic) .timeline-add-header {
+  margin: 12px 12px 0;
+  font-weight: 650;
+}
+
+:root:not(.config-classic) .timeline-add-container,
+:root:not(.config-classic) .timeline-add-button,
+:root:not(.config-classic) .timeline-text-container {
+  margin-left: 12px;
+}
+
+/* ===== Settings / triggers switch (raidboss, oopsy) ===== */
+
+:root:not(.config-classic) .config-view-switch {
+  display: inline-flex;
+  margin: 0 0 16px;
+  padding: 3px;
+  border: 1px solid var(--cfg-line-strong);
+  border-radius: 8px;
+  background-color: var(--cfg-surface-2);
+}
+
+:root:not(.config-classic) .config-view-switch > button {
+  height: 28px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--cfg-muted);
+  font-weight: 560;
+}
+
+:root:not(.config-classic) .config-view-switch > button:hover {
+  background: none;
+  color: var(--cfg-text);
+}
+
+:root:not(.config-classic) .config-view-switch > button.config-active {
+  background-color: var(--cfg-accent-bg);
+  box-shadow: inset 0 0 0 1px var(--cfg-line-strong);
+  color: var(--cfg-text);
+}
+
+:root:not(.config-classic) .config-view-count {
+  margin-left: 6px;
+  color: var(--cfg-faint);
+  font-family: var(--cfg-font-accent);
+  font-size: 11.5px;
+}
+
+:root:not(.config-classic) .config-has-triggers[data-view="triggers"] .config-card,
+:root:not(.config-classic) .config-has-triggers:not([data-view="triggers"]) .config-card-tree,
+:root:not(.config-classic) .config-has-triggers .config-card-tree > .config-card-title,
+.config-searching:not(.config-classic) .config-view-switch {
+  display: none;
+}
+
+:root:not(.config-classic) .config-has-triggers[data-view="triggers"] .config-card-tree,
+.config-searching:not(.config-classic) .config-has-triggers[data-view="triggers"] .config-card {
+  display: flex;
+}
+
+/* Searches list triggers on their own (see .config-trigger-results). */
+.config-searching:not(.config-classic) .config-has-triggers[data-view] .config-card-tree {
+  display: none;
+}
+
+/* ===== Trigger browser ===== */
+
+:root:not(.config-classic) .overlay-options.config-trigger-browser {
+  display: block;
+  border: none;
+  background: none;
+  overflow: visible;
+}
+
+:root:not(.config-classic) .config-trigger-browser > * {
+  padding: 0;
+  border-top: none;
+}
+
+:root:not(.config-classic) .config-trigger-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+:root:not(.config-classic) .config-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+:root:not(.config-classic) .config-chips > .config-chip {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 99px;
+  background: none;
+  color: var(--cfg-muted);
+  font-size: 12.5px;
+  font-weight: 560;
+  transition: background-color 160ms, border-color 160ms, color 160ms;
+}
+
+:root:not(.config-classic) .config-chips > .config-chip:hover {
+  background: none;
+  color: var(--cfg-text);
+}
+
+:root:not(.config-classic) .config-chips > .config-chip.config-active {
+  border-color: transparent;
+  background-color: var(--cfg-accent);
+  color: var(--cfg-accent-ink);
+}
+
+:root:not(.config-classic) .config-chips > .config-chip-toggle.config-active {
+  border-color: var(--cfg-accent);
+  background-color: var(--cfg-accent-bg);
+  color: var(--cfg-text);
+}
+
+:root:not(.config-classic) .config-chip-count {
+  margin-left: 5px;
+  font-family: var(--cfg-font-accent);
+  opacity: 0.7;
+}
+
+:root:not(.config-classic) .config-trigger-browser .trigger-expansion-header,
+:root:not(.config-classic) .config-trigger-browser > .trigger-expansion-container,
+:root:not(.config-classic) .config-filter-miss {
+  display: none;
+}
+
+:root:not(.config-classic) .config-trigger-browser > .trigger-expansion-container.config-active {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+}
+
+:root:not(.config-classic) .config-trigger-browser .trigger-file-container {
+  grid-column-end: auto;
+  margin: 0;
+  border: 1px solid var(--cfg-line);
+  border-radius: 10px;
+  background-color: var(--cfg-surface);
+  transition: border-color 160ms, box-shadow 160ms;
+}
+
+:root:not(.config-classic) .config-trigger-browser .trigger-file-container:hover {
+  border-color: var(--cfg-line-strong);
+}
+
+/* An open file is a long page of its own: no highlight around it. */
+:root:not(.config-classic) .config-trigger-browser .trigger-file-container:not(.collapsed) {
+  grid-column: 1 / -1;
+  border-color: var(--cfg-line-strong);
+}
+
+:root:not(.config-classic) .config-trigger-browser .trigger-file-container > .trigger-file-header {
+  position: relative;
+  display: block;
+  padding: 11px 36px 11px 14px;
+  border-radius: 10px;
+}
+
+:root:not(.config-classic) .config-trigger-browser .trigger-file-container > .trigger-file-header::before,
+:root:not(.config-classic) .config-trigger-browser .trigger-file-header-part:nth-child(n + 2) {
+  display: none;
+}
+
+:root:not(.config-classic) .config-trigger-browser .trigger-file-header-part:first-child {
+  font-weight: 650;
+}
+
+:root:not(.config-classic) .config-file-meta {
+  margin-top: 3px;
+  color: var(--cfg-muted);
+  font-size: 11.5px;
+  font-weight: 450;
+}
+
+:root:not(.config-classic) .config-file-changed {
+  color: var(--cfg-accent);
+}
+
+:root:not(.config-classic) .config-trigger-browser .trigger-file-container > .overlay-options,
+:root:not(.config-classic) .config-trigger-browser .trigger-file-options,
+:root:not(.config-classic) .config-trigger-browser .timeline-edit-container {
+  margin: 0 14px 12px;
+}
+
+:root:not(.config-classic) .config-trigger-empty {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--cfg-muted);
+}
+
+/* Where a search result was opened. */
+:root:not(.config-classic) .config-flash {
+  border-radius: 6px;
+  animation: config-flash 1.8s ease-out;
+}
+
+@keyframes config-flash {
+  from {
+    background-color: var(--cfg-accent-bg);
+    box-shadow: 0 0 0 2px var(--cfg-accent);
+  }
+}
+
+/* ===== Trigger search results ===== */
+
+:root:not(.config-classic) .config-trigger-results {
+  max-width: 1000px;
+  margin: 0 auto 80px;
+  padding: 0 18px;
+}
+
+:root:not(.config-classic) .config-trigger-results:empty {
+  display: none;
+}
+
+:root:not(.config-classic) .config-hits {
+  border: 1px solid var(--cfg-line);
+  border-radius: 10px;
+  background-color: var(--cfg-surface);
+  overflow: hidden;
+}
+
+:root:not(.config-classic) .config-hits > .config-hit {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  column-gap: 14px;
+  width: 100%;
+  height: auto;
+  padding: 9px 16px;
+  border: none;
+  border-top: 1px solid var(--cfg-line);
+  border-radius: 0;
+  background: none;
+  text-align: left;
+  font-weight: 450;
+}
+
+:root:not(.config-classic) .config-hits > .config-hit:first-child {
+  border-top: none;
+}
+
+:root:not(.config-classic) .config-hits > .config-hit:hover {
+  border-color: var(--cfg-line);
+  background-color: var(--cfg-hover);
+}
+
+:root:not(.config-classic) .config-hit-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+:root:not(.config-classic) .config-hit-where {
+  grid-row: 2;
+  color: var(--cfg-muted);
+  font-size: 12px;
+}
+
+:root:not(.config-classic) .config-hit-preview {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  max-width: 260px;
+  padding: 1px 8px;
+  border: 1px solid currentcolor;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+:root:not(.config-classic) .config-alarm {
+  color: var(--cfg-alarm);
+}
+
+:root:not(.config-classic) .config-alert {
+  color: var(--cfg-alert);
+}
+
+:root:not(.config-classic) .config-info {
+  color: var(--cfg-info);
+}
+
+:root:not(.config-classic) .config-hits-more {
+  margin: 0;
+  padding: 9px 16px;
+  border-top: 1px solid var(--cfg-line);
+  color: var(--cfg-muted);
+  font-size: 12px;
+}
+
+/* ===== Reload prompt (the butter bar), as a floating pill ===== */
+
+:root:not(.config-classic) #butter-margin,
+:root:not(.config-classic) #butter-margin.hidden {
+  display: block;
+  position: fixed;
+  left: 50%;
+  bottom: 14px;
+  z-index: 10;
+  margin: 0;
+  transform: translate(-50%, 0);
+  transition: transform 320ms var(--cfg-ease), opacity 220ms;
+}
+
+:root:not(.config-classic) #butter-margin.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 24px);
+}
+
+:root:not(.config-classic) #butter-bar {
+  position: static;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: auto;
+  height: auto;
+  padding: 6px 6px 6px 16px;
+  border: 1px solid var(--cfg-line-strong);
+  border-radius: 99px;
+  background-color: var(--cfg-surface-2);
+  box-shadow: var(--cfg-shadow);
+  white-space: nowrap;
+  overflow: visible;
+}
+
+:root:not(.config-classic) #butter-bar::before {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: var(--cfg-accent);
+  box-shadow: 0 0 0 4px var(--cfg-accent-bg);
+}
+
+:root:not(.config-classic) #butter-bar .reload-button {
+  padding: 0 14px;
+  height: 28px;
+  border: none;
+  border-radius: 99px;
+  background-color: var(--cfg-accent);
+  color: var(--cfg-accent-ink);
+}
+
+:root:not(.config-classic) #butter-bar .reload-button:hover {
+  background-color: var(--cfg-accent);
+  filter: brightness(1.08);
+}
+
+/* ===== Details ===== */
+
+/* A number box with something that isn't a number. */
+:root:not(.config-classic) .config-num.config-invalid,
+:root:not(.config-classic) .config-num.config-invalid:focus-within {
+  border-color: var(--cfg-alarm);
+  box-shadow: 0 0 0 3px rgb(255 100 100 / 14%);
+}
+
+:root:not(.config-classic) .config-desc-link {
+  margin-left: 6px;
+  font-weight: 560;
+  white-space: nowrap;
+}
+
+:root:not(.config-classic) .timeline-add-container > div,
+:root:not(.config-classic) .timeline-add-row-remove {
+  white-space: nowrap;
+}
+
+:root:not(.config-classic) .option-input-container a {
+  overflow-wrap: anywhere;
+}
+
+/* Search results show each section's title right above its cards. */
+.config-searching:not(.config-classic) .overlay-container > a {
+  display: block;
+  margin-bottom: 12px;
+}
+
+/* Section titles were links to collapse them; now they are only titles. */
+.config-tabs:not(.config-classic) .overlay-container > a,
+.config-tabs:not(.config-classic) .overlay-container > a:hover {
+  color: inherit;
+  text-decoration: none;
+  cursor: default;
+}
+
+/* An open file keeps its header (and the way to close it) in view while its triggers scroll. */
+:root:not(.config-classic) .config-trigger-browser .trigger-file-container:not(.collapsed) > .trigger-file-header {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--cfg-line);
+  border-radius: 10px 10px 0 0;
+  background-color: var(--cfg-surface);
+}
+
+:root:not(.config-classic) .config-trigger-browser .trigger-file-container > .trigger-file-header::after {
+  content: "";
+  position: absolute;
+  top: 20px;
+  right: 16px;
+  width: 6px;
+  height: 6px;
+  border: solid var(--cfg-muted);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  transition: transform 200ms var(--cfg-ease), opacity 160ms;
+}
+
+:root:not(.config-classic) .trigger-file-container:not(.collapsed) > .trigger-file-header::after {
+  top: 23px;
+  transform: rotate(-135deg);
+}
+
+/* Closed cards show theirs only when pointed at, so a page of cards stays calm. */
+:root:not(.config-classic) .config-trigger-browser .trigger-file-container.collapsed > .trigger-file-header::after {
+  opacity: 0;
+}
+
+:root:not(.config-classic) .trigger-file-container.collapsed > .trigger-file-header:hover::after,
+:root:not(.config-classic) .trigger-file-container.collapsed > .trigger-file-header:focus-visible::after {
+  opacity: 1;
+}
+
+/* Lists that change in place (another expansion, settings and triggers) come in like tabs do. */
+:root:not(.config-classic) .config-trigger-browser > .trigger-expansion-container.config-active,
+:root:not(.config-classic) .config-view-enter > .config-card {
+  animation: config-fade-in 220ms var(--cfg-ease);
+}
+
+:root:not(.config-classic) .trigger-file-container:not(.collapsed) > :not(.trigger-file-header) {
+  animation: config-fade-in 220ms var(--cfg-ease);
+}
+
+@keyframes config-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+/* ===== Control widths ===== */
+
+/* Controls of a kind have one width, so a card's controls line up; long choices are cut. */
+:root:not(.config-classic) .option-input-container select {
+  width: 300px;
+  max-width: 100%;
+  min-width: 0;
+  text-overflow: ellipsis;
+}
+
+:root:not(.config-classic) input[type="text"].input-string-field {
+  width: 300px;
+  max-width: 100%;
+  min-width: 0;
+}
+
+/* ===== Descriptions ===== */
+
+:root:not(.config-classic) .config-help {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 15px;
+  height: 15px;
+  margin-left: 7px;
+  border: 1px solid var(--cfg-faint);
+  border-radius: 50%;
+  color: var(--cfg-muted);
+  font-family: var(--cfg-font-accent);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: help;
+  transition: border-color 140ms, color 140ms, background-color 140ms;
+}
+
+:root:not(.config-classic) .config-help:hover,
+:root:not(.config-classic) .config-help:focus-visible {
+  border-color: var(--cfg-accent);
+  background-color: var(--cfg-accent-bg);
+  color: var(--cfg-text);
+  outline: none;
+}
+
+:root:not(.config-classic) .config-tooltip {
+  position: fixed;
+  z-index: 20;
+  max-width: 320px;
+  padding: 9px 12px;
+  border: 1px solid var(--cfg-line-strong);
+  border-radius: 8px;
+  background-color: var(--cfg-surface-2);
+  box-shadow: var(--cfg-shadow);
+  color: var(--cfg-text);
+  font-size: 12.5px;
+  font-weight: 450;
+  line-height: 1.55;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-3px);
+  transition: opacity 140ms, transform 140ms, visibility 0s 140ms;
+}
+
+:root:not(.config-classic) .config-tooltip.config-tooltip-shown {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition: opacity 140ms, transform 140ms;
+}
+
+/* A name or a value only (setTip): nothing to point at in it, and it often lies over the next
+   row's buttons, which stay usable. */
+:root:not(.config-classic) .config-tooltip.config-tooltip-plain {
+  pointer-events: none;
+}
+
+:root:not(.config-classic) .config-tooltip p {
+  margin: 0;
+}
+
+:root:not(.config-classic) .config-tooltip p + p {
+  margin-top: 6px;
+  color: var(--cfg-muted);
+}
+
+/* ===== Trigger browser filters ===== */
+
+/* Expansions: one connected group of buttons. */
+:root:not(.config-classic) .config-segments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--cfg-line-strong);
+  border-radius: 9px;
+  background-color: var(--cfg-surface-2);
+}
+
+:root:not(.config-classic) .config-segments > .config-chip {
+  height: 28px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--cfg-muted);
+  font-weight: 560;
+  transition: background-color 160ms, color 160ms;
+}
+
+:root:not(.config-classic) .config-segments > .config-chip:hover {
+  background-color: var(--cfg-hover);
+  color: var(--cfg-text);
+}
+
+:root:not(.config-classic) .config-segments > .config-chip.config-active {
+  background-color: var(--cfg-accent);
+  color: var(--cfg-accent-ink);
+}
+
+/* Content types: a labeled row of small chips, with the "changed only" switch at its end. */
+:root:not(.config-classic) .config-trigger-toolbar > .config-chips {
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
+:root:not(.config-classic) .config-chips-label {
+  flex: none;
+  margin-right: 4px;
+  color: var(--cfg-faint);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+:root:not(.config-classic) .config-chips-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-width: 0;
+}
+
+:root:not(.config-classic) .config-chips-list > .config-chip {
+  height: 26px;
+  padding: 0 11px;
+  border-radius: 99px;
+  background: none;
+  color: var(--cfg-muted);
+  font-size: 12px;
+  font-weight: 560;
+  transition: background-color 160ms, border-color 160ms, color 160ms;
+}
+
+:root:not(.config-classic) .config-chips-list > .config-chip:hover {
+  background: none;
+  color: var(--cfg-text);
+}
+
+:root:not(.config-classic) .config-chips-list > .config-chip.config-active {
+  border-color: var(--cfg-accent);
+  background-color: var(--cfg-accent-bg);
+  color: var(--cfg-text);
+}
+
+:root:not(.config-classic) .config-chips-single > .config-chips-label,
+:root:not(.config-classic) .config-chips-single > .config-chips-list {
+  display: none;
+}
+
+:root:not(.config-classic) .config-trigger-toolbar .config-changed-toggle {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 26px;
+  margin-left: auto;
+  padding: 0 4px 0 12px;
+  border: none;
+  background: none;
+  color: var(--cfg-muted);
+  font-size: 12px;
+  font-weight: 560;
+}
+
+:root:not(.config-classic) .config-trigger-toolbar .config-changed-toggle:hover {
+  background: none;
+  color: var(--cfg-text);
+}
+
+:root:not(.config-classic) .config-changed-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+:root:not(.config-classic) .config-mini-switch {
+  display: inline-block;
+  flex: none;
+  width: 26px;
+  height: 15px;
+  border-radius: 99px;
+  background-color: var(--cfg-line-strong);
+  background-image: radial-gradient(circle at 7.5px 50%, var(--cfg-knob) 4.5px, transparent 5.5px);
+  background-repeat: no-repeat;
+  transition: background-color 200ms, background-position 220ms var(--cfg-ease);
+}
+
+:root:not(.config-classic) .config-changed-toggle.config-active {
+  color: var(--cfg-text);
+}
+
+:root:not(.config-classic) .config-changed-toggle.config-active .config-mini-switch {
+  background-color: var(--cfg-accent);
+  background-image: radial-gradient(circle at 7.5px 50%, var(--cfg-knob-on) 4.5px, transparent 5.5px);
+  background-position: 11px 0;
+}
+
+/* Content type headings among the file cards. */
+:root:not(.config-classic) .config-type-heading {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 10px 0 0 2px;
+  color: var(--cfg-muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+:root:not(.config-classic) .config-type-heading:first-child {
+  margin-top: 0;
+}
+
+:root:not(.config-classic) .config-type-heading > span {
+  color: var(--cfg-faint);
+  font-family: var(--cfg-font-accent);
+  font-size: 11px;
+}
+
+/* ===== Small windows ===== */
+
+/* The default's button is only its icon (its name on hover), for the controls' room. */
+.config-w600:not(.config-classic) .config-ctl > .config-reset {
+  padding: 0 7px;
+}
+
+.config-w600:not(.config-classic) .config-ctl > .config-reset > span {
+  display: none;
+}
+
+/* config-w600 and config-w480 are set on html from the page's width over its scale. */
+.config-w600:not(.config-classic) .config-tab-bar {
+  position: relative;
+  padding-left: 10px;
+}
+
+.config-w600:not(.config-classic) .config-logo {
+  display: none;
+}
+
+/* Search is an icon that opens over the tabs. */
+.config-w600:not(.config-classic) .config-search {
+  flex: 0 0 32px;
+  justify-content: center;
+  gap: 0;
+  min-width: 32px;
+  padding: 0;
+}
+
+.config-w600:not(.config-classic) .config-search input[type="text"].config-search-input {
+  width: 0;
+  opacity: 0;
+}
+
+.config-w600:not(.config-classic) .config-search kbd {
+  display: none;
+}
+
+/* A query left in the box: a dot on the icon, so the tabs stay usable. */
+.config-w600:not(.config-classic) .config-search.config-has-query::after {
+  content: "";
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--cfg-accent);
+}
+
+.config-w600:not(.config-classic) .config-search.config-has-query {
+  position: relative;
+}
+
+.config-w600:not(.config-classic) .config-search.config-has-query:focus-within::after {
+  display: none;
+}
+
+.config-w600:not(.config-classic) .config-search:focus-within {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  right: 10px;
+  z-index: 3;
+  width: auto;
+  justify-content: flex-start;
+  gap: 7px;
+  padding: 0 10px;
+}
+
+.config-w600:not(.config-classic) .config-search:focus-within input[type="text"].config-search-input {
+  width: auto;
+  opacity: 1;
+}
+
+.config-w600.config-tabs:not(.config-classic) .overlay-container,
+.config-w600:not(.config-classic) .config-trigger-results {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+.config-w600:not(.config-classic) #butter-bar {
+  max-width: calc(100vw - 24px);
+}
+
+.config-w600:not(.config-classic) .reload-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Names above their controls. */
+.config-w480:not(.config-classic) .overlay-options,
+.config-w480:not(.config-classic) .trigger-file-options {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.config-w480:not(.config-classic) .overlay-options > .option-input-container {
+  justify-items: start;
+  padding-top: 0;
+  border-top: none;
+}
+
+.config-w480:not(.config-classic) .config-range {
+  width: 96px;
+}
+
+.config-w480:not(.config-classic) .trigger-file-options > .trigger-details {
+  grid-template-columns: 96px minmax(0, 1fr);
+}
+
+.config-w480:not(.config-classic) .config-trigger-browser .trigger-file-container > .overlay-options,
+.config-w480:not(.config-classic) .config-trigger-browser .trigger-file-options,
+.config-w480:not(.config-classic) .config-trigger-browser .timeline-edit-container {
+  margin-left: 10px;
+  margin-right: 10px;
+}
+
+/* config.css sets these widths with !important. */
+.config-w480:not(.config-classic) .timeline-add-container .timeline-add-row-time {
+  width: 56px !important;
+}
+
+.config-w480:not(.config-classic) .timeline-add-container .timeline-add-row-text {
+  width: 150px !important;
+}
+
+.config-w480:not(.config-classic) .timeline-add-container .timeline-add-row-duration {
+  width: 40px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root:not(.config-classic) *,
+  :root:not(.config-classic) *::before,
+  :root:not(.config-classic) *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}

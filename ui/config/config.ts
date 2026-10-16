@@ -22,7 +22,17 @@ import {
   LooseTriggerSet,
 } from '../../types/trigger';
 
+import { differsFromBaseline, initBaseline, setBaseline } from './config_dirty';
 import defaultOptions, { ConfigOptions } from './config_options';
+import { tagOptionRow } from './config_rows';
+import {
+  applyStoredTheme,
+  applyStyle,
+  applyTheme,
+  applyZoom,
+  buildSectionTabs,
+} from './config_tabs';
+import { setTriggerBrowserContext } from './config_triggers';
 
 // Load other config files
 import './general_config';
@@ -34,6 +44,7 @@ import '../raidboss/raidboss_config';
 
 import '../../resources/defaults.css';
 import './config.css';
+import './config_modern.css';
 
 // Text in the butter bar, to prompt the user to reload after a config change.
 const kReloadText = {
@@ -78,6 +89,9 @@ const kDirectoryDefaultText = {
   ko: '(기본)',
   tc: '(默認)',
 };
+
+// Fork: how long saves wait for further changes (see saveConfigData).
+const kSaveDelayMs = 300;
 
 // Translating data folders to a category name.
 export const kPrefixToCategory = {
@@ -362,29 +376,80 @@ export class CactbotConfigurator {
     // Otherwise, use the operating system language as a default for the config tool.
     this.lang = this.configOptions.DisplayLanguage ?? this.configOptions.ShortLocale;
     this.savedConfig = savedConfig ?? {};
+    initBaseline(this.savedConfig);
     this.developerOptions = this.getBooleanOption('general', 'ShowDeveloperOptions', false);
 
     const templates = UserConfig.optionTemplates;
     for (const [group, template] of Object.entries(templates))
       (this.contents[group] ??= []).push(template);
 
+    applyStyle(this.getStringOption('general', 'ConfigStyle', 'modern'));
+    applyTheme(this.getStringOption('general', 'ConfigTheme', 'dark'));
+    applyZoom(this.getStringOption('general', 'ConfigZoom', '1'));
+    // Best effort: the save goes out as a message right away.
+    window.addEventListener('beforeunload', () => void this.flushPendingSave());
+    setTriggerBrowserContext({
+      translate: (text) => this.translate(text),
+      readSaved: (group, path) => this._getOptionLeafHelper(group, path),
+    });
     this.buildButterBar();
+    // Fork: changes the overlays haven't loaded, as when this page reloaded for its style.
+    document.getElementById('butter-margin')?.classList.toggle(
+      'hidden',
+      !differsFromBaseline(this.savedConfig),
+    );
 
     const container = document.getElementById('container');
     if (!container)
       throw new UnreachableCode();
     this.buildUI(container, this.contents);
+    buildSectionTabs(container, this.lang, (text) => this.translate(text));
   }
 
-  async saveConfigData(): Promise<void> {
-    // TODO: rate limit this?
-    await callOverlayHandler({
-      call: 'cactbotSaveData',
-      overlay: 'options',
-      data: this.savedConfig,
-    });
+  // Fork: text inputs save on every keystroke, and each save sends the whole config, so saves
+  // close together are combined.
+  private saveTimer?: number;
+  private saving?: Promise<void>;
 
-    document.getElementById('butter-margin')?.classList.remove('hidden');
+  saveConfigData(): Promise<void> {
+    window.clearTimeout(this.saveTimer);
+    return new Promise((resolve) => {
+      this.saveTimer = window.setTimeout(() => {
+        this.saveTimer = undefined;
+        this.saving = this.flushConfigData();
+        void this.saving.then(resolve);
+      }, kSaveDelayMs);
+    });
+  }
+
+  // Saves a change still waiting in saveConfigData now, as the page is about to go away (reloads
+  // also reload this page).
+  flushPendingSave(): Promise<void> {
+    if (this.saveTimer === undefined)
+      return this.saving ?? Promise.resolve();
+    window.clearTimeout(this.saveTimer);
+    this.saveTimer = undefined;
+    this.saving = this.flushConfigData();
+    return this.saving;
+  }
+
+  async flushConfigData(): Promise<void> {
+    try {
+      await callOverlayHandler({
+        call: 'cactbotSaveData',
+        overlay: 'options',
+        data: this.savedConfig,
+      });
+    } catch (e) {
+      // Fork: a failed save mustn't stop the reload button (which waits for saves).
+      console.error(e);
+    }
+
+    // Fork: only while the config differs from what the overlays run with (see config_dirty.ts).
+    document.getElementById('butter-margin')?.classList.toggle(
+      'hidden',
+      !differsFromBaseline(this.savedConfig),
+    );
   }
 
   // Helper translate function.  Takes in an object with language keys
@@ -554,6 +619,15 @@ export class CactbotConfigurator {
     // Any type of SavedConfigEntry is fine here and we'll validate on loading.
     obj[finalArg] = value;
     void this.saveConfigData();
+    if (group === 'general' && finalArg === 'ConfigTheme' && typeof value === 'string')
+      applyTheme(value);
+    if (group === 'general' && finalArg === 'ConfigZoom' && typeof value === 'string')
+      applyZoom(value);
+    // The page is built for one style: built again for the other.
+    if (group === 'general' && finalArg === 'ConfigStyle' && typeof value === 'string') {
+      applyStyle(value);
+      void this.flushPendingSave().then(() => window.location.reload());
+    }
   }
 
   buildButterBar(): void {
@@ -570,7 +644,13 @@ export class CactbotConfigurator {
     buttonInput.classList.add('reload-button');
     buttonInput.type = 'button';
     buttonInput.onclick = () => {
-      void callOverlayHandler({ call: 'cactbotReloadOverlays' });
+      // Fork: a change made just before is saved first (see saveConfigData).
+      void this.flushPendingSave().then(() => {
+        setBaseline(this.savedConfig);
+        void callOverlayHandler({ call: 'cactbotReloadOverlays' });
+        // Fork: shown again on the next change.
+        document.getElementById('butter-margin')?.classList.add('hidden');
+      });
     };
     buttonInput.value = this.translate(kReloadButtonText);
     container.appendChild(buttonInput);
@@ -655,6 +735,7 @@ export class CactbotConfigurator {
           if (!ret)
             continue;
           elements.set(opt, ret.elements);
+          tagOptionRow(ret.elements, opt, getOptDefault(opt, this.configOptions), group);
           values[opt.id] = ret.value;
         }
 
@@ -1190,6 +1271,7 @@ export class CactbotConfigurator {
   }
 }
 
+applyStoredTheme();
 UserConfig.getUserConfigLocation('config', defaultOptions, () => {
   const options = { ...defaultOptions };
   new CactbotConfigurator(

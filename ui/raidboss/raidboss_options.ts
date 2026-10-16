@@ -115,6 +115,8 @@ const defaultRaidbossConfigOptions = {
   InfoSoundVolume: 1,
   LongSoundVolume: 1,
   PullSoundVolume: 1,
+  // Fork: multiplies every volume above (see PopupText._playAudioFile).
+  MasterVolume: 1,
   RumbleEnabled: false,
   InfoRumbleDuration: 400,
   InfoRumbleWeak: 0.5,

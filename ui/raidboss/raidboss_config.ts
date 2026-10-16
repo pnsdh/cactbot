@@ -31,13 +31,22 @@ import {
   CactbotConfigurator,
   ConfigLooseTrigger,
   ConfigLooseTriggerSet,
+  ConfigProcessedFile,
   ConfigProcessedFileMap,
 } from '../config/config';
+import {
+  buildTriggerBrowser,
+  FileSetting,
+  registerTriggerFile,
+  TriggerEntry,
+} from '../config/config_triggers';
 
 import raidbossFileData from './data/raidboss_manifest.txt';
 import { RaidbossTriggerField, RaidbossTriggerOutput } from './popup-text';
 import raidbossOptions, { RaidbossOptions } from './raidboss_options';
 import { TimelineParser } from './timeline_parser';
+
+type RaidbossFileInfo = ConfigProcessedFile<ConfigLooseTriggerSet>;
 
 const kOptionKeys = {
   output: 'Output',
@@ -661,9 +670,15 @@ class RaidbossConfigurator {
 
       const headerDiv = document.createElement('div');
       headerDiv.classList.add('trigger-file-header');
+      // Fork: a file's trigger rows are built when it is first opened (see buildTriggers):
+      // building all of them up front took most of the config page's load time.
+      let buildTriggers: (() => void) | undefined;
       headerDiv.onclick = () => {
         triggerContainer.classList.toggle('collapsed');
+        buildTriggers?.();
+        buildTriggers = undefined;
       };
+      this.registerTriggerFile(info, triggerContainer);
 
       const parts = [info.title, info.type, info.prefix];
       for (const part of parts) {
@@ -757,6 +772,78 @@ class RaidbossConfigurator {
         continue;
       }
 
+      // Fork: the rest of this loop, making the file's trigger rows, is in buildTriggerRows, run
+      // when the file is first opened.  Upstream code added at the end of this loop belongs there
+      // (or here, if it mustn't wait for the rows).
+      buildTriggers = () => this.buildTriggerRows(key, info, triggerOptions);
+    }
+    buildTriggerBrowser('raidboss', container);
+  }
+
+  // Fork: lets the config page's trigger browser show and search this file (config_triggers.ts).
+  registerTriggerFile(info: RaidbossFileInfo, triggerContainer: HTMLElement): void {
+    // Changes saved for the whole file, besides its triggers': its alert output and options (each
+    // against its default), and timeline edits.
+    const settings: FileSetting[] = [];
+    const setId = info.triggerSet.id;
+    if (setId !== undefined) {
+      settings.push({
+        path: [kOptionKeys.triggerSets, setId, kOptionKeys.output],
+        // The general alert output as it is now.
+        default: () =>
+          this.base.getStringOption(
+            'raidboss',
+            defaultAlertOutput.id,
+            defaultAlertOutput.default.toString(),
+          ),
+      });
+      for (const opt of info.triggerSet.config ?? []) {
+        settings.push({
+          path: [kOptionKeys.triggerSetConfig, setId, opt.id],
+          default: typeof opt.default === 'function' ? undefined : opt.default.toString(),
+        });
+      }
+    }
+    if (info.triggerSet.timeline !== undefined && typeof info.zoneId === 'number')
+      settings.push({ path: ['timeline', info.zoneId.toString()] });
+    // An overridden set shows a warning instead of its triggers.
+    if (info.triggerSet.overriddenByFile !== undefined) {
+      registerTriggerFile('raidboss', triggerContainer, info.title, info.type, [], settings);
+      return;
+    }
+
+    const severities = ['alarm', 'alert', 'info'] as const;
+    const triggers: TriggerEntry[] = [];
+    for (const [trigId, trig] of Object.entries(info.triggers ?? {})) {
+      // As buildTriggerRows skips them.
+      if (!this.base.developerOptions && !triggerOutputFunctions.some((func) => func in trig))
+        continue;
+      const outputs = Object.values(trig.configOutput ?? {});
+      const strings = Object.values(trig.outputStrings ?? {}).map((s) =>
+        typeof s === 'string' ? s : this.base.translate(s)
+      );
+      const comment = trig.comment?.[this.base.lang] ?? trig.comment?.en ?? '';
+      const severity = severities.find((s) => trig.configOutput?.[`${s}Text`] !== undefined);
+      triggers.push({
+        id: trigId,
+        text: [trigId, ...outputs, ...strings, comment].join(' ').toLowerCase(),
+        preview: severity !== undefined ? trig.configOutput?.[`${severity}Text`] : outputs[0],
+        severity: severity,
+      });
+    }
+    registerTriggerFile(
+      'raidboss',
+      triggerContainer,
+      info.title,
+      info.type,
+      triggers,
+      settings,
+    );
+  }
+
+  buildTriggerRows(key: string, info: RaidbossFileInfo, triggerOptions: HTMLElement): void {
+    // A block to keep this loop's code where it was in buildUI, for merging upstream changes.
+    {
       for (const [trigId, trig] of Object.entries(info.triggers ?? {})) {
         // Don't construct triggers that won't show anything.
         let hasOutputFunc = false;
@@ -2223,7 +2310,7 @@ const templateOptions: OptionsTemplate = {
         fr: 'Raidboss Skin',
         ja: 'Raidbossのスキン',
         cn: 'Raidboss皮肤',
-        ko: 'Raidboss 스킨',
+        ko: '레이드보스 스킨',
         tc: 'Raidboss皮膚',
       },
       type: 'select',
@@ -2513,6 +2600,22 @@ const templateOptions: OptionsTemplate = {
       },
       type: 'float',
       default: 3,
+    },
+    // Fork: one volume for all trigger sounds, over their own volumes.
+    {
+      id: 'MasterVolume',
+      name: {
+        en: 'Master volume',
+        ko: '전체 소리 크기',
+      },
+      comment: {
+        en:
+          'Multiplies the volumes below: at 100% each sound plays at its own volume. Sounds only: text to speech is as loud as set in ACT (its sound options, or a TTS plugin).',
+        ko:
+          '아래 소리 크기들에 곱해지는 배율입니다. 100%면 각 소리가 정해진 크기 그대로 납니다. 효과음에만 적용되고, TTS 음성 크기는 ACT의 사운드 설정(또는 TTS 플러그인)에서 정합니다.',
+      },
+      type: 'float',
+      default: 1,
     },
     {
       id: 'AlarmSoundVolume',

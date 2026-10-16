@@ -126,5 +126,71 @@ UserConfig.registerOptions('general', {
           return value;
       },
     },
+    // Fork: the new config page, or the original one (see config_tabs.ts).
+    {
+      id: 'ConfigStyle',
+      name: {
+        en: 'Config page style',
+        ko: '설정 화면 스타일',
+      },
+      type: 'select',
+      options: {
+        en: {
+          'New': 'modern',
+          'Original cactbot': 'classic',
+        },
+        ko: {
+          '새 디자인': 'modern',
+          '기존 cactbot 화면': 'classic',
+        },
+      },
+      default: 'modern',
+    },
+    // Fork: the config page's theme (see config_tabs.ts).
+    {
+      id: 'ConfigTheme',
+      name: {
+        en: 'Config page theme',
+        ko: '설정 화면 테마',
+      },
+      type: 'select',
+      options: {
+        en: {
+          'Dark': 'dark',
+          'Light': 'light',
+          'Follow Windows': 'system',
+        },
+        ko: {
+          '다크': 'dark',
+          '라이트': 'light',
+          'Windows 설정 따르기': 'system',
+        },
+      },
+      default: 'dark',
+      // The original page has one look.
+      hidden: (values) => values['ConfigStyle'] === 'classic',
+    },
+    // Fork: the config page's scale (also Ctrl+wheel there; see config_tabs.ts).
+    {
+      id: 'ConfigZoom',
+      name: {
+        en: 'Config page scale',
+        ko: '설정 화면 배율',
+      },
+      type: 'select',
+      options: {
+        en: {
+          '80%': '0.8',
+          '90%': '0.9',
+          '100%': '1',
+          '110%': '1.1',
+          '125%': '1.25',
+          '150%': '1.5',
+          '175%': '1.75',
+          '200%': '2',
+        },
+      },
+      default: '1',
+    },
   ],
 });
