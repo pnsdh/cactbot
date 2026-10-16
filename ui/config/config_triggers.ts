@@ -158,6 +158,38 @@ const makeKeyboardButton = (element: HTMLElement): void => {
   });
 };
 
+// Output strings (and timeline renames) start from their default text when edited, so a small
+// change needs no retyping.  Left as it was, the box goes back to empty (the default) unsaved.
+const kPrefilled = '.trigger-outputstring > input, .timeline-text-edit';
+const prefillFromDefault = (root: HTMLElement): void => {
+  root.addEventListener('focusin', (e) => {
+    const input = e.target;
+    if (!(input instanceof HTMLInputElement) || !input.matches(kPrefilled))
+      return;
+    if (input.value !== '' || input.placeholder === '')
+      return;
+    input.value = input.placeholder;
+    input.dataset.prefilled = '';
+  });
+  root.addEventListener('input', (e) => {
+    if (e.target instanceof HTMLInputElement && e.target.dataset.prefilled !== undefined)
+      e.target.dataset.prefilled = 'edited';
+  });
+  root.addEventListener('focusout', (e) => {
+    const input = e.target;
+    if (!(input instanceof HTMLInputElement) || input.dataset.prefilled === undefined)
+      return;
+    const edited = input.dataset.prefilled === 'edited';
+    delete input.dataset.prefilled;
+    if (input.value !== input.placeholder)
+      return;
+    input.value = '';
+    // Edited back to the default text: saved as the default (empty), not as that text.
+    if (edited)
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+};
+
 const isUserSection = (label: string): boolean => /[\\/]|\.js$/.test(label);
 
 // Finds a trigger's row in an open file, as either config builds it.
@@ -175,7 +207,8 @@ export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void 
   const expansions = [...groupDiv.children].filter((e): e is HTMLElement =>
     e instanceof HTMLElement && e.classList.contains('trigger-expansion-container')
   );
-  if (expansions.length === 0)
+  // The original page keeps the original lists.
+  if (expansions.length === 0 || document.documentElement.classList.contains('config-classic'))
     return;
   groupDiv.classList.add('config-trigger-browser');
 
@@ -233,6 +266,8 @@ export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void 
     )
   )
     makeKeyboardButton(header);
+
+  prefillFromDefault(groupDiv);
 
   // Fights' own options explain themselves in tooltips, as top level options do.
   for (const file of list)

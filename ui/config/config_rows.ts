@@ -39,6 +39,7 @@ const kTopics: { [group: string]: Topic[] } = {
     {
       title: { en: 'Sound', ko: '소리' },
       ids: [
+        'MasterVolume',
         'AlarmSoundVolume',
         'AlertSoundVolume',
         'InfoSoundVolume',
@@ -181,6 +182,7 @@ const kNumbers: { [id: string]: NumberKind } = {
   DisplayAlarmTextForSeconds: kSeconds,
   DisplayAlertTextForSeconds: kSeconds,
   DisplayInfoTextForSeconds: kSeconds,
+  MasterVolume: kPercent,
   AlarmSoundVolume: kPercent,
   AlertSoundVolume: kPercent,
   InfoSoundVolume: kPercent,
@@ -444,6 +446,26 @@ const decorateNumber = (
   box.before(range);
 };
 
+// A directory: its path first, cut at the start when long (the end says the most), then the button.
+// The config writes the path into its own label, which this follows.
+const decorateDirectory = (inputDiv: HTMLElement): void => {
+  const label = inputDiv.querySelector<HTMLElement>('.input-dir-label');
+  if (label === null)
+    return;
+  const path = document.createElement('span');
+  path.classList.add('config-path');
+  const text = document.createElement('bdi');
+  text.dir = 'ltr';
+  path.appendChild(text);
+  const sync = () => text.textContent = label.textContent ?? '';
+  sync();
+  const watched = { childList: true, characterData: true, subtree: true };
+  new MutationObserver(sync).observe(label, watched);
+  label.classList.add('config-hidden');
+  inputDiv.prepend(path);
+  setTooltip(path, () => escapeHtml(label.textContent ?? ''));
+};
+
 // What the default is, for the reset button: a number with its unit, a choice's text, on or off.
 const describeDefault = (
   id: string,
@@ -651,6 +673,8 @@ export const arrangeSection = (
     const input = inputDiv.querySelector<HTMLInputElement>('input[type="text"]');
     if (input !== null && isNumberType(type))
       decorateNumber(input, id, type === 'integer', translate);
+    if (type === 'directory')
+      decorateDirectory(inputDiv);
     addOptionTooltip(left, translate, kHelp[id], isNumberType(type));
     if (type !== 'html' && type !== 'directory')
       addReset(id, left, inputDiv, translate);

@@ -1737,7 +1737,9 @@ export class PopupText {
 
   _playAudioFile(_triggerHelper: TriggerHelper, url: string, volume?: number): void {
     const audio = new Audio(url);
-    audio.volume = volume ?? 1;
+    // Fork: times the master volume, kept within what audio allows.
+    const master = isFinite(this.options.MasterVolume) ? this.options.MasterVolume : 1;
+    audio.volume = Math.min(Math.max((volume ?? 1) * master, 0), 1);
     void audio.play();
   }
 

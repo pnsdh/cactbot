@@ -2596,6 +2596,20 @@ const templateOptions: OptionsTemplate = {
       type: 'float',
       default: 3,
     },
+    // Fork: one volume for all trigger sounds, over their own volumes.
+    {
+      id: 'MasterVolume',
+      name: {
+        en: 'Master volume',
+        ko: '전체 소리 크기',
+      },
+      comment: {
+        en: 'Multiplies the volumes below: at 100% each sound plays at its own volume.',
+        ko: '아래 소리 크기들에 곱해지는 배율입니다. 100%면 각 소리가 정해진 크기 그대로 납니다.',
+      },
+      type: 'float',
+      default: 1,
+    },
     {
       id: 'AlarmSoundVolume',
       name: {

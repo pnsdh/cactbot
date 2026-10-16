@@ -162,8 +162,23 @@ export const applyTheme = (theme: string): void => {
   storageSet(kThemeStorageKey, value);
 };
 
+// The original page: config_modern.css and this file's changes off (config_modern.css's rules all
+// start with :not(.config-classic) on the root).
+const kStyleStorageKey = 'cactbot-config-style';
+
+export const isClassic = (): boolean =>
+  document.documentElement.classList.contains('config-classic');
+
+export const applyStyle = (style: string): void => {
+  document.documentElement.classList.toggle('config-classic', style === 'classic');
+  storageSet(kStyleStorageKey, style === 'classic' ? 'classic' : 'modern');
+};
+
 // The saved config loads after the page shows, so the last theme is remembered here too.
 export const applyStoredTheme = (): void => {
+  const style = storageGet(kStyleStorageKey);
+  if (style !== null)
+    applyStyle(style);
   const theme = storageGet(kThemeStorageKey);
   if (theme !== null)
     applyTheme(theme);
@@ -447,6 +462,8 @@ export const buildSectionTabs = (
   translate: (text: LocaleText) => string,
 ): void => {
   document.documentElement.lang = langToLocale(lang);
+  if (isClassic())
+    return;
   document.documentElement.classList.add('config-tabs');
   handleZoomKeys();
 

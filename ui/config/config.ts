@@ -24,7 +24,13 @@ import {
 
 import defaultOptions, { ConfigOptions } from './config_options';
 import { tagOptionRow } from './config_rows';
-import { applyStoredTheme, applyTheme, applyZoom, buildSectionTabs } from './config_tabs';
+import {
+  applyStoredTheme,
+  applyStyle,
+  applyTheme,
+  applyZoom,
+  buildSectionTabs,
+} from './config_tabs';
 import { setTriggerBrowserContext } from './config_triggers';
 
 // Load other config files
@@ -375,6 +381,7 @@ export class CactbotConfigurator {
     for (const [group, template] of Object.entries(templates))
       (this.contents[group] ??= []).push(template);
 
+    applyStyle(this.getStringOption('general', 'ConfigStyle', 'modern'));
     applyTheme(this.getStringOption('general', 'ConfigTheme', 'dark'));
     applyZoom(this.getStringOption('general', 'ConfigZoom', '1'));
     // Best effort: the save goes out as a message right away.
@@ -600,6 +607,11 @@ export class CactbotConfigurator {
       applyTheme(value);
     if (group === 'general' && finalArg === 'ConfigZoom' && typeof value === 'string')
       applyZoom(value);
+    // The page is built for one style: built again for the other.
+    if (group === 'general' && finalArg === 'ConfigStyle' && typeof value === 'string') {
+      applyStyle(value);
+      void this.flushPendingSave().then(() => window.location.reload());
+    }
   }
 
   buildButterBar(): void {
