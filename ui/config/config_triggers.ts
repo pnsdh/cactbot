@@ -678,7 +678,9 @@ export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void 
           continue;
         unbuilt.delete(entry.target as HTMLElement);
         watcher?.unobserve(entry.target);
-        buildPanel(panel);
+        // Not if its page was left (or another tab chosen) before it showed.
+        if (page?.file.container === entry.target && panel.classList.contains('config-page-shown'))
+          buildPanel(panel);
       }
     });
   const scroller = () => groupDiv.closest<HTMLElement>('.config-scroll');

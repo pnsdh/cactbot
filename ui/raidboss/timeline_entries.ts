@@ -97,23 +97,34 @@ export const countEntryEdits = (zone: SavedConfigEntry | undefined): number => {
 export const countTimelineEdits = (zone: SavedConfigEntry | undefined): number => {
   if (!isObject(zone))
     return 0;
-  // An added entry's own edits aren't counted again.
-  const count = (saved: SavedConfigEntry | undefined) =>
-    parseEntryEdits(saved).filter((e) => e.added !== true).length;
-  const jobs = isObject(zone.jobEntries) ? Object.values(zone.jobEntries) : [];
-  const add = Array.isArray(zone.add) ? zone.add : [];
-  const added = add.filter((row) =>
-    isObject(row) && typeof row.text === 'string' && row.text.trim() !== '' &&
-    typeof row.time === 'string' && !isNaN(parseFloat(row.time))
-  );
+  // Added entries (each of the common ones or a job's own) as "time|text", by layer.
+  const added: { key: string; job: string }[] = [];
+  for (const row of Array.isArray(zone.add) ? zone.add : []) {
+    if (!isObject(row) || typeof row.text !== 'string' || row.text.trim() === '')
+      continue;
+    const time = typeof row.time === 'string' ? parseFloat(row.time) : NaN;
+    if (isNaN(time))
+      continue;
+    added.push({ key: `${time}|${row.text}`, job: typeof row.job === 'string' ? row.job : '' });
+  }
+  // An added entry is one edit with its own edits; a job's edits of a common added entry count
+  // as that job's.
+  const addedIn = (job: string) =>
+    new Set(added.filter((row) => row.job === job).map((row) => row.key));
+  const count = (saved: SavedConfigEntry | undefined, job: string) => {
+    const own = addedIn(job);
+    return parseEntryEdits(saved).filter((e) => e.added !== true || !own.has(`${e.time}|${e.name}`))
+      .length;
+  };
+  const jobs = isObject(zone.jobEntries) ? Object.entries(zone.jobEntries) : [];
   const hidden = isObject(zone.enable)
     ? Object.values(zone.enable).filter((v) => v === false).length
     : 0;
   const renamed = isObject(zone.globalReplace)
     ? Object.values(zone.globalReplace).filter((v) => typeof v === 'string' && v !== '').length
     : 0;
-  return count(zone.entries) + jobs.reduce((n: number, j) => n + count(j), 0) + added.length +
-    hidden + renamed;
+  return count(zone.entries, '') + jobs.reduce((n: number, [job, j]) => n + count(j, job), 0) +
+    added.length + hidden + renamed;
 };
 
 // The entry each edit is for: the one with its name at its time, or else one with its name moved
