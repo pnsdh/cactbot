@@ -439,6 +439,9 @@ export class Timeline {
           name: e.name,
           text: `${this.activeText} ${e.text}`,
           isDur: true,
+          // Fork: a highlighted entry's duration bar is highlighted too.
+          ...e.highlight !== undefined ? { highlight: e.highlight } : {},
+          ...e.highlightColor !== undefined ? { highlightColor: e.highlightColor } : {},
         };
         events.push(durationEvent);
         this.activeEvents.splice(i, 1);
@@ -475,7 +478,8 @@ export class Timeline {
       if (e.time <= this.nextEventState.minFightNow || timeUntilEvent <= 0)
         continue;
 
-      if (!(e.name in this.ignores)) {
+      // Fork: or hidden on its own (see timeline_entries.ts).
+      if (!(e.name in this.ignores) && e.hidden !== true) {
         const activeEvent: Event = {
           ...e,
           id: `${e.id}-${this.nextEventState.jumpCount}`,

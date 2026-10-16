@@ -11,6 +11,8 @@ import {
   TriggerSetAutoConfig,
 } from '../../types/trigger';
 
+import { TimelineEntryEdit } from './timeline_entries';
+
 // This file defines the base options that raidboss expects to see.
 
 // Backwards compat for this old style of overriding triggers.
@@ -32,7 +34,12 @@ export type PerTriggerOption = Partial<{
 export type TimelineConfig = Partial<{
   Ignore: string[];
   Rename: { [text: string]: string };
-  Add: { time: number; text: string; duration?: number }[];
+  // Fork: job, for an entry added for one job only.
+  Add: { time: number; text: string; duration?: number; job?: string }[];
+  // Fork: edits of single entries (see timeline_entries.ts).
+  Entries: TimelineEntryEdit[];
+  // Fork: edits for one job, over the common ones, by job.
+  JobEntries: { [job: string]: TimelineEntryEdit[] };
 }>;
 
 export type PerTriggerAutoConfig = { [triggerId: string]: TriggerAutoConfig };
@@ -58,6 +65,8 @@ type RaidbossNonConfigOptions = {
   TriggerSetConfig: TriggerSetConfig;
   Triggers: LooseTriggerSet[];
   PlayerNameOverride?: string;
+  // Fork: the player's job as timelines load, for timeline entry edits by job (set by popup-text).
+  TimelineJob?: string;
   IsRemoteRaidboss: boolean;
   // Transforms text before passing it to text popups (also affects TTS).
   TransformText: (text: string) => string;

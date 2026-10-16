@@ -739,6 +739,9 @@ export class PopupText {
     if (!this.me || !this.zoneName || !this.timelineLoader.IsReady())
       return;
 
+    // Fork: timeline entry edits by job (timeline_parser.ts) are for this job.
+    this.options.TimelineJob = this.job;
+
     // Drop the triggers and timelines from the previous zone, so we can add new ones.
     this.triggers = [];
     this.netTriggers = [];

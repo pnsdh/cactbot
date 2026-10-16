@@ -179,6 +179,12 @@
   background: var(--timeline-bar-soon-color, #f88);
 }
 
+/* Fork: highlighted entries (set in the config page) have their color as the bar's, and a bold name.
+   Skins can use .timer-bar[data-highlight] and --timeline-highlight(-rgb). */
+.timer-bar[data-highlight] timer-bar::part(timerbar-lefttext) {
+  font-weight: bold;
+}
+
 #timeline-debug {
   position: absolute;
   left: calc(100%);

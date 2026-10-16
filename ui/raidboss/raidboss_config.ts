@@ -1,7 +1,7 @@
 import { isLang, Lang } from '../../resources/languages';
 import { buildNetRegexForTrigger } from '../../resources/netregexes';
 import { UnreachableCode } from '../../resources/not_reached';
-import PartyTracker from '../../resources/party';
+import PartyTracker, { jobLocalizedFull } from '../../resources/party';
 import Regexes from '../../resources/regexes';
 import { triggerOutputFunctions } from '../../resources/responses';
 import { translateRegex, translateRegexBuildParam } from '../../resources/translations';
@@ -34,8 +34,10 @@ import {
   ConfigProcessedFile,
   ConfigProcessedFileMap,
 } from '../config/config';
+import { isClassic } from '../config/config_tabs';
 import {
   buildTriggerBrowser,
+  describeTimeline,
   FileSetting,
   registerTriggerFile,
   TriggerEntry,
@@ -44,9 +46,27 @@ import {
 import raidbossFileData from './data/raidboss_manifest.txt';
 import { RaidbossTriggerField, RaidbossTriggerOutput } from './popup-text';
 import raidbossOptions, { RaidbossOptions } from './raidboss_options';
+import { buildTimelineEditor } from './timeline_editor';
+import {
+  countEntryEdits,
+  countTimelineEdits,
+  highlightId,
+  kNoHighlight,
+  paletteColor,
+  parseEntryEdits,
+  readPalette,
+  TimelineEntryEdit,
+} from './timeline_entries';
 import { TimelineParser } from './timeline_parser';
 
 type RaidbossFileInfo = ConfigProcessedFile<ConfigLooseTriggerSet>;
+
+// Fork: on the original config page, about edits only the new style's editor shows.
+const kEntryEditsNote = {
+  en:
+    '${n} edits of single entries (or entries added for one job), made with the new config page style, apply too: switch to it to see or change them.',
+  ko: '새 디자인 설정 화면에서 항목별·직업별로 고친 내용 ${n}개도 적용되고 있습니다. 보거나 고치려면 \'설정 화면 스타일\'을 \'새 디자인\'으로 바꿔 주세요.',
+};
 
 const kOptionKeys = {
   output: 'Output',
@@ -823,11 +843,16 @@ class RaidbossConfigurator {
         typeof s === 'string' ? s : this.base.translate(s)
       );
       const comment = trig.comment?.[this.base.lang] ?? trig.comment?.en ?? '';
-      const severity = severities.find((s) => trig.configOutput?.[`${s}Text`] !== undefined);
+      // What it says: its output, or else (with output strings) the first of them.
+      // With output strings, its color only when it says them in one way.
+      const fields = severities.filter((s) => `${s}Text` in trig);
+      const severity = severities.find((s) => trig.configOutput?.[`${s}Text`] !== undefined) ??
+        (fields.length === 1 ? fields[0] : undefined);
+      const said = severity !== undefined ? trig.configOutput?.[`${severity}Text`] : outputs[0];
       triggers.push({
         id: trigId,
         text: [trigId, ...outputs, ...strings, comment].join(' ').toLowerCase(),
-        preview: severity !== undefined ? trig.configOutput?.[`${severity}Text`] : outputs[0],
+        preview: said ?? strings[0],
         severity: severity,
       });
     }
@@ -1131,17 +1156,70 @@ class RaidbossConfigurator {
 
     let hasEverBeenExpanded = false;
 
+    // Fork: read once, for the editor or for its count on a fight's page (config_triggers.ts).
+    let parsed: { text: string; timeline: TimelineParser } | undefined;
+    const parse = () => {
+      if (parsed === undefined) {
+        const text = this.timelineTextFromSet(set);
+        parsed = {
+          text: text,
+          timeline: new TimelineParser(text, set.timelineReplace ?? [], [], [], options),
+        };
+      }
+      return parsed;
+    };
+    describeTimeline(container, {
+      // As the editor lists them (hideall ones aside).
+      size: () => {
+        const { timeline } = parse();
+        return timeline.events.filter((e) =>
+          e.lineNumber !== undefined && !(e.name in timeline.ignores)
+        ).length;
+      },
+      edits: () =>
+        countTimelineEdits(
+          this.base.getJsonOption('raidboss', ['timeline', zoneId.toString()], {}),
+        ),
+    });
+
     const headerDiv = document.createElement('div');
     headerDiv.classList.add('timeline-edit-header');
     headerDiv.onclick = () => {
       container.classList.toggle('collapsed');
       // Build the rest of this UI on demand lazily.
       if (!hasEverBeenExpanded) {
-        const text = this.timelineTextFromSet(set);
-        const timeline = new TimelineParser(text, set.timelineReplace ?? [], [], [], options);
-        this.buildTimelineListingUI(timeline, text, container);
-        this.buildTimelineAddUI(zoneId, container);
-        this.buildTimelineTextUI(zoneId, timeline, container);
+        const { text, timeline } = parse();
+        // Fork: the new config page also edits single entries (timeline_editor.ts).
+        if (!isClassic()) {
+          const zonePath = ['timeline', zoneId.toString()];
+          buildTimelineEditor(container, {
+            timeline: timeline,
+            text: text,
+            translate: (text) => this.base.translate(text),
+            get: (path) => this.base.getJsonOption('raidboss', [...zonePath, ...path], ''),
+            set: (path, value) =>
+              this.base.setJsonOption('raidboss', [...zonePath, ...path], value),
+            getColors: () => this.base.getJsonOption('raidboss', ['timelineColors'], {}),
+            setColor: (id, value) =>
+              this.base.setJsonOption('raidboss', ['timelineColors', id], value),
+            jobName: (job) => this.base.translate(jobLocalizedFull[job as Job] ?? { en: job }),
+            buildByName: (pane) => this.buildTimelineTextUI(zoneId, timeline, pane),
+          });
+        } else {
+          this.buildTimelineListingUI(timeline, text, container);
+          this.buildTimelineAddUI(zoneId, container);
+          this.buildTimelineTextUI(zoneId, timeline, container);
+          // Fork: edits made in the new style's editor apply here too, but only it shows them.
+          const n = countEntryEdits(
+            this.base.getJsonOption('raidboss', ['timeline', zoneId.toString()], {}),
+          );
+          if (n > 0) {
+            const note = document.createElement('div');
+            note.style.margin = '8px 0';
+            note.innerText = this.base.translate(kEntryEditsNote).replace('${n}', n.toString());
+            container.appendChild(note);
+          }
+        }
       }
       hasEverBeenExpanded = true;
     };
@@ -1901,6 +1979,8 @@ const processPerZoneTimelineConfig = (options: RaidbossOptions, savedConfig: Sav
   const timeline = savedConfig['timeline'];
   if (typeof timeline !== 'object' || Array.isArray(timeline))
     return;
+  // Fork: the user's highlight colors.
+  const palette = readPalette(savedConfig['timelineColors']);
 
   for (const [zoneKey, zoneEntry] of Object.entries(timeline)) {
     const zoneId = parseInt(zoneKey);
@@ -1941,7 +2021,38 @@ const processPerZoneTimelineConfig = (options: RaidbossOptions, savedConfig: Sav
         if (text.trim() === '' || isNaN(time))
           continue;
 
-        (timelineConfig.Add ??= []).push({ time, text, duration });
+        // Fork: an entry added for one job only (timeline_editor.ts).
+        const job = typeof row.job === 'string' && row.job !== '' ? row.job : undefined;
+        (timelineConfig.Add ??= []).push({
+          time,
+          text,
+          duration,
+          ...job !== undefined ? { job } : {},
+        });
+      }
+    }
+
+    // Fork: * 'timeline', zoneId, 'entries', 'time|name', { text, hide, highlight, color }
+    //       * 'timeline', zoneId, 'jobEntries', job, 'time|name', { ... }
+    // (see timeline_entries.ts).  Highlights get their colors from the user's list.
+    const resolve = (edits: TimelineEntryEdit[]) => {
+      for (const edit of edits) {
+        if (edit.highlight === undefined || edit.highlight === kNoHighlight)
+          continue;
+        edit.color = paletteColor(palette, edit.highlight, edit.color);
+        edit.highlight = highlightId(edit.highlight);
+      }
+      return edits;
+    };
+    const entries = resolve(parseEntryEdits(zoneEntry['entries']));
+    if (entries.length > 0)
+      timelineConfig.Entries = entries;
+    const jobEntries = zoneEntry['jobEntries'];
+    if (typeof jobEntries === 'object' && jobEntries !== null && !Array.isArray(jobEntries)) {
+      for (const [job, saved] of Object.entries(jobEntries)) {
+        const edits = resolve(parseEntryEdits(saved));
+        if (edits.length > 0)
+          (timelineConfig.JobEntries ??= {})[job] = edits;
       }
     }
   }

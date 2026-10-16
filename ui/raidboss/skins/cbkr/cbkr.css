@@ -175,6 +175,31 @@
   --cbkr-h: var(--cbkr-soon-head);
 }
 
+/* Highlighted entries (set in the config page): their color, also once soon, and heavier names. */
+.timer-bar[data-highlight],
+.timer-bar.soon[data-highlight] {
+  --cbkr-c: var(--timeline-highlight-rgb);
+  --cbkr-h: var(--timeline-highlight-rgb-light);
+}
+
+.timer-bar[data-highlight] timer-bar {
+  --timerbar-font-weight: 750;
+}
+
+/* The bar is mostly panel until it is near, so the panel and name carry the color all along. */
+.timer-bar[data-highlight] timer-bar::part(timerbar-root) {
+  --cbkr-panel-tint: linear-gradient(90deg, rgb(var(--cbkr-c) / 24%), transparent 70%);
+}
+
+.timer-bar.next[data-highlight] timer-bar::part(timerbar-root) {
+  --cbkr-panel-tint: linear-gradient(90deg, rgb(var(--cbkr-c) / 32%), transparent 70%);
+}
+
+.timer-bar[data-highlight] timer-bar::part(timerbar-lefttext) {
+  color: rgb(var(--cbkr-h));
+  font-weight: 750;
+}
+
 .timer-bar timer-bar {
   --cbkr-d: 6.5px;
   --cbkr-edge: 255 255 255;

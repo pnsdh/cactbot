@@ -13,6 +13,7 @@ import { NetParams } from '../../types/net_props';
 import { LooseTimelineTrigger, TimelineReplacement, TriggerAutoConfig } from '../../types/trigger';
 
 import defaultOptions, { RaidbossOptions, TimelineConfig } from './raidboss_options';
+import { applyEntryEdits, editJob } from './timeline_entries';
 
 const isLogDefinitionName = (type: string): type is LogDefinitionName => {
   return type in logDefinitions;
@@ -114,6 +115,10 @@ export type Event = {
   isDur?: boolean;
   style?: { [key: string]: string };
   sync?: Sync;
+  // Fork: set by edits of single entries (see timeline_entries.ts).
+  hidden?: boolean;
+  highlight?: string;
+  highlightColor?: string;
 };
 
 export type Error = {
@@ -229,7 +234,11 @@ export class TimelineParser {
       this.ignores[text] = true;
 
     let uniqueId = 0;
+    // Fork: entries added for one job are for that job only.
+    const job = editJob(this.options.TimelineJob ?? '');
     for (const event of this.timelineConfig.Add ?? []) {
+      if (event.job !== undefined && editJob(event.job) !== job)
+        continue;
       this.events.push({
         id: `${++uniqueId}`,
         time: event.time,
@@ -473,6 +482,9 @@ export class TimelineParser {
         e.style = style.style;
       }
     }
+
+    // Fork: edits of single entries from the config page (see timeline_entries.ts).
+    applyEntryEdits(this.events, this.timelineConfig, this.options.TimelineJob ?? '');
 
     // Sort by time, but when the time is the same, sort by file order.
     // Then assign a sortKey to each event so that we can maintain that order.
