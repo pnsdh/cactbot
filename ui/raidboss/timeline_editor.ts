@@ -970,6 +970,7 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
     const closePicker = () => {
       picker?.pop.remove();
       picker?.r.colorButton.classList.remove('config-active');
+      picker?.r.row.classList.remove('config-tl-picking');
       picker = undefined;
     };
     const openPicker = (r: Row, focus = false) => {
@@ -1050,6 +1051,7 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
         r.colorButton.focus();
       });
       r.row.appendChild(pop);
+      r.row.classList.add('config-tl-picking');
       r.colorButton.classList.add('config-active');
       picker = { r: r, pop: pop };
       if (focus)

@@ -2022,6 +2022,15 @@ html:not(.config-classic) {
   position: relative;
   border-top: 1px solid var(--cfg-line);
   box-shadow: inset 3px 0 0 var(--config-tl-color);
+
+  /* Lines out of view aren't laid out (a timeline can have more than a thousand); not the
+     one with its color picker open, which reaches out of it. */
+  content-visibility: auto;
+  contain-intrinsic-size: 33px;
+}
+
+:root:not(.config-classic) .config-tl-row.config-tl-picking {
+  content-visibility: visible;
 }
 
 :root:not(.config-classic) .config-tl-row.config-tl-open {
