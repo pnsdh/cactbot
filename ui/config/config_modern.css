@@ -2180,9 +2180,8 @@ html:not(.config-classic) {
   top: calc(100% - 2px);
   right: 8px;
   z-index: 2;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  display: grid;
+  justify-items: start;
   gap: 6px;
   max-width: min(440px, calc(100% - 24px));
   padding: 8px 10px;
@@ -2313,10 +2312,27 @@ html:not(.config-classic) {
   border-color: var(--cfg-text);
 }
 
+/* The colors set the picker's width. */
+:root:not(.config-classic) .config-tl-pick-colors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Under the colors and never wider than them, with its line always there, so the picker doesn't
+   change size (and move the colors under the mouse) as names show while pointing at them. */
 :root:not(.config-classic) .config-tl-pick-name {
-  margin-left: 4px;
+  width: 0;
+  min-width: 100%;
+  min-height: 16px;
+  padding-left: 2px;
+  overflow: hidden;
+  line-height: 16px;
   color: var(--cfg-muted);
   font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 :root:not(.config-classic) .config-tl-empty {

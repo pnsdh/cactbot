@@ -975,6 +975,8 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
       closePicker();
       const { e } = r;
       const pop = make('div', 'config-tl-pop');
+      const colors = make('div', 'config-tl-pick-colors');
+      pop.appendChild(colors);
       const picks: { button: HTMLButtonElement; value: string | undefined }[] = [];
       const pickName = make('span', 'config-tl-pick-name');
       const show = () => {
@@ -1002,7 +1004,7 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
           show();
         };
         picks.push({ button: button, value: value });
-        pop.appendChild(button);
+        colors.appendChild(button);
       };
       // An entry added for this job has no common edits to follow.
       const inherits = isJob && !isOwnAdded(e);
