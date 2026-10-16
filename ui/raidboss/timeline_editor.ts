@@ -60,7 +60,13 @@ const t = {
   add: { en: '+ Add', ko: '+ 항목 추가' },
   newEntry: { en: 'New entry', ko: '새 항목' },
   colors: { en: 'Colors', ko: '강조 색' },
-  more: { en: 'More', ko: '더 보기' },
+  part: { en: 'Part', ko: '구간' },
+  prevPart: { en: 'Previous part', ko: '이전 구간' },
+  nextPart: { en: 'Next part', ko: '다음 구간' },
+  movedFlag: { en: 'Moved', ko: '옮겨짐' },
+  details: { en: 'Details', ko: '자세히' },
+  hide: { en: 'Hide', ko: '숨기기' },
+  show: { en: 'Show', ko: '보이기' },
   sectionsHelp: {
     en:
       '<p>The timeline jumps between its parts as the fight goes (e.g. by the boss\'s pattern), so times are where entries are in the timeline file (in seconds), not times in the fight.</p><p>Click a part to go to it.</p>',
@@ -70,17 +76,16 @@ const t = {
   start: { en: 'Start', ko: '시작' },
   from: { en: 'from ${time}s', ko: '${time}초부터' },
   addedBadge: { en: 'Added', ko: '추가' },
-  shownText: { en: 'Shown as', ko: '표시 문구' },
-  shown: { en: 'Shown', ko: '보임' },
-  hidden: { en: 'Hidden', ko: '숨김' },
   highlight: { en: 'Highlight', ko: '강조' },
   none: { en: 'None', ko: '없음' },
   inherit: { en: 'As common', ko: '공통 따름' },
   applyAll: { en: 'This highlight for all ${n}', ko: '같은 이름 ${n}개 모두 이 강조로' },
-  reset: { en: '↺ As common', ko: '↺ 공통으로' },
+  resetTip: {
+    en: 'Removes this job\'s edit of this entry, so the common one applies.',
+    ko: '이 항목의 직업 편집을 지우고 공통 편집을 따릅니다.',
+  },
   remove: { en: 'Remove', ko: '삭제' },
   time: { en: 'Time (s)', ko: '시간(초)' },
-  text: { en: 'Text', ko: '문구' },
   duration: { en: 'Duration (s)', ko: '지속 시간(초)' },
   offset: {
     en: '+${s}s from the start of this part (in the timeline file).',
@@ -332,6 +337,18 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
       return a !== undefined && (a.job ?? '') === l;
     }).length;
 
+  // The open color picker closes on a click elsewhere (set as the entries are built).
+  let closeOpenPicker: () => void = () => undefined;
+  let pickerOf: () => HTMLElement | undefined = () => undefined;
+  document.addEventListener('mousedown', (e) => {
+    const pop = pickerOf();
+    if (pop === undefined || !(e.target instanceof Node) || pop.contains(e.target))
+      return;
+    if (e.target instanceof Element && e.target.closest('.config-tl-color-button') !== null)
+      return;
+    closeOpenPicker();
+  });
+
   // Called on scroll while the entries show (set as they are built).
   let onScroll: () => void = () => undefined;
   let scrollQueued = false;
@@ -453,10 +470,12 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
     const isHidden = (e: Event) => hiddenByName(e) || (edit(e).hide ?? commonEdit(e).hide) === true;
 
     // ---- The bar on top: the edited layer, search, filters, adding, colors; the parts ----
+    // What to edit and the colors on top; finding and going around stays in view.
+    const head = make('div', 'config-tl-toolbar config-tl-head');
     const sticky = make('div', 'config-tl-sticky');
     const toolbar = make('div', 'config-tl-toolbar');
     sticky.appendChild(toolbar);
-    pane.appendChild(sticky);
+    pane.append(head, sticky);
 
     const layerName = (l: Layer) => l === '' ? tr(t.common) : ctx.jobName(l);
     const withCount = (l: Layer) => {
@@ -487,26 +506,8 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
     editedOnly.classList.toggle('config-active', filters.onlyEdited);
     editedOnly.append(make('span', 'config-mini-switch'), tr(t.editedOnly), count);
     const addButton = make('button', 'config-tl-tool', tr(t.add));
-    // Less used: the colors and copying, in a menu.
-    const more = make('span', 'config-tl-more');
-    const moreButton = make('button', 'config-tl-tool config-tl-more-button', '⋯');
-    moreButton.setAttribute('aria-label', tr(t.more));
-    moreButton.setAttribute('aria-haspopup', 'true');
-    const menu = make('div', 'config-tl-menu config-hidden');
-    const colorsButton = make('button', 'config-tl-menu-item', `🎨 ${tr(t.colors)}`);
+    const colorsButton = make('button', 'config-tl-tool', `🎨 ${tr(t.colors)}`);
     colorsButton.classList.toggle('config-active', colorsOpen);
-    menu.appendChild(colorsButton);
-    more.append(moreButton, menu);
-    const showMenu = (show: boolean) => {
-      menu.classList.toggle('config-hidden', !show);
-      moreButton.classList.toggle('config-active', show);
-      moreButton.setAttribute('aria-expanded', show ? 'true' : 'false');
-    };
-    moreButton.onclick = () => showMenu(menu.classList.contains('config-hidden'));
-    more.addEventListener('focusout', (e) => {
-      if (!(e.relatedTarget instanceof Node) || !more.contains(e.relatedTarget))
-        showMenu(false);
-    });
 
     // Copy another layer's edits (and entries added for it) here, leaving the ones here.
     const copy = make('select', 'config-tl-copy');
@@ -515,17 +516,30 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
       if (l !== layer && layerCount(l) > 0)
         copy.add(new Option(withCount(l), l));
     }
-    toolbar.append(layerGroup, search, editedOnly, addButton, more);
     if (copy.options.length > 1)
-      menu.appendChild(copy);
+      layerGroup.appendChild(copy);
 
-    // Parts of a timeline with jumps, to go to.
-    const partBar = make('div', 'config-tl-parts');
-    const partChips: { chip: HTMLButtonElement; heading: HTMLElement }[] = [];
-    if (sections.length > 0) {
-      partBar.appendChild(help(() => tr(t.sectionsHelp)));
-      sticky.appendChild(partBar);
-    }
+    // Parts of a timeline with jumps: the one in view, to go to another, and the ones around it.
+    const partGroup = make('span', 'config-tl-part-group');
+    const partSelect = make('select', 'config-tl-part-select');
+    partSelect.setAttribute('aria-label', tr(t.part));
+    const prevPart = make('button', 'config-tl-tool config-tl-step', '‹');
+    prevPart.setAttribute('aria-label', tr(t.prevPart));
+    prevPart.title = tr(t.prevPart);
+    const nextPart = make('button', 'config-tl-tool config-tl-step', '›');
+    nextPart.setAttribute('aria-label', tr(t.nextPart));
+    nextPart.title = tr(t.nextPart);
+    partGroup.append(
+      make('span', 'config-tl-part-label', tr(t.part)),
+      partSelect,
+      prevPart,
+      nextPart,
+      help(() => tr(t.sectionsHelp)),
+    );
+    head.append(layerGroup, colorsButton);
+    toolbar.append(search, editedOnly, addButton);
+    if (sections.length > 0)
+      toolbar.appendChild(partGroup);
 
     const colorsBox = make('div', 'config-tl-colors');
     colorsBox.classList.toggle('config-hidden', !colorsOpen);
@@ -573,7 +587,13 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
     pane.appendChild(list);
     const empty = make('div', 'config-tl-empty config-hidden', tr(t.noMatch));
 
-    type Row = { e: Event; row: HTMLElement; refresh: () => void };
+    type Row = {
+      e: Event;
+      row: HTMLElement;
+      input: HTMLInputElement;
+      colorButton: HTMLButtonElement;
+      refresh: () => void;
+    };
     const rows: Row[] = [];
     const headings: { heading: HTMLElement; rows: HTMLElement[] }[] = [];
     const sectionOf = (e: Event): Section | undefined =>
@@ -581,7 +601,9 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
     const sectionOfRow = new Map<Event, Section | undefined>();
     let lastSection: Section | undefined | null = null;
     let currentSection: Section | undefined;
+    // The open details of an entry, and the open color picker.
     let open: { r: Row; panel: HTMLElement } | undefined;
+    let picker: { r: Row; pop: HTMLElement } | undefined;
 
     const fileHeader = parent.closest('.trigger-file-container')
       ?.querySelector<HTMLElement>(':scope > .trigger-file-header');
@@ -592,77 +614,6 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
       if (s !== null)
         s.scrollTop -= (fileHeader?.offsetHeight ?? 0) + sticky.offsetHeight + 4;
     };
-
-    for (const e of events) {
-      if (!isAdded(e))
-        currentSection = sectionOf(e);
-      sectionOfRow.set(e, currentSection);
-      if (sections.length > 0 && currentSection !== lastSection) {
-        lastSection = currentSection;
-        const title = currentSection === undefined
-          ? tr(t.start)
-          : `${currentSection.title} · ${
-            format(t.from, { time: formatSeconds(currentSection.time) })
-          }`;
-        const heading = make('div', 'config-tl-section', title);
-        list.appendChild(heading);
-        headings.push({ heading: heading, rows: [] });
-        const chip = make('button', 'config-tl-part', currentSection?.title ?? tr(t.start));
-        chip.onclick = () => goTo(heading);
-        partBar.appendChild(chip);
-        partChips.push({ chip: chip, heading: heading });
-      }
-
-      const row = make('div', 'config-tl-row');
-      row.tabIndex = 0;
-      row.setAttribute('role', 'button');
-      row.setAttribute('aria-expanded', 'false');
-      headings[headings.length - 1]?.rows.push(row);
-      const time = make('span', 'config-tl-time', formatSeconds(e.time));
-      const name = make('span', 'config-tl-name');
-      const shown = make('span', 'config-tl-shown');
-      const was = make('span', 'config-tl-was');
-      name.append(shown, was);
-      const same = sameName.get(e.name) ?? [];
-      if (same.length > 1)
-        name.appendChild(make('span', 'config-tl-dup', `#${same.indexOf(e) + 1}/${same.length}`));
-      if (isAdded(e)) {
-        const job = addedInfo.get(e)?.job;
-        const badge = job !== undefined ? ctx.jobName(job) : tr(t.addedBadge);
-        name.appendChild(make('span', 'config-tl-badge', badge));
-      }
-      const state = make('span', 'config-tl-state');
-      const jobChip = make('span', 'config-tl-badge', isJob ? ctx.jobName(layer) : '');
-      const hiddenChip = make('span', 'config-tl-hidden-chip', tr(t.hidden));
-      const dot = make('span', 'config-tl-dot');
-      state.append(jobChip, hiddenChip, dot);
-      row.append(time, name, state);
-      list.appendChild(row);
-
-      const refresh = () => {
-        const text = shownText(e);
-        shown.textContent = text;
-        was.textContent = text !== e.text ? `← ${e.text}` : '';
-        const color = paletteColor(palette, effective(e).highlight, effective(e).color);
-        row.style.setProperty('--config-tl-color', color ?? 'transparent');
-        dot.classList.toggle('config-hidden', color === undefined);
-        row.classList.toggle('config-tl-highlighted', color !== undefined);
-        row.classList.toggle('config-tl-hidden', isHidden(e));
-        hiddenChip.classList.toggle('config-hidden', !isHidden(e));
-        jobChip.classList.toggle('config-hidden', !isJob || isEmpty(edit(e)));
-        row.classList.toggle('config-tl-edited', isEdited(e));
-      };
-      refresh();
-      const r: Row = { e: e, row: row, refresh: refresh };
-      rows.push(r);
-    }
-    list.appendChild(empty);
-
-    const updateCount = () => {
-      const n = events.filter(isEdited).length;
-      count.textContent = n > 0 ? n.toString() : '';
-    };
-    updateCount();
 
     const save = (e: Event, value: Edit) => {
       const current = own.state.get(e);
@@ -678,130 +629,250 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
       entriesPane.replaceChildren();
       buildEntries(entriesPane);
     };
-
-    // ---- An open entry ----
-    const buildPanel = (r: Row): HTMLElement => {
-      const { e } = r;
-      const panel = make('div', 'config-tl-panel');
-      const notes = make('div', 'config-tl-notes');
-      const note = (text: string, cls?: string) => notes.appendChild(make('p', cls, text));
+    // An entry added here: its time, text or duration changed (its edits go with it).
+    const updateAdded = (e: Event, change: { [key: string]: string }): boolean => {
+      const index = addedInfo.get(e)?.index ?? -1;
+      const before = entryKey(e.time, e.name, true);
+      writeAddRows((all) => {
+        const target = all[index];
+        if (target !== undefined)
+          Object.assign(target, change);
+      });
+      const a = addedRow(addRows()[index]);
+      if (a === undefined)
+        return false;
+      e.time = a.time;
+      e.name = a.text;
+      e.text = a.text;
+      const after = entryKey(e.time, e.name, true);
+      if (after !== before) {
+        moveKeys(before, after);
+        reload();
+      }
+      return true;
+    };
+    // The text an entry shows unless edited here.
+    const inherited = (e: Event) => isOwnAdded(e) ? e.text : commonEdit(e).text ?? baseText(e);
+    // Notes about an entry, for its details.
+    const notesOf = (e: Event): { text: string; warn: boolean }[] => {
+      const notes: { text: string; warn: boolean }[] = [];
       const section = sectionOfRow.get(e);
       if (section !== undefined)
-        note(format(t.offset, { s: formatSeconds(e.time - section.time) }));
+        notes.push({
+          text: format(t.offset, { s: formatSeconds(e.time - section.time) }),
+          warn: false,
+        });
       if (isAdded(e)) {
         const job = addedInfo.get(e)?.job;
-        if (job !== undefined)
-          note(format(t.addedJobNote, { job: ctx.jobName(job) }));
-        else
-          note(tr(isJob ? t.addedCommonNote : t.addedNote));
+        const text = job !== undefined
+          ? format(t.addedJobNote, { job: ctx.jobName(job) })
+          : tr(isJob ? t.addedCommonNote : t.addedNote);
+        notes.push({ text: text, warn: false });
       }
       if (baseText(e) !== e.text)
-        note(format(t.renamed, { text: baseText(e) }));
+        notes.push({ text: format(t.renamed, { text: baseText(e) }), warn: false });
       if (hiddenByName(e))
-        note(tr(t.hiddenByName), 'config-tl-warn');
+        notes.push({ text: tr(t.hiddenByName), warn: true });
       const key = own.state.get(e)?.key;
       const at = key !== undefined ? parseEntryKey(key) : undefined;
       if (at !== undefined && Math.abs(at.time - e.time) > 0.001)
-        note(format(t.moved, { time: formatSeconds(at.time) }), 'config-tl-warn');
-      if (notes.childElementCount > 0)
-        panel.appendChild(notes);
+        notes.push({ text: format(t.moved, { time: formatSeconds(at.time) }), warn: true });
+      return notes;
+    };
+    const isMoved = (e: Event) => {
+      const key = own.state.get(e)?.key;
+      const at = key !== undefined ? parseEntryKey(key) : undefined;
+      return at !== undefined && Math.abs(at.time - e.time) > 0.001;
+    };
+    const visibleRows = () => rows.filter((x) => !x.row.classList.contains('config-hidden'));
 
-      // Text (for an entry added here, its time, text and duration), and hidden.
-      const line = make('div', 'config-tl-panel-line');
-      panel.appendChild(line);
-      const field = (label: LocaleText, cls: string, value: string, placeholder?: string) => {
-        const wrap = make('label', `config-tl-field ${cls}`);
-        wrap.appendChild(make('span', 'config-tl-field-label', tr(label)));
-        const input = make('input');
-        input.type = 'text';
-        input.value = value;
-        if (placeholder !== undefined)
-          input.placeholder = placeholder;
-        wrap.appendChild(input);
-        line.appendChild(wrap);
-        return input;
-      };
-      let textInput: HTMLInputElement;
-      if (isOwnAdded(e)) {
-        const index = addedInfo.get(e)?.index ?? -1;
-        const saved = asObject(addRows()[index]);
-        const timeInput = field(
-          t.time,
-          'config-tl-f-time',
-          typeof saved.time === 'string' ? saved.time : '',
+    for (const e of events) {
+      if (!isAdded(e))
+        currentSection = sectionOf(e);
+      sectionOfRow.set(e, currentSection);
+      if (sections.length > 0 && currentSection !== lastSection) {
+        lastSection = currentSection;
+        const when = currentSection !== undefined
+          ? format(t.from, { time: formatSeconds(currentSection.time) })
+          : undefined;
+        const title = currentSection?.title ?? tr(t.start);
+        const heading = make(
+          'div',
+          'config-tl-section',
+          when !== undefined ? `${title} · ${when}` : title,
         );
-        textInput = field(t.text, 'config-tl-f-text', e.text);
-        const durationInput = field(
-          t.duration,
-          'config-tl-f-duration',
-          typeof saved.duration === 'string' ? saved.duration : '',
-        );
-        const update = (change: { [key: string]: string }): boolean => {
-          const before = entryKey(e.time, e.name, true);
-          writeAddRows((all) => {
-            const target = all[index];
-            if (target !== undefined)
-              Object.assign(target, change);
-          });
-          const a = addedRow(addRows()[index]);
-          if (a === undefined)
-            return false;
-          e.time = a.time;
-          e.name = a.text;
-          e.text = a.text;
-          const after = entryKey(e.time, e.name, true);
-          if (after !== before) {
-            moveKeys(before, after);
-            reload();
-          }
-          return true;
-        };
-        textInput.oninput = () => {
-          if (update({ text: textInput.value }))
-            r.refresh();
-        };
-        durationInput.oninput = () => update({ duration: durationInput.value });
-        // A new time puts the entry in its place.
-        timeInput.onchange = () => {
-          if (update({ time: timeInput.value }))
-            rebuild();
-        };
-        const remove = make('button', 'config-tl-remove', tr(t.remove));
-        remove.onclick = () => {
-          moveKeys(entryKey(e.time, e.name, true));
-          writeAddRows((all) => all.splice(index, 1));
-          openId = undefined;
-          rebuild();
-        };
-        line.appendChild(remove);
-      } else {
-        const inherited = () => commonEdit(e).text ?? baseText(e);
-        textInput = field(t.shownText, 'config-tl-f-text', edit(e).text ?? '', inherited());
-        // Starts from what it is now when edited (see prefillFromDefault).
-        textInput.classList.add('config-tl-text');
-        textInput.oninput = () => {
-          const value = textInput.value === inherited() ? undefined : textInput.value;
-          save(e, { ...edit(e), text: value });
-          r.refresh();
-          refreshPanel();
-        };
+        list.appendChild(heading);
+        headings.push({ heading: heading, rows: [] });
+        partSelect.add(new Option(title, (headings.length - 1).toString()));
       }
-      const hide = make('button', 'config-tl-hide');
-      hide.disabled = hiddenByName(e);
-      hide.onclick = () => {
+
+      // A line: its time, its text to edit in place, then marks and buttons: hidden, color,
+      // details.
+      const row = make('div', 'config-tl-row');
+      headings[headings.length - 1]?.rows.push(row);
+      const time = make('span', 'config-tl-time', formatSeconds(e.time));
+      const cell = make('span', 'config-tl-cell');
+      const input = make('input', 'config-tl-inline');
+      input.type = 'text';
+      input.setAttribute('aria-label', e.text);
+      const was = make('span', 'config-tl-was');
+      cell.append(input, was);
+      const side = make('span', 'config-tl-side');
+      const same = sameName.get(e.name) ?? [];
+      if (same.length > 1)
+        side.appendChild(make('span', 'config-tl-dup', `#${same.indexOf(e) + 1}/${same.length}`));
+      if (isAdded(e)) {
+        const job = addedInfo.get(e)?.job;
+        side.appendChild(
+          make('span', 'config-tl-badge', job !== undefined ? ctx.jobName(job) : tr(t.addedBadge)),
+        );
+      }
+      const flag = make('button', 'config-tl-flag', tr(t.movedFlag));
+      side.appendChild(flag);
+      // A job's edit of this entry, which goes back to the common one.
+      const jobChip = make('button', 'config-tl-job-chip', isJob ? `${ctx.jobName(layer)} ↺` : '');
+      jobChip.title = tr(t.resetTip);
+      if (isJob && !isOwnAdded(e))
+        side.appendChild(jobChip);
+      const eye = make('button', 'config-tl-icon config-tl-eye');
+      eye.disabled = hiddenByName(e);
+      const colorButton = make('button', 'config-tl-icon config-tl-color-button');
+      colorButton.title = tr(t.highlight);
+      colorButton.setAttribute('aria-label', tr(t.highlight));
+      const dot = make('span', 'config-tl-dot');
+      colorButton.appendChild(dot);
+      const more = make('button', 'config-tl-icon config-tl-more', '▾');
+      more.title = tr(t.details);
+      more.setAttribute('aria-label', tr(t.details));
+      side.append(eye, colorButton, more);
+      row.append(time, cell, side);
+      list.appendChild(row);
+
+      const refresh = () => {
+        if (document.activeElement !== input)
+          input.value = shownText(e);
+        input.placeholder = inherited(e);
+        was.textContent = shownText(e) !== e.text ? `← ${e.text}` : '';
+        const color = paletteColor(palette, effective(e).highlight, effective(e).color);
+        row.style.setProperty('--config-tl-color', color ?? 'transparent');
+        dot.classList.toggle('config-tl-dot-none', color === undefined);
+        row.classList.toggle('config-tl-highlighted', color !== undefined);
+        const hidden = isHidden(e);
+        row.classList.toggle('config-tl-hidden', hidden);
+        eye.textContent = hidden ? '⦸' : '👁';
+        eye.classList.toggle('config-active', hidden);
+        eye.title = tr(hidden ? t.show : t.hide);
+        eye.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+        flag.classList.toggle('config-hidden', !isMoved(e));
+        jobChip.classList.toggle('config-hidden', isEmpty(edit(e)));
+        more.classList.toggle('config-hidden', notesOf(e).length === 0 && !isOwnAdded(e));
+        row.classList.toggle('config-tl-edited', isEdited(e));
+      };
+      refresh();
+      const r: Row = { e: e, row: row, input: input, colorButton: colorButton, refresh: refresh };
+      rows.push(r);
+
+      // The text, edited in place: an entry added here changes its own, others are edited over
+      // what they show.
+      let before = '';
+      input.onfocus = () => before = input.value;
+      input.oninput = () => {
+        if (isOwnAdded(e)) {
+          if (updateAdded(e, { text: input.value }))
+            refresh();
+          return;
+        }
+        const v = input.value;
+        save(e, { ...edit(e), text: v === '' || v === inherited(e) ? undefined : v });
+        refresh();
+      };
+      input.onblur = () => {
+        if (input.value === '')
+          input.value = shownText(e);
+      };
+      input.onkeydown = (ev) => {
+        if (ev.key === 'Escape') {
+          input.value = before;
+          input.dispatchEvent(new window.Event('input'));
+          input.blur();
+          return;
+        }
+        // Up and down (and Enter, down) go to the next entries' text.
+        const step = ev.key === 'ArrowUp'
+          ? -1
+          : ev.key === 'ArrowDown' || ev.key === 'Enter'
+          ? 1
+          : 0;
+        if (step === 0)
+          return;
+        ev.preventDefault();
+        const shown = visibleRows();
+        const target = shown[shown.indexOf(r) + step];
+        target?.input.focus();
+        target?.input.select();
+        target?.row.scrollIntoView({ block: 'nearest' });
+      };
+      eye.onclick = () => {
         const hidden = !isHidden(e);
         const inheritedHide = commonEdit(e).hide === true;
-        const value = isJob ? (hidden === inheritedHide ? undefined : hidden) : hidden || undefined;
+        const value = isJob && !isOwnAdded(e)
+          ? (hidden === inheritedHide ? undefined : hidden)
+          : hidden || undefined;
         save(e, { ...edit(e), hide: value });
-        r.refresh();
-        refreshPanel();
+        refresh();
       };
-      line.appendChild(hide);
+      jobChip.onclick = () => {
+        save(e, {});
+        input.value = shownText(e);
+        refresh();
+        if (picker?.r === r)
+          openPicker(r);
+      };
+      colorButton.onclick = () => {
+        if (picker?.r === r)
+          closePicker();
+        else
+          openPicker(r);
+      };
+      more.onclick = () => toggleDetails(r);
+      flag.onclick = () => toggleDetails(r);
+      // Clicking the line elsewhere edits its text.
+      row.onclick = (ev) => {
+        if (ev.target === row || ev.target === time || ev.target === cell)
+          input.focus();
+      };
+    }
+    list.appendChild(empty);
 
-      // Highlight: none, the colors (and for a job, as common).
-      const colorLine = make('div', 'config-tl-panel-line config-tl-pick-line');
-      colorLine.appendChild(make('span', 'config-tl-field-label', tr(t.highlight)));
+    const updateCount = () => {
+      const n = events.filter(isEdited).length;
+      count.textContent = n > 0 ? n.toString() : '';
+    };
+    updateCount();
+
+    // ---- The color picker of an entry: none, the colors (and for a job, as common) ----
+    const closePicker = () => {
+      picker?.pop.remove();
+      picker?.r.colorButton.classList.remove('config-active');
+      picker = undefined;
+    };
+    const openPicker = (r: Row) => {
+      closePicker();
+      const { e } = r;
+      const pop = make('div', 'config-tl-pop');
       const picks: { button: HTMLButtonElement; value: string | undefined }[] = [];
+      const pickName = make('span', 'config-tl-pick-name');
+      const show = () => {
+        const mine = edit(e);
+        let current: string | undefined;
+        if (mine.highlight === undefined)
+          current = inherits ? undefined : '';
+        else
+          current = mine.highlight === kNoHighlight ? '' : highlightId(mine.highlight);
+        for (const { button, value } of picks)
+          button.classList.toggle('config-active', value === current);
+        pickName.textContent = highlightName(effective(e));
+      };
       const pick = (button: HTMLButtonElement, value: string | undefined) => {
         button.onclick = () => {
           let highlight = value;
@@ -809,10 +880,10 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
             highlight = isJob && commonEdit(e).highlight !== undefined ? kNoHighlight : undefined;
           save(e, { ...edit(e), highlight: highlight, color: undefined });
           r.refresh();
-          refreshPanel();
+          show();
         };
         picks.push({ button: button, value: value });
-        colorLine.appendChild(button);
+        pop.appendChild(button);
       };
       // An entry added for this job has no common edits to follow.
       const inherits = isJob && !isOwnAdded(e);
@@ -836,12 +907,8 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
         swatch.setAttribute('aria-label', colorName(p));
         pick(swatch, p.id);
       }
-      const pickName = make('span', 'config-tl-pick-name');
-      colorLine.appendChild(pickName);
-      panel.appendChild(colorLine);
-
-      // Actions.
-      const actions = make('div', 'config-tl-panel-line config-tl-actions');
+      pop.appendChild(pickName);
+      // The same highlight for every entry with this name.
       const same = sameName.get(e.name) ?? [];
       if (same.length > 1) {
         const all = make('button', 'config-tl-action', format(t.applyAll, { n: same.length }));
@@ -856,85 +923,93 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
               x.refresh();
           }
         };
-        actions.appendChild(all);
+        pop.appendChild(all);
       }
-      const reset = make('button', 'config-tl-action', tr(t.reset));
-      reset.onclick = () => {
-        save(e, {});
-        textInput.value = '';
-        r.refresh();
-        refreshPanel();
-      };
-      if (isJob && !isOwnAdded(e))
-        actions.appendChild(reset);
-      panel.appendChild(actions);
-
-      const refreshPanel = () => {
-        const mine = edit(e);
-        const hidden = isHidden(e);
-        hide.textContent = hidden ? `⦸ ${tr(t.hidden)}` : `👁 ${tr(t.shown)}`;
-        hide.classList.toggle('config-active', hidden);
-        hide.setAttribute('aria-pressed', hidden ? 'true' : 'false');
-        let current: string | undefined;
-        if (mine.highlight === undefined)
-          current = inherits ? undefined : '';
-        else
-          current = mine.highlight === kNoHighlight ? '' : highlightId(mine.highlight);
-        for (const { button, value } of picks)
-          button.classList.toggle('config-active', value === current);
-        pickName.textContent = highlightName(effective(e));
-        reset.classList.toggle('config-hidden', isEmpty(mine));
-        const anyAction = [...actions.children].some((c) => !c.classList.contains('config-hidden'));
-        actions.classList.toggle('config-hidden', !anyAction);
-      };
-      refreshPanel();
-
-      panel.addEventListener('keydown', (ev) => {
+      show();
+      pop.addEventListener('keydown', (ev) => {
         if (ev.key !== 'Escape')
           return;
         ev.stopPropagation();
-        close();
-        r.row.focus();
+        closePicker();
+        r.colorButton.focus();
       });
+      r.row.appendChild(pop);
+      r.colorButton.classList.add('config-active');
+      picker = { r: r, pop: pop };
+    };
+    closeOpenPicker = closePicker;
+    pickerOf = () => picker?.pop;
+
+    // ---- The details of an entry: notes, and for one added here, its time and duration ----
+    const buildDetails = (r: Row): HTMLElement => {
+      const { e } = r;
+      const panel = make('div', 'config-tl-panel');
+      const notes = notesOf(e);
+      if (notes.length > 0) {
+        const box = make('div', 'config-tl-notes');
+        for (const n of notes)
+          box.appendChild(make('p', n.warn ? 'config-tl-warn' : undefined, n.text));
+        panel.appendChild(box);
+      }
+      if (isOwnAdded(e)) {
+        const line = make('div', 'config-tl-panel-line');
+        const saved = asObject(addRows()[addedInfo.get(e)?.index ?? -1]);
+        const field = (label: LocaleText, cls: string, value: SavedConfigEntry | undefined) => {
+          const wrap = make('label', `config-tl-field ${cls}`);
+          wrap.appendChild(make('span', 'config-tl-field-label', tr(label)));
+          const input = make('input');
+          input.type = 'text';
+          input.value = typeof value === 'string' ? value : '';
+          wrap.appendChild(input);
+          line.appendChild(wrap);
+          return input;
+        };
+        const timeInput = field(t.time, 'config-tl-f-time', saved.time);
+        const durationInput = field(t.duration, 'config-tl-f-duration', saved.duration);
+        durationInput.oninput = () => updateAdded(e, { duration: durationInput.value });
+        // A new time puts the entry in its place.
+        timeInput.onchange = () => {
+          if (updateAdded(e, { time: timeInput.value }))
+            rebuild();
+        };
+        const remove = make('button', 'config-tl-remove', tr(t.remove));
+        remove.onclick = () => {
+          moveKeys(entryKey(e.time, e.name, true));
+          writeAddRows((all) => all.splice(addedInfo.get(e)?.index ?? -1, 1));
+          openId = undefined;
+          rebuild();
+        };
+        line.appendChild(remove);
+        panel.appendChild(line);
+      }
       return panel;
     };
-
-    const unmark = () => {
+    const closeDetails = () => {
       if (open === undefined)
         return;
       open.panel.remove();
       open.r.row.classList.remove('config-tl-open');
-      open.r.row.setAttribute('aria-expanded', 'false');
-    };
-    const close = () => {
-      unmark();
       open = undefined;
       openId = undefined;
     };
-    const openRow = (r: Row) => {
-      unmark();
-      const panel = buildPanel(r);
+    const toggleDetails = (r: Row) => {
+      const same = open?.r === r;
+      closeDetails();
+      if (same)
+        return;
+      const panel = buildDetails(r);
       r.row.after(panel);
       r.row.classList.add('config-tl-open');
-      r.row.setAttribute('aria-expanded', 'true');
       open = { r: r, panel: panel };
       openId = idOf(r.e);
     };
-    const toggle = (r: Row) => {
-      if (open?.r === r)
-        close();
-      else
-        openRow(r);
-    };
-    for (const r of rows)
-      r.row.onclick = () => toggle(r);
 
     // ---- Colors ----
     const refreshAll = () => {
       for (const r of rows)
         r.refresh();
-      if (open !== undefined)
-        openRow(open.r);
+      if (picker !== undefined)
+        openPicker(picker.r);
     };
     const buildColors = () => {
       colorsBox.replaceChildren();
@@ -999,7 +1074,6 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
       colorsBox.appendChild(addColor);
     };
     colorsButton.onclick = () => {
-      showMenu(false);
       colorsOpen = !colorsOpen;
       colorsButton.classList.toggle('config-active', colorsOpen);
       colorsBox.classList.toggle('config-hidden', !colorsOpen);
@@ -1009,48 +1083,24 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
     if (colorsOpen)
       buildColors();
 
-    // ---- Keyboard: up and down move between entries (an open one follows), Enter opens ----
-    const visibleRows = () => rows.filter((x) => !x.row.classList.contains('config-hidden'));
-    list.addEventListener('keydown', (ev) => {
-      const r = rows.find((x) => x.row === ev.target);
-      if (r === undefined)
-        return;
-      if (ev.key === 'Enter' || ev.key === ' ') {
-        ev.preventDefault();
-        toggle(r);
-        return;
-      }
-      if (ev.key === 'Escape') {
-        close();
-        return;
-      }
-      if (ev.key !== 'ArrowDown' && ev.key !== 'ArrowUp')
-        return;
-      ev.preventDefault();
-      const shown = visibleRows();
-      const target = shown[shown.indexOf(r) + (ev.key === 'ArrowDown' ? 1 : -1)];
-      if (target === undefined)
-        return;
-      const following = open !== undefined;
-      target.row.focus();
-      if (following)
-        openRow(target);
-      target.row.scrollIntoView({ block: 'nearest' });
-    });
-
     // ---- Filters ----
     const filter = () => {
       const query = filters.query.trim().toLowerCase();
       let shown = 0;
-      for (const { e, row } of rows) {
+      for (const r of rows) {
+        const { e, row } = r;
         const hit = (query === '' ||
           `${e.text} ${e.name} ${shownText(e)}`.toLowerCase().includes(query)) &&
           (!filters.onlyEdited || isEdited(e));
         row.classList.toggle('config-hidden', !hit);
-        if (hit)
+        if (hit) {
           shown++;
-        else if (open?.r.row === row)
-          close();
+        } else {
+          if (open?.r === r)
+            closeDetails();
+          if (picker?.r === r)
+            closePicker();
+        }
       }
       for (const { heading, rows } of headings) {
         const none = rows.every((x) => x.classList.contains('config-hidden'));
@@ -1066,7 +1116,7 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
       if (ev.key !== 'Enter')
         return;
       ev.preventDefault();
-      visibleRows()[0]?.row.focus();
+      visibleRows()[0]?.input.focus();
     };
     editedOnly.onclick = () => {
       filters.onlyEdited = !filters.onlyEdited;
@@ -1113,7 +1163,7 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
       }
       rebuild();
     };
-    // A new entry at the time in view, opened to type its text.
+    // A new entry at the time in view, its text ready to type.
     const topRow = (): Row | undefined => {
       const bottom = sticky.getBoundingClientRect().bottom;
       return visibleRows().find((x) => x.row.getBoundingClientRect().bottom > bottom);
@@ -1138,40 +1188,48 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
       rebuild();
     };
 
-    // ---- The bar stays under the fight's header; the part in view is marked ----
+    // ---- The bar stays under the fight's header; the part in view is shown ----
+    const currentPart = (): number => {
+      const bottom = sticky.getBoundingClientRect().bottom + 8;
+      let current = 0;
+      headings.forEach(({ heading }, i) => {
+        const visible = !heading.classList.contains('config-hidden');
+        if (visible && heading.getBoundingClientRect().top <= bottom)
+          current = i;
+      });
+      return current;
+    };
+    const goToPart = (i: number) => {
+      const target = headings[Math.max(0, Math.min(headings.length - 1, i))];
+      if (target !== undefined)
+        goTo(target.heading);
+    };
+    partSelect.onchange = () => goToPart(parseInt(partSelect.value));
+    prevPart.onclick = () => goToPart(currentPart() - 1);
+    nextPart.onclick = () => goToPart(currentPart() + 1);
     sticky.style.top = `${fileHeader?.offsetHeight ?? 0}px`;
     onScroll = () => {
       sticky.style.top = `${fileHeader?.offsetHeight ?? 0}px`;
-      if (partChips.length === 0)
+      if (headings.length === 0)
         return;
-      const bottom = sticky.getBoundingClientRect().bottom + 8;
-      let current = partChips[0];
-      for (const p of partChips) {
-        const visible = !p.heading.classList.contains('config-hidden');
-        if (visible && p.heading.getBoundingClientRect().top <= bottom)
-          current = p;
-      }
-      for (const p of partChips) {
-        const active = p === current;
-        if (active && !p.chip.classList.contains('config-active'))
-          partBar.scrollLeft = p.chip.offsetLeft - 40;
-        p.chip.classList.toggle('config-active', active);
-      }
+      const current = currentPart();
+      partSelect.value = current.toString();
+      prevPart.disabled = current === 0;
+      nextPart.disabled = current === headings.length - 1;
     };
     listenScroll();
     onScroll();
 
-    // The entry open before a rebuild.
+    // The entry open before a rebuild (or a new one, to type its text).
     const reopen = openId !== undefined ? rows.find((x) => idOf(x.e) === openId) : undefined;
     if (reopen !== undefined) {
-      openRow(reopen);
       reopen.row.scrollIntoView({ block: 'center' });
-      const input = open?.panel.querySelector<HTMLInputElement>('.config-tl-f-text input');
       if (focusText) {
-        input?.focus();
-        input?.select();
+        openId = undefined;
+        reopen.input.focus();
+        reopen.input.select();
       } else {
-        reopen.row.focus();
+        toggleDetails(reopen);
       }
     } else {
       openId = undefined;

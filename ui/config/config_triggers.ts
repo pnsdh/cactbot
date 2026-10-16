@@ -50,6 +50,7 @@ const kUserFiles: LocaleText = { en: 'User files', ko: '사용자 파일' };
 const kContentType: LocaleText = { en: 'Content', ko: '콘텐츠' };
 const kOtherType: LocaleText = { en: 'Other', ko: '기타' };
 const kOpenAll: LocaleText = { en: 'Open all', ko: '모두 펼치기' };
+const kTriggerGroup: LocaleText = { en: 'Edit triggers', ko: '트리거 편집' };
 const kCloseAll: LocaleText = { en: 'Close all', ko: '모두 접기' };
 
 const files: { [group: string]: TriggerFile[] } = {};
@@ -213,6 +214,45 @@ const findTriggerRow = (file: TriggerFile, id: string): HTMLElement | undefined 
   return undefined;
 };
 
+// A file's trigger list is folded under a header of its own, like its timeline edits: most
+// people only change a fight's options.
+const groupTriggers = (file: TriggerFile): void => {
+  const options = file.container.querySelector<HTMLElement>(':scope > .trigger-file-options');
+  if (options === null)
+    return;
+  const overridden = options.querySelector('.trigger-set-override-warning') !== null;
+  if (file.triggers.length === 0 && !overridden)
+    return;
+  const group = document.createElement('div');
+  group.classList.add('timeline-edit-container', 'config-trigger-group');
+  // An overridden set's warning stays in view.
+  if (!overridden)
+    group.classList.add('collapsed');
+  const header = document.createElement('div');
+  header.classList.add('timeline-edit-header');
+  const title = document.createElement('span');
+  title.textContent = context.translate(kTriggerGroup);
+  const meta = document.createElement('span');
+  meta.classList.add('config-trigger-group-meta');
+  header.append(title, meta);
+  const update = () => {
+    const changed =
+      file.triggers.filter((t) => isChange(context.readSaved(file.group, ['triggers', t.id])))
+        .length;
+    const parts = [file.triggers.length.toLocaleString()];
+    if (changed > 0)
+      parts.push(format(kChangedCount, changed));
+    meta.textContent = file.triggers.length > 0 ? parts.join(' · ') : '';
+  };
+  update();
+  group.addEventListener('input', update);
+  group.addEventListener('change', update);
+  header.addEventListener('click', () => group.classList.toggle('collapsed'));
+  makeKeyboardButton(header);
+  options.before(group);
+  group.append(header, options);
+};
+
 const openTriggerRow = (row: HTMLElement, open: boolean): void => {
   row.classList.toggle('config-trigger-open', open);
   row.setAttribute('aria-expanded', open ? 'true' : 'false');
@@ -222,7 +262,7 @@ const openTriggerRow = (row: HTMLElement, open: boolean): void => {
 // changed), each opened to the rest of its settings: open, a file of many triggers was a page of
 // forms many screens long.
 const compactTriggers = (file: TriggerFile): void => {
-  const options = file.container.querySelector<HTMLElement>(':scope > .trigger-file-options');
+  const options = file.container.querySelector<HTMLElement>('.trigger-file-options');
   if (options === null || options.classList.contains('config-compact'))
     return;
   const rows = [...options.querySelectorAll<HTMLElement>(':scope > .trigger')];
@@ -338,6 +378,7 @@ export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void 
       }
     };
     update();
+    groupTriggers(file);
     file.container.addEventListener('change', update);
     file.container.addEventListener('input', update);
     // Timeline rows are removed with a button, saving without an input event.
@@ -606,6 +647,7 @@ export const revealTrigger = (hit: TriggerHit): void => {
   if (file.container.classList.contains('collapsed'))
     header?.click();
   const row = trigger !== undefined ? findTriggerRow(file, trigger.id) : undefined;
+  row?.closest('.config-trigger-group')?.classList.remove('collapsed');
   if (row === undefined) {
     flash([file.container]);
     file.container.scrollIntoView({ block: 'start' });
