@@ -97,7 +97,9 @@ export const countEntryEdits = (zone: SavedConfigEntry | undefined): number => {
 export const countTimelineEdits = (zone: SavedConfigEntry | undefined): number => {
   if (!isObject(zone))
     return 0;
-  const count = (saved: SavedConfigEntry | undefined) => parseEntryEdits(saved).length;
+  // An added entry's own edits aren't counted again.
+  const count = (saved: SavedConfigEntry | undefined) =>
+    parseEntryEdits(saved).filter((e) => e.added !== true).length;
   const jobs = isObject(zone.jobEntries) ? Object.values(zone.jobEntries) : [];
   const add = Array.isArray(zone.add) ? zone.add : [];
   const added = add.filter((row) =>

@@ -3,7 +3,6 @@ import { LocaleText } from '../../types/trigger';
 
 import { DefaultValue, setDefault } from './config_dirty';
 import { addTooltipsIn } from './config_rows';
-import { setTip } from './config_tooltip';
 
 // Fork: a browser over the trigger lists that raidboss_config.ts and oopsyraidsy_config.ts build
 // (expansion > file > trigger rows): expansions and content types as chips, files as cards that
@@ -51,10 +50,8 @@ const kUserFiles: LocaleText = { en: 'User files', ko: '사용자 파일' };
 const kContentType: LocaleText = { en: 'Content', ko: '콘텐츠' };
 const kOtherType: LocaleText = { en: 'Other', ko: '기타' };
 const kOpenAll: LocaleText = { en: 'Open all', ko: '모두 펼치기' };
-const kTriggerGroup: LocaleText = { en: 'Edit Triggers', ko: '트리거 편집' };
 const kCloseAll: LocaleText = { en: 'Close all', ko: '모두 접기' };
 const kBack: LocaleText = { en: 'List', ko: '목록' };
-const kBackHelp: LocaleText = { en: 'Back to the list (Esc)', ko: '목록으로 (Esc)' };
 const kTabTriggers: LocaleText = { en: 'Triggers', ko: '트리거' };
 const kTabTimeline: LocaleText = { en: 'Timeline', ko: '타임라인' };
 const kTabOptions: LocaleText = { en: 'Fight options', ko: '전투 옵션' };
@@ -263,8 +260,8 @@ const findTriggerRow = (file: TriggerFile, id: string): HTMLElement | undefined 
   return undefined;
 };
 
-// A file's trigger list is folded under a header of its own, like its timeline edits: most
-// people only change a fight's options.
+// A file's trigger list (or an overridden set's warning), boxed as its timeline edits are: the
+// triggers tab of its page (see buildTriggerBrowser).
 const groupTriggers = (file: TriggerFile): void => {
   const options = file.container.querySelector<HTMLElement>(':scope > .trigger-file-options');
   if (options === null)
@@ -274,31 +271,8 @@ const groupTriggers = (file: TriggerFile): void => {
     return;
   const group = document.createElement('div');
   group.classList.add('timeline-edit-container', 'config-trigger-group');
-  // An overridden set's warning stays in view.
-  if (!overridden)
-    group.classList.add('collapsed');
-  const header = document.createElement('div');
-  header.classList.add('timeline-edit-header');
-  const title = document.createElement('span');
-  title.textContent = context.translate(kTriggerGroup);
-  const meta = document.createElement('span');
-  meta.classList.add('config-trigger-group-meta');
-  header.append(title, meta);
-  const update = () => {
-    const changed =
-      file.triggers.filter((t) => isChange(context.readSaved(file.group, ['triggers', t.id])))
-        .length;
-    const parts = [format(kTriggerCount, file.triggers.length)];
-    if (changed > 0)
-      parts.push(format(kChangedCount, changed));
-    meta.textContent = file.triggers.length > 0 ? parts.join(' · ') : '';
-  };
-  update();
-  group.addEventListener('input', update);
-  group.addEventListener('change', update);
-  header.addEventListener('click', () => group.classList.toggle('collapsed'));
   options.before(group);
-  group.append(header, options);
+  group.appendChild(options);
 };
 
 const openTriggerRow = (row: HTMLElement, open: boolean): void => {
@@ -579,8 +553,10 @@ export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void 
         continue;
       for (const container of filesIn(expansion)) {
         const file = fileOf.get(container);
-        const hit = (type === undefined || file?.type === type) &&
-          (!changedOnly || file !== undefined && (changed.get(file) ?? 0) > 0);
+        // The page shown is never filtered out.
+        const hit = container.classList.contains('config-page') ||
+          (type === undefined || file?.type === type) &&
+            (!changedOnly || file !== undefined && (changed.get(file) ?? 0) > 0);
         container.classList.toggle('config-filter-miss', !hit);
         if (hit)
           shown++;
@@ -670,7 +646,6 @@ export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void 
     header: HTMLElement;
     panels: Map<PageTab, HTMLElement>;
     tabs: Map<PageTab, HTMLButtonElement>;
-    tab: PageTab;
     update: () => void;
   };
   const kTabNames: { [tab in PageTab]: LocaleText } = {
@@ -685,6 +660,27 @@ export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void 
   let listScroll = 0;
   // Set while a file's header is clicked for its own toggle (see below).
   let toggling = false;
+  // A page's timeline tab shown when the page itself isn't (one restored while loading): its
+  // editor is built once it shows.
+  const unbuilt = new Map<HTMLElement, HTMLElement>();
+  const buildPanel = (panel: HTMLElement) => {
+    if (!panel.classList.contains('collapsed'))
+      return;
+    panel.querySelector<HTMLElement>(':scope > .timeline-edit-header')?.click();
+    panel.classList.remove('collapsed');
+  };
+  const watcher = typeof ResizeObserver === 'undefined'
+    ? undefined
+    : new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const panel = unbuilt.get(entry.target as HTMLElement);
+        if (panel === undefined || entry.contentRect.height === 0)
+          continue;
+        unbuilt.delete(entry.target as HTMLElement);
+        watcher?.unobserve(entry.target);
+        buildPanel(panel);
+      }
+    });
   const scroller = () => groupDiv.closest<HTMLElement>('.config-scroll');
 
   const makeButton = (className: string, text: string, onclick: () => void) => {
@@ -701,7 +697,6 @@ export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void 
   };
 
   const showTab = (p: Page, tab: PageTab) => {
-    p.tab = tab;
     for (const [t, panel] of p.panels) {
       const shown = t === tab;
       panel.classList.toggle('config-page-shown', shown);
@@ -709,13 +704,16 @@ export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void 
       button?.classList.toggle('config-active', shown);
       button?.setAttribute('aria-selected', shown ? 'true' : 'false');
     }
-    // Never folded in a page; the timeline editor is built when first opened.
+    // Never folded in a page; the timeline editor is built when first opened, and not while
+    // the page is out of sight.
     const panel = p.panels.get(tab);
-    if (panel?.classList.contains('collapsed')) {
-      const header = panel.querySelector<HTMLElement>(':scope > .timeline-edit-header');
-      if (tab === 'timeline' && header !== null)
-        header.click();
-      panel.classList.remove('collapsed');
+    if (panel !== undefined) {
+      if (tab === 'timeline' && groupDiv.offsetParent === null && watcher !== undefined) {
+        unbuilt.set(p.file.container, panel);
+        watcher.observe(p.file.container);
+      } else {
+        buildPanel(panel);
+      }
     }
     storageSet(tabKey, tab);
   };
@@ -740,7 +738,8 @@ export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void 
     const s = scroller();
     if (s !== null)
       s.scrollTop = listScroll;
-    header.focus({ preventScroll: true });
+    if (header.offsetParent !== null)
+      header.focus({ preventScroll: true });
   };
 
   const buildPage = (file: TriggerFile, header: HTMLElement): Page => {
@@ -761,7 +760,6 @@ export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void 
     const timelineInfo = timeline !== null ? timelines.get(timeline) : undefined;
 
     const back = makeButton('config-page-back', context.translate(kBack), () => closePage());
-    setTip(back, context.translate(kBackHelp));
     const tabBar = document.createElement('div');
     tabBar.classList.add('config-page-tabs');
     tabBar.setAttribute('role', 'tablist');
@@ -772,7 +770,6 @@ export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void 
       header: header,
       panels: panels,
       tabs: new Map(),
-      tab: 'options',
       update: () => undefined,
     };
     for (const tab of panels.keys()) {
@@ -835,6 +832,8 @@ export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void 
     pages.set(file, p);
     page = p;
     file.container.classList.add('config-page');
+    // Not hidden by the list's filters (as when it comes back with "changed only" on).
+    file.container.classList.remove('config-filter-miss');
     groupDiv.classList.add('config-page-open');
     // Not a button while it is the page's header.
     header.removeAttribute('role');
@@ -843,7 +842,7 @@ export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void 
     const tabs = [...p.panels.keys()];
     showTab(p, tabs.find((t) => t === wanted) ?? tabs[0] ?? 'options');
     p.update();
-    storageSet(pageKey, file.title);
+    storageSet(pageKey, `${list.indexOf(file)}|${file.title}`);
     if (s !== null)
       s.scrollTop = 0;
   };
@@ -873,7 +872,11 @@ export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void 
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape' || e.defaultPrevented || !visible())
       return;
-    if (e.target instanceof Element && e.target.closest('input, select, textarea') !== null)
+    if (
+      e.target instanceof Element &&
+      e.target.closest('input[type="text"], input[type="number"], input:not([type]), textarea') !==
+        null
+    )
       return;
     closePage();
   });
@@ -896,9 +899,16 @@ export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void 
     openFile: (file, tab) => openPage(file, tab),
   };
 
-  // The page shown last.
-  const last = storageGet(pageKey);
-  const lastFile = last !== null && last !== '' ? list.find((f) => f.title === last) : undefined;
+  // The page shown last: the same file if the list is as it was, or else one of that name.
+  const last = storageGet(pageKey) ?? '';
+  const bar = last.indexOf('|');
+  const lastTitle = bar >= 0 ? last.slice(bar + 1) : last;
+  const atIndex = bar >= 0 ? list[parseInt(last.slice(0, bar))] : undefined;
+  const lastFile = lastTitle === ''
+    ? undefined
+    : atIndex?.title === lastTitle
+    ? atIndex
+    : list.find((f) => f.title === lastTitle);
   if (lastFile !== undefined) {
     const expansion = groups.find((e) => e.containers.some((c) => c.contains(lastFile.container)));
     if (expansion !== undefined && expansion !== current)

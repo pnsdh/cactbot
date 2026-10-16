@@ -848,7 +848,9 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
       if (isJob && !isOwnAdded(e))
         side.appendChild(jobChip);
       const eye = make('button', 'config-tl-icon config-tl-eye');
-      eye.disabled = hiddenByName(e);
+      // Not disabled: its tooltip says why (disabled buttons get no mouse events).
+      if (hiddenByName(e))
+        eye.setAttribute('aria-disabled', 'true');
       eye.setAttribute('aria-label', tr(t.hide));
       setTip(eye, tr(hiddenByName(e) ? t.hiddenByNameShort : t.hide));
       const colorButton = make('button', 'config-tl-icon config-tl-color-button');
@@ -905,7 +907,12 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
       // The text, edited in place: an entry added here changes its own, others are edited over
       // what they show.
       let before = '';
-      input.onfocus = () => before = input.value;
+      let returning = false;
+      input.onfocus = () => {
+        if (!returning)
+          before = input.value;
+        returning = false;
+      };
       input.oninput = () => {
         if (isOwnAdded(e)) {
           if (updateAdded(e, { text: input.value }))
@@ -917,6 +924,11 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
         refresh();
       };
       input.onblur = () => {
+        // To another window: the typing goes on when it comes back.
+        if (!document.hasFocus()) {
+          returning = true;
+          return;
+        }
         if (input.value.trim() === '')
           input.value = shownText(e);
         showWas();
@@ -948,6 +960,8 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
         target?.row.scrollIntoView({ block: 'nearest' });
       };
       eye.onclick = () => {
+        if (hiddenByName(e))
+          return;
         const hidden = !isHidden(e);
         const inheritedHide = commonEdit(e).hide === true;
         const value = isJob && !isOwnAdded(e)

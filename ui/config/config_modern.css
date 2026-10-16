@@ -1104,9 +1104,8 @@ html:not(.config-classic) {
   border-color: var(--cfg-line-strong);
 }
 
-/* An open file is a long page of its own: no highlight around it. */
+/* An open file is a page of its own: no highlight around it. */
 :root:not(.config-classic) .config-trigger-browser .trigger-file-container:not(.collapsed) {
-  grid-column: 1 / -1;
   border-color: var(--cfg-line-strong);
 }
 
@@ -1180,6 +1179,7 @@ html:not(.config-classic) {
 :root:not(.config-classic) .config-page > .trigger-file-header > .trigger-file-header-part:first-child {
   order: 1;
   flex: 0 1 auto;
+  max-width: calc(100% - 160px);
   min-width: 0;
   overflow: hidden;
   font-size: 15px;
@@ -1236,10 +1236,6 @@ html:not(.config-classic) {
   overflow-x: auto;
 }
 
-:root:not(.config-classic) .config-page > .trigger-file-header > .config-page-tabs.config-hidden {
-  display: none;
-}
-
 :root:not(.config-classic) .config-page-tabs::-webkit-scrollbar {
   height: 0;
 }
@@ -1258,6 +1254,11 @@ html:not(.config-classic) {
   color: var(--cfg-muted);
   font-weight: 560;
   white-space: nowrap;
+}
+
+/* Inside, as the top bar's: the bar scrolls and would cut it. */
+:root:not(.config-classic) .config-page-tab:focus-visible {
+  outline-offset: -6px;
 }
 
 :root:not(.config-classic) .config-page-tab:hover {
@@ -1281,7 +1282,7 @@ html:not(.config-classic) {
 }
 
 :root:not(.config-classic) .config-page-tab-count {
-  color: var(--cfg-faint);
+  color: var(--cfg-muted);
   font-size: 11.5px;
   font-variant-numeric: tabular-nums;
 }
@@ -1507,7 +1508,6 @@ html:not(.config-classic) {
   position: sticky;
   top: 0;
   z-index: 3;
-  margin-bottom: 8px;
   border-bottom: 1px solid var(--cfg-line);
   border-radius: 10px 10px 0 0;
   background-color: var(--cfg-surface);
@@ -1522,13 +1522,10 @@ html:not(.config-classic) {
   height: 6px;
   border: solid var(--cfg-muted);
   border-width: 0 2px 2px 0;
-  transform: rotate(45deg);
-  transition: transform 200ms var(--cfg-ease), opacity 160ms;
-}
 
-:root:not(.config-classic) .trigger-file-container:not(.collapsed) > .trigger-file-header::after {
-  top: 23px;
-  transform: rotate(-135deg);
+  /* Pointing to the page it opens. */
+  transform: rotate(-45deg);
+  transition: opacity 160ms;
 }
 
 /* Closed cards show theirs only when pointed at, so a page of cards stays calm. */
@@ -1793,17 +1790,6 @@ html:not(.config-classic) {
   color: var(--cfg-faint);
   font-family: var(--cfg-font-accent);
   font-size: 11px;
-}
-
-/* A fight's trigger list, folded under a header like its timeline edits. */
-:root:not(.config-classic) .config-trigger-group > .timeline-edit-header {
-  grid-template-columns: auto auto 1fr;
-}
-
-:root:not(.config-classic) .config-trigger-group-meta {
-  color: var(--cfg-muted);
-  font-size: 12px;
-  font-weight: 500;
 }
 
 :root:not(.config-classic) .config-trigger-browser .config-trigger-group > .trigger-file-options {
@@ -2321,7 +2307,12 @@ html:not(.config-classic) {
   transform: rotate(180deg);
 }
 
-:root:not(.config-classic) .config-tl-icon:hover:not(:disabled) {
+:root:not(.config-classic) .config-tl-icon[aria-disabled="true"] {
+  opacity: 0.4;
+  cursor: default;
+}
+
+:root:not(.config-classic) .config-tl-icon:hover:not([aria-disabled="true"]) {
   color: var(--cfg-text);
   background-color: var(--cfg-hover);
 }
