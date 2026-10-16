@@ -78,6 +78,20 @@ export const parseEntryEdits = (saved: SavedConfigEntry | undefined): TimelineEn
   return edits;
 };
 
+// How many edits of single entries (and entries added for one job) a fight's saved timeline
+// config has, for the original config page, which doesn't show them.
+export const countEntryEdits = (zone: SavedConfigEntry | undefined): number => {
+  if (!isObject(zone))
+    return 0;
+  const count = (saved: SavedConfigEntry | undefined) => parseEntryEdits(saved).length;
+  const jobs = isObject(zone.jobEntries) ? Object.values(zone.jobEntries) : [];
+  const add = Array.isArray(zone.add) ? zone.add : [];
+  const jobAdded = add.filter((row) =>
+    isObject(row) && typeof row.job === 'string' && row.job !== ''
+  );
+  return count(zone.entries) + jobs.reduce((n: number, j) => n + count(j), 0) + jobAdded.length;
+};
+
 // The entry each edit is for: the one with its name at its time, or else one with its name moved
 // within kEntryMoveSeconds (see below).  Undefined when there is none.
 export const matchEntries = <E extends { time: number; name: string }>(

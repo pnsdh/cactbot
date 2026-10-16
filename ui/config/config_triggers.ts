@@ -254,7 +254,8 @@ const groupTriggers = (file: TriggerFile): void => {
 
 const openTriggerRow = (row: HTMLElement, open: boolean): void => {
   row.classList.toggle('config-trigger-open', open);
-  row.setAttribute('aria-expanded', open ? 'true' : 'false');
+  row.querySelector('.config-trigger-line > .trigger-id')
+    ?.setAttribute('aria-expanded', open ? 'true' : 'false');
 };
 
 // A file's trigger rows as single lines (the trigger, what it says, its output, whether it was
@@ -330,8 +331,9 @@ const compactTriggers = (file: TriggerFile): void => {
       continue;
     }
     openable.push(row);
-    row.tabIndex = 0;
-    row.setAttribute('role', 'button');
+    // Its name is the button that opens it (the row holds the output's select).
+    id.tabIndex = 0;
+    id.setAttribute('role', 'button');
     openTriggerRow(row, false);
     const toggle = () => {
       openTriggerRow(row, !row.classList.contains('config-trigger-open'));
@@ -342,8 +344,8 @@ const compactTriggers = (file: TriggerFile): void => {
         return;
       toggle();
     });
-    row.addEventListener('keydown', (e) => {
-      if (e.target !== row || e.key !== 'Enter' && e.key !== ' ')
+    id.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ')
         return;
       e.preventDefault();
       toggle();
@@ -693,6 +695,7 @@ export const revealTrigger = (hit: TriggerHit): void => {
     scroller.scrollTop -= header.offsetHeight + 8;
   const details = row.nextElementSibling;
   flash(details instanceof HTMLElement ? [row, details] : [row]);
-  if (row.tabIndex >= 0)
-    row.focus({ preventScroll: true });
+  const name = row.querySelector<HTMLElement>('.config-trigger-line > .trigger-id');
+  if (name !== null && name.tabIndex >= 0)
+    name.focus({ preventScroll: true });
 };

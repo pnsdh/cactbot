@@ -47,6 +47,7 @@ import { RaidbossTriggerField, RaidbossTriggerOutput } from './popup-text';
 import raidbossOptions, { RaidbossOptions } from './raidboss_options';
 import { buildTimelineEditor } from './timeline_editor';
 import {
+  countEntryEdits,
   highlightId,
   kNoHighlight,
   paletteColor,
@@ -57,6 +58,13 @@ import {
 import { TimelineParser } from './timeline_parser';
 
 type RaidbossFileInfo = ConfigProcessedFile<ConfigLooseTriggerSet>;
+
+// Fork: on the original config page, about edits only the new style's editor shows.
+const kEntryEditsNote = {
+  en:
+    '${n} edits of single entries (or entries added for one job), made with the new config page style, apply too: switch to it to see or change them.',
+  ko: '새 디자인 설정 화면에서 한 항목별·직업별 편집 ${n}개도 적용 중입니다. 보거나 고치려면 설정 화면 스타일을 새 디자인으로 바꿔 주세요.',
+};
 
 const kOptionKeys = {
   output: 'Output',
@@ -1174,6 +1182,16 @@ class RaidbossConfigurator {
           this.buildTimelineListingUI(timeline, text, container);
           this.buildTimelineAddUI(zoneId, container);
           this.buildTimelineTextUI(zoneId, timeline, container);
+          // Fork: edits made in the new style's editor apply here too, but only it shows them.
+          const n = countEntryEdits(
+            this.base.getJsonOption('raidboss', ['timeline', zoneId.toString()], {}),
+          );
+          if (n > 0) {
+            const note = document.createElement('div');
+            note.style.margin = '8px 0';
+            note.innerText = this.base.translate(kEntryEditsNote).replace('${n}', n.toString());
+            container.appendChild(note);
+          }
         }
       }
       hasEverBeenExpanded = true;
