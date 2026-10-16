@@ -331,6 +331,14 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
     // Off then.
   }
   const filters = { query: '', onlyEdited: onlyEdited };
+  const setOnlyEdited = (value: boolean) => {
+    filters.onlyEdited = value;
+    try {
+      window.localStorage.setItem(kChangedStorageKey, value ? '1' : '0');
+    } catch {
+      // Only this page then.
+    }
+  };
   let layer: Layer = '';
   try {
     layer = window.localStorage.getItem(kLayerStorageKey) ?? '';
@@ -639,7 +647,9 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
         const parts = [
           s.edit.text,
           s.edit.hide !== undefined ? tr(s.edit.hide ? t.hiddenLower : t.shownLower) : undefined,
-          s.edit.highlight !== undefined ? highlightName(s.edit) : undefined,
+          s.edit.highlight !== undefined
+            ? `${tr(t.highlight)}: ${highlightName(s.edit)}`
+            : undefined,
         ].filter((p) => p !== undefined);
         const where = s.at.added ? ` (${tr(t.addedBadge)})` : '';
         const when = format(t.seconds, { s: formatSeconds(s.at.time) });
@@ -842,11 +852,15 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
       row.append(time, cell, side);
       list.appendChild(row);
 
-      const refresh = () => {
-        if (document.activeElement !== input)
-          input.value = shownText(e);
-        input.placeholder = inherited(e);
+      const showWas = () =>
         was.textContent = shownText(e) !== e.text ? format(t.original, { text: e.text }) : '';
+      const refresh = () => {
+        // Not while typing: the text box would narrow under the caret.
+        if (document.activeElement !== input) {
+          input.value = shownText(e);
+          showWas();
+        }
+        input.placeholder = inherited(e);
         const color = paletteColor(palette, effective(e).highlight, effective(e).color);
         row.style.setProperty('--config-tl-color', color ?? 'transparent');
         // A light wash of it on the line, and the text in it unless too dark to read.
@@ -895,6 +909,7 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
       input.onblur = () => {
         if (input.value.trim() === '')
           input.value = shownText(e);
+        showWas();
       };
       input.onkeydown = (ev) => {
         if (ev.isComposing)
@@ -1024,7 +1039,6 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
       for (const p of palette) {
         const swatch = make('button', 'config-tl-swatch');
         swatch.style.backgroundColor = p.color;
-        swatch.title = colorName(p);
         swatch.setAttribute('aria-label', colorName(p));
         // Its name while pointed at, as the colors have no text of their own.
         const preview = () => pickName.textContent = colorName(p);
@@ -1265,12 +1279,7 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
       visibleRows()[0]?.input.focus();
     };
     editedOnly.onclick = () => {
-      filters.onlyEdited = !filters.onlyEdited;
-      try {
-        window.localStorage.setItem(kChangedStorageKey, filters.onlyEdited ? '1' : '0');
-      } catch {
-        // Only this page then.
-      }
+      setOnlyEdited(!filters.onlyEdited);
       editedOnly.classList.toggle('config-active', filters.onlyEdited);
       editedOnly.setAttribute('aria-checked', filters.onlyEdited ? 'true' : 'false');
       filter();
@@ -1349,7 +1358,7 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
       openId = `A${index}`;
       focusText = true;
       filters.query = '';
-      filters.onlyEdited = false;
+      setOnlyEdited(false);
       rebuild();
     };
 

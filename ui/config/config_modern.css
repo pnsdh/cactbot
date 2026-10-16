@@ -2199,8 +2199,8 @@ html:not(.config-classic) {
 }
 
 :root:not(.config-classic) .config-tl-dup {
-  color: var(--cfg-faint);
-  font-size: 11px;
+  color: var(--cfg-muted);
+  font-size: 12px;
   font-weight: 450;
 }
 
@@ -2210,7 +2210,7 @@ html:not(.config-classic) {
   border-radius: 99px;
   color: var(--cfg-muted);
   background-color: var(--cfg-hover);
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 600;
 }
 
@@ -2255,8 +2255,8 @@ html:not(.config-classic) {
 }
 
 :root:not(.config-classic) .config-tl-field-label {
-  color: var(--cfg-faint);
-  font-size: 11px;
+  color: var(--cfg-muted);
+  font-size: 11.5px;
   font-weight: 600;
 }
 

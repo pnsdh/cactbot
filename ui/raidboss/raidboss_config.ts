@@ -63,7 +63,7 @@ type RaidbossFileInfo = ConfigProcessedFile<ConfigLooseTriggerSet>;
 const kEntryEditsNote = {
   en:
     '${n} edits of single entries (or entries added for one job), made with the new config page style, apply too: switch to it to see or change them.',
-  ko: '새 디자인 설정 화면에서 한 항목별·직업별 편집 ${n}개도 적용 중입니다. 보거나 고치려면 설정 화면 스타일을 새 디자인으로 바꿔 주세요.',
+  ko: '새 디자인 설정 화면에서 항목별·직업별로 고친 내용 ${n}개도 적용되고 있습니다. 보거나 고치려면 \'설정 화면 스타일\'을 \'새 디자인\'으로 바꿔 주세요.',
 };
 
 const kOptionKeys = {
