@@ -475,7 +475,8 @@ export class Timeline {
       if (e.time <= this.nextEventState.minFightNow || timeUntilEvent <= 0)
         continue;
 
-      if (!(e.name in this.ignores)) {
+      // Fork: or hidden on its own (see timeline_entries.ts).
+      if (!(e.name in this.ignores) && e.hidden !== true) {
         const activeEvent: Event = {
           ...e,
           id: `${e.id}-${this.nextEventState.jumpCount}`,

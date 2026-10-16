@@ -169,7 +169,7 @@ const makeKeyboardButton = (element: HTMLElement): void => {
 
 // Output strings (and timeline renames) start from their default text when edited, so a small
 // change needs no retyping.  Left as it was, the box goes back to empty (the default) unsaved.
-const kPrefilled = '.trigger-outputstring > input, .timeline-text-edit';
+const kPrefilled = '.trigger-outputstring > input, .timeline-text-edit, .config-tl-text';
 const prefillFromDefault = (root: HTMLElement): void => {
   root.addEventListener('focusin', (e) => {
     const input = e.target;

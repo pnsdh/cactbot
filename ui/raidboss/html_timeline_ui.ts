@@ -6,6 +6,7 @@ import { LooseTimelineTrigger } from '../../types/trigger';
 import { PopupTextGenerator } from './popup-text';
 import { RaidbossOptions } from './raidboss_options';
 import { TimelineUI } from './timeline';
+import { highlightColor, rgbChannels, rgbChannelsLight } from './timeline_entries';
 import { Event } from './timeline_parser';
 
 const kBig = 1000000000; // Something bigger than any fight length in seconds.
@@ -352,6 +353,16 @@ export class HTMLTimelineUI extends TimelineUI {
     if (e.style && !reuse)
       bar.applyStyles(e.style);
 
+    // Fork: a highlighted entry (see timeline_entries.ts): its color for the bar, and a hook for
+    // skins (.timer-bar[data-highlight], --timeline-highlight-rgb).
+    const highlight = highlightColor(e.highlight, e.highlightColor);
+    if (highlight !== undefined) {
+      div.dataset.highlight = e.highlight;
+      div.style.setProperty('--timeline-highlight', highlight);
+      div.style.setProperty('--timeline-highlight-rgb', rgbChannels(highlight));
+      div.style.setProperty('--timeline-highlight-rgb-light', rgbChannelsLight(highlight));
+    }
+
     // Adding a timer with the same id immediately removes the previous.
     const activeBar = this.activeBars[e.id];
     if (activeBar) {
@@ -366,12 +377,12 @@ export class HTMLTimelineUI extends TimelineUI {
     }
 
     const setSoon = () => {
-      bar.fg = this.barExpiresSoonColor;
+      bar.fg = highlight ?? this.barExpiresSoonColor;
       div.classList.add('soon');
     };
     let soonTimeout: number | undefined = undefined;
     if (!channeling && e.time - fightNow > this.options.BarExpiresSoonSeconds) {
-      bar.fg = this.barColor;
+      bar.fg = highlight ?? this.barColor;
       soonTimeout = window.setTimeout(
         setSoon,
         (e.time - fightNow - this.options.BarExpiresSoonSeconds) * 1000,

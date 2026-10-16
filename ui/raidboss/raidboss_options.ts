@@ -11,6 +11,8 @@ import {
   TriggerSetAutoConfig,
 } from '../../types/trigger';
 
+import { TimelineEntryEdit } from './timeline_entries';
+
 // This file defines the base options that raidboss expects to see.
 
 // Backwards compat for this old style of overriding triggers.
@@ -33,6 +35,8 @@ export type TimelineConfig = Partial<{
   Ignore: string[];
   Rename: { [text: string]: string };
   Add: { time: number; text: string; duration?: number }[];
+  // Fork: edits of single entries (see timeline_entries.ts).
+  Entries: TimelineEntryEdit[];
 }>;
 
 export type PerTriggerAutoConfig = { [triggerId: string]: TriggerAutoConfig };
