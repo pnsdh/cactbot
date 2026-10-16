@@ -1654,6 +1654,7 @@ html:not(.config-classic) {
 
 :root:not(.config-classic) .config-tl-toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   margin-bottom: 10px;
@@ -1712,6 +1713,11 @@ html:not(.config-classic) {
   padding: 6px 8px 6px 10px;
   border-top: 1px solid var(--cfg-line);
   box-shadow: inset 3px 0 0 var(--config-tl-color);
+}
+
+/* A job's edits have a button to go back to the common ones. */
+:root:not(.config-classic) .config-tl-job > .config-tl-row {
+  grid-template-columns: 64px minmax(120px, 1fr) minmax(160px, 1.3fr) 40px 266px;
 }
 
 :root:not(.config-classic) .config-tl-head {
@@ -1816,6 +1822,69 @@ html:not(.config-classic) {
   padding: 0;
   border: 1px solid rgb(0 0 0 / 30%);
   border-radius: 50%;
+}
+
+:root:not(.config-classic) .config-tl-layer-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--cfg-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: help;
+}
+
+:root:not(.config-classic) .config-tl-layer-label select {
+  width: 170px;
+  cursor: pointer;
+}
+
+:root:not(.config-classic) .config-tl-toolbar select.config-tl-copy {
+  width: 170px;
+}
+
+/* A part of a timeline with jumps. */
+:root:not(.config-classic) .config-tl-section {
+  margin-top: 10px;
+  padding: 8px 10px 6px;
+  border-top: 1px solid var(--cfg-line);
+  color: var(--cfg-accent);
+  font-size: 12px;
+  font-weight: 650;
+  cursor: help;
+}
+
+:root:not(.config-classic) .config-tl-offset {
+  display: block;
+  color: var(--cfg-faint);
+  font-size: 11px;
+}
+
+:root:not(.config-classic) .config-tl-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 99px;
+  background-color: var(--cfg-hover);
+  color: var(--cfg-muted);
+  font-size: 11px;
+  font-weight: 600;
+  vertical-align: 1px;
+  cursor: help;
+}
+
+:root:not(.config-classic) .config-tl-fixed {
+  color: var(--cfg-muted);
+  font-size: 13px;
+  cursor: help;
+}
+
+:root:not(.config-classic) .config-tl-highlight .config-tl-reset {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 99px;
+  font-size: 13px;
 }
 
 :root:not(.config-classic) .config-tl-empty {
@@ -1944,7 +2013,8 @@ html:not(.config-classic) {
 }
 
 /* config.css sets these widths with !important. */
-.config-w600:not(.config-classic) .config-tl-row {
+.config-w600:not(.config-classic) .config-tl-row,
+.config-w600:not(.config-classic) .config-tl-job > .config-tl-row {
   grid-template-columns: 52px minmax(0, 1fr) 40px;
 }
 

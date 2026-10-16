@@ -471,7 +471,8 @@ const jobLocalizedAbbr: Record<Job, LocaleText> = {
   },
 };
 
-const jobLocalizedFull: Record<Job, LocaleText> = {
+// Fork: exported for the config page (timeline_editor.ts).
+export const jobLocalizedFull: Record<Job, LocaleText> = {
   NONE: {
     en: 'Adventurer',
     de: 'Abenteurer',

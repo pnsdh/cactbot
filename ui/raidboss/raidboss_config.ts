@@ -45,8 +45,8 @@ import {
 import raidbossFileData from './data/raidboss_manifest.txt';
 import { RaidbossTriggerField, RaidbossTriggerOutput } from './popup-text';
 import raidbossOptions, { RaidbossOptions } from './raidboss_options';
-import { buildTimelineEditor } from './timeline_editor';
-import { parseEntryKey, TimelineEntryEdit } from './timeline_entries';
+import { addedRow, AddedRowChange, buildTimelineEditor } from './timeline_editor';
+import { parseEntryEdits } from './timeline_entries';
 import { TimelineParser } from './timeline_parser';
 
 type RaidbossFileInfo = ConfigProcessedFile<ConfigLooseTriggerSet>;
@@ -1144,16 +1144,16 @@ class RaidbossConfigurator {
         const timeline = new TimelineParser(text, set.timelineReplace ?? [], [], [], options);
         // Fork: the new config page also edits single entries (timeline_editor.ts).
         if (!isClassic()) {
-          const entriesId = ['timeline', zoneId.toString(), 'entries'];
+          const zonePath = ['timeline', zoneId.toString()];
           buildTimelineEditor(container, {
-            zoneId: zoneId,
             timeline: timeline,
+            text: text,
             translate: (text) => this.base.translate(text),
-            getEntries: () => this.base.getJsonOption('raidboss', entriesId, {}),
-            setEntry: (key, value) =>
-              this.base.setJsonOption('raidboss', [...entriesId, key], value),
+            get: (path) => this.base.getJsonOption('raidboss', [...zonePath, ...path], ''),
+            set: (path, value) =>
+              this.base.setJsonOption('raidboss', [...zonePath, ...path], value),
             buildByName: (pane) => this.buildTimelineTextUI(zoneId, timeline, pane),
-            buildAdded: (pane) => this.buildTimelineAddUI(zoneId, pane),
+            buildAdded: (pane, onRowChange) => this.buildTimelineAddUI(zoneId, pane, onRowChange),
           });
         } else {
           this.buildTimelineListingUI(timeline, text, container);
@@ -1222,6 +1222,8 @@ class RaidbossConfigurator {
   buildTimelineAddUI(
     zoneId: number,
     parent: HTMLElement,
+    // Fork: told of each row's time and text before and after a change (none: removed).
+    onRowChange?: AddedRowChange,
   ): void {
     const addId = ['timeline', zoneId.toString(), 'add'];
 
@@ -1259,11 +1261,19 @@ class RaidbossConfigurator {
     const storeRows = () => this.base.setJsonOption('raidboss', addId, rows);
 
     const addRow = (obj: { [name: string]: SavedConfigEntry }): void => {
+      // Fork: the row as last saved with a time and text.
+      let last = addedRow(obj);
       const setFunc = () => {
         obj.time = timeInput.value;
         obj.text = textInput.value;
         obj.duration = durationInput.value;
         storeRows();
+        const now = addedRow(obj);
+        if (now !== undefined) {
+          if (last !== undefined)
+            onRowChange?.(last, now);
+          last = now;
+        }
       };
 
       const timeInput = document.createElement('input');
@@ -1313,6 +1323,8 @@ class RaidbossConfigurator {
         rows.splice(idx, 1);
 
         storeRows();
+        if (last !== undefined)
+          onRowChange?.(last);
       });
     };
 
@@ -1964,24 +1976,17 @@ const processPerZoneTimelineConfig = (options: RaidbossOptions, savedConfig: Sav
     }
 
     // Fork: * 'timeline', zoneId, 'entries', 'time|name', { text, hide, highlight, color }
+    //       * 'timeline', zoneId, 'jobEntries', job, 'time|name', { ... }
     // (see timeline_entries.ts).
-    const entries = zoneEntry['entries'];
-    if (typeof entries === 'object' && !Array.isArray(entries)) {
-      for (const [key, value] of Object.entries(entries)) {
-        const at = parseEntryKey(key);
-        if (at === undefined || typeof value !== 'object' || Array.isArray(value))
-          continue;
-        const edit: TimelineEntryEdit = { time: at.time, name: at.name };
-        if (typeof value.text === 'string' && value.text !== '')
-          edit.text = value.text;
-        if (value.hide === true)
-          edit.hide = true;
-        if (typeof value.highlight === 'string' && value.highlight !== '') {
-          edit.highlight = value.highlight;
-          if (typeof value.color === 'string')
-            edit.color = value.color;
-        }
-        (timelineConfig.Entries ??= []).push(edit);
+    const entries = parseEntryEdits(zoneEntry['entries']);
+    if (entries.length > 0)
+      timelineConfig.Entries = entries;
+    const jobEntries = zoneEntry['jobEntries'];
+    if (typeof jobEntries === 'object' && !Array.isArray(jobEntries)) {
+      for (const [job, saved] of Object.entries(jobEntries)) {
+        const edits = parseEntryEdits(saved);
+        if (edits.length > 0)
+          (timelineConfig.JobEntries ??= {})[job] = edits;
       }
     }
   }

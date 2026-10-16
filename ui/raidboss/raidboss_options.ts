@@ -37,6 +37,8 @@ export type TimelineConfig = Partial<{
   Add: { time: number; text: string; duration?: number }[];
   // Fork: edits of single entries (see timeline_entries.ts).
   Entries: TimelineEntryEdit[];
+  // Fork: edits for one job, over the common ones, by job.
+  JobEntries: { [job: string]: TimelineEntryEdit[] };
 }>;
 
 export type PerTriggerAutoConfig = { [triggerId: string]: TriggerAutoConfig };
@@ -62,6 +64,8 @@ type RaidbossNonConfigOptions = {
   TriggerSetConfig: TriggerSetConfig;
   Triggers: LooseTriggerSet[];
   PlayerNameOverride?: string;
+  // Fork: the player's job as timelines load, for timeline entry edits by job (set by popup-text).
+  TimelineJob?: string;
   IsRemoteRaidboss: boolean;
   // Transforms text before passing it to text popups (also affects TTS).
   TransformText: (text: string) => string;
