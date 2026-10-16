@@ -160,23 +160,78 @@ const kClassJobs: { [job: string]: Job } = {
 // The job whose edits are for a player of this job.
 export const editJob = (job: string): string => kClassJobs[job] ?? job;
 
-// Highlights: skins draw them their own way (raidboss.css and skins look at
-// .timer-bar[data-highlight] and --timeline-highlight-rgb); these colors are the default.
-export const kHighlightColors: { [highlight: string]: string } = {
-  danger: '#ff5c5c',
-  caution: '#ffc24a',
-  mitigation: '#4fc3ff',
-  note: '#b79bff',
+// Highlights are colors from a list the user can change and name (e.g. "blue = spread"), saved
+// as raidboss 'timelineColors': { id: { color, name } }; entries keep the color's id, so changing
+// a color changes every entry with it.  Skins draw them their own way (raidboss.css and skins
+// look at .timer-bar[data-highlight] and --timeline-highlight-rgb).
+export const kPalette: { id: string; color: string }[] = [
+  { id: 'red', color: '#ff5c5c' },
+  { id: 'orange', color: '#ff9f43' },
+  { id: 'yellow', color: '#ffc24a' },
+  { id: 'green', color: '#7bed9f' },
+  { id: 'blue', color: '#4fc3ff' },
+  { id: 'purple', color: '#b79bff' },
+];
+
+// The first highlights had meanings rather than colors.
+const kOldHighlights: { [highlight: string]: string } = {
+  danger: 'red',
+  caution: 'yellow',
+  mitigation: 'blue',
+  note: 'purple',
 };
+
+export const highlightId = (highlight: string): string => kOldHighlights[highlight] ?? highlight;
+
+export type PaletteColor = { id: string; color: string; name?: string; custom: boolean };
 
 export const isHexColor = (color: string): boolean => /^#[0-9a-f]{6}$/i.test(color);
 
+const asObject = (value: SavedConfigEntry | undefined): { [key: string]: SavedConfigEntry } =>
+  typeof value === 'object' && !Array.isArray(value) ? value : {};
+
+// The list of colors: the built in ones (as the user changed them), then the user's own.
+export const readPalette = (saved: SavedConfigEntry | undefined): PaletteColor[] => {
+  const colors = asObject(saved);
+  const read = (id: string, fallback?: string): PaletteColor | undefined => {
+    const value = asObject(colors[id]);
+    const color = typeof value.color === 'string' && isHexColor(value.color)
+      ? value.color
+      : fallback;
+    if (color === undefined)
+      return undefined;
+    const name = typeof value.name === 'string' && value.name.trim() !== ''
+      ? value.name.trim()
+      : undefined;
+    return { id: id, color: color, name: name, custom: fallback === undefined };
+  };
+  const builtIn = kPalette.flatMap((p) => read(p.id, p.color) ?? []);
+  const own = Object.keys(colors)
+    .filter((id) => !kPalette.some((p) => p.id === id))
+    .flatMap((id) => read(id) ?? []);
+  return [...builtIn, ...own];
+};
+
+// The color of a highlight: its own (a 'custom' one, or as resolved from the user's colors when
+// the config is read), or else the built in color of its id.
 export const highlightColor = (highlight?: string, color?: string): string | undefined => {
+  if (highlight === undefined || highlight === '' || highlight === kNoHighlight)
+    return undefined;
+  if (color !== undefined && isHexColor(color))
+    return color;
+  return kPalette.find((p) => p.id === highlightId(highlight))?.color;
+};
+
+export const paletteColor = (
+  palette: PaletteColor[],
+  highlight?: string,
+  color?: string,
+): string | undefined => {
   if (highlight === undefined || highlight === '' || highlight === kNoHighlight)
     return undefined;
   if (highlight === 'custom')
     return color !== undefined && isHexColor(color) ? color : undefined;
-  return kHighlightColors[highlight];
+  return palette.find((p) => p.id === highlightId(highlight))?.color;
 };
 
 // "r g b" for colors with alpha in CSS, e.g. rgb(var(--timeline-highlight-rgb) / 50%).

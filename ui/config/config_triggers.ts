@@ -49,6 +49,8 @@ const kNoChanged: LocaleText = { en: 'No fight has changes.', ko: '변경한 전
 const kUserFiles: LocaleText = { en: 'User files', ko: '사용자 파일' };
 const kContentType: LocaleText = { en: 'Content', ko: '콘텐츠' };
 const kOtherType: LocaleText = { en: 'Other', ko: '기타' };
+const kOpenAll: LocaleText = { en: 'Open all', ko: '모두 펼치기' };
+const kCloseAll: LocaleText = { en: 'Close all', ko: '모두 접기' };
 
 const files: { [group: string]: TriggerFile[] } = {};
 const browsers: { [group: string]: { showFile: (file: TriggerFile) => void } } = {};
@@ -211,6 +213,84 @@ const findTriggerRow = (file: TriggerFile, id: string): HTMLElement | undefined 
   return undefined;
 };
 
+const openTriggerRow = (row: HTMLElement, open: boolean): void => {
+  row.classList.toggle('config-trigger-open', open);
+  row.setAttribute('aria-expanded', open ? 'true' : 'false');
+};
+
+// A file's trigger rows as single lines (the trigger, what it says, its output, whether it was
+// changed), each opened to the rest of its settings: open, a file of many triggers was a page of
+// forms many screens long.
+const compactTriggers = (file: TriggerFile): void => {
+  const options = file.container.querySelector<HTMLElement>(':scope > .trigger-file-options');
+  if (options === null || options.classList.contains('config-compact'))
+    return;
+  const rows = [...options.querySelectorAll<HTMLElement>(':scope > .trigger')];
+  if (rows.length === 0)
+    return;
+  options.classList.add('config-compact');
+  const entries = new Map(file.triggers.map((t) => [t.id, t]));
+  for (const row of rows) {
+    const details = row.nextElementSibling;
+    const id = row.querySelector('.trigger-id');
+    if (!(details instanceof HTMLElement) || !details.classList.contains('trigger-details'))
+      continue;
+    if (id === null)
+      continue;
+    const line = document.createElement('div');
+    line.classList.add('config-trigger-line');
+    const entry = entries.get(id.textContent ?? '');
+    const preview = document.createElement('span');
+    preview.classList.add('config-trigger-preview');
+    if (entry?.severity !== undefined)
+      preview.classList.add(`config-trigger-${entry.severity}`);
+    preview.textContent = entry?.preview ?? '';
+    line.append(id, preview);
+    // Its output (shown, muted, ...) can be changed without opening it.
+    const output = details.querySelector<HTMLElement>(':scope > .trigger-options');
+    if (output !== null)
+      line.appendChild(output);
+    row.prepend(line);
+    row.tabIndex = 0;
+    row.setAttribute('role', 'button');
+    openTriggerRow(row, false);
+    const update = () => {
+      const changed = entry !== undefined &&
+        isChange(context.readSaved(file.group, ['triggers', entry.id]));
+      row.classList.toggle('config-trigger-changed', changed);
+    };
+    update();
+    details.addEventListener('input', update);
+    details.addEventListener('change', update);
+    output?.addEventListener('change', update);
+    const toggle = () => openTriggerRow(row, !row.classList.contains('config-trigger-open'));
+    row.addEventListener('click', (e) => {
+      if (e.target instanceof Element && e.target.closest('select, input, button, a') !== null)
+        return;
+      toggle();
+    });
+    row.addEventListener('keydown', (e) => {
+      if (e.target !== row || e.key !== 'Enter' && e.key !== ' ')
+        return;
+      e.preventDefault();
+      toggle();
+    });
+  }
+  const tools = document.createElement('div');
+  tools.classList.add('config-trigger-tools');
+  const all = document.createElement('button');
+  all.type = 'button';
+  all.textContent = context.translate(kOpenAll);
+  all.onclick = () => {
+    const open = !rows.every((r) => r.classList.contains('config-trigger-open'));
+    for (const row of rows)
+      openTriggerRow(row, open);
+    all.textContent = context.translate(open ? kCloseAll : kOpenAll);
+  };
+  tools.appendChild(all);
+  options.prepend(tools);
+};
+
 export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void => {
   const list = files[group] ?? [];
   const expansions = [...groupDiv.children].filter((e): e is HTMLElement =>
@@ -264,8 +344,10 @@ export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void 
     file.container.addEventListener('click', update);
     // Opening a card scrolls it into view, as it moves to a row of its own.
     header.addEventListener('click', () => {
-      if (!file.container.classList.contains('collapsed'))
-        file.container.scrollIntoView({ block: 'start' });
+      if (file.container.classList.contains('collapsed'))
+        return;
+      compactTriggers(file);
+      file.container.scrollIntoView({ block: 'start' });
     });
   }
   // Headers that open things can be reached and used with the keyboard.
@@ -529,6 +611,7 @@ export const revealTrigger = (hit: TriggerHit): void => {
     file.container.scrollIntoView({ block: 'start' });
     return;
   }
+  openTriggerRow(row, true);
   // The row's top goes right under the file's header, which stays on top while open (rows with
   // many output strings are taller than the page, so centering them would hide their name).
   row.scrollIntoView({ block: 'start' });

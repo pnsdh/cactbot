@@ -1642,27 +1642,182 @@ html:not(.config-classic) {
   font-size: 11px;
 }
 
+/* ===== Trigger rows as single lines (config_triggers.ts compactTriggers) ===== */
+
+:root:not(.config-classic) .config-compact > .config-trigger-tools {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 0 6px;
+}
+
+:root:not(.config-classic) .config-trigger-tools > button {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 99px;
+  font-size: 12px;
+}
+
+:root:not(.config-classic) .trigger-file-options.config-compact > .trigger {
+  padding: 0;
+  font-weight: 450;
+  cursor: pointer;
+}
+
+:root:not(.config-classic) .config-trigger-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  padding: 4px 28px 4px 8px;
+  position: relative;
+}
+
+:root:not(.config-classic) .config-compact > .trigger:hover > .config-trigger-line {
+  background-color: var(--cfg-hover);
+}
+
+:root:not(.config-classic) .config-compact > .trigger:focus-visible {
+  outline: 2px solid var(--cfg-accent);
+  outline-offset: -2px;
+}
+
+:root:not(.config-classic) .config-trigger-line > .trigger-id {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 50%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-weight: 650;
+}
+
+:root:not(.config-classic) .config-trigger-line > .config-trigger-preview {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--cfg-muted);
+  font-size: 12.5px;
+}
+
+:root:not(.config-classic) .config-trigger-preview.config-trigger-alarm {
+  color: var(--cfg-alarm);
+}
+
+:root:not(.config-classic) .config-trigger-preview.config-trigger-alert {
+  color: var(--cfg-alert);
+}
+
+:root:not(.config-classic) .config-trigger-preview.config-trigger-info {
+  color: var(--cfg-info);
+}
+
+:root:not(.config-classic) .trigger.disabled .config-trigger-preview,
+:root:not(.config-classic) .trigger.disabled .trigger-id {
+  color: var(--cfg-faint);
+}
+
+:root:not(.config-classic) .config-trigger-line > .trigger-options {
+  flex: none;
+}
+
+:root:not(.config-classic) .config-trigger-line > .trigger-options select {
+  width: 150px;
+}
+
+/* Opens like the cards. */
+:root:not(.config-classic) .config-trigger-line::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  width: 5px;
+  height: 5px;
+  margin-top: -4px;
+  border: solid var(--cfg-muted);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  transition: transform 200ms var(--cfg-ease);
+}
+
+:root:not(.config-classic) .config-trigger-open > .config-trigger-line::after {
+  margin-top: -1px;
+  transform: rotate(-135deg);
+}
+
+/* A changed trigger has a dot after its name. */
+:root:not(.config-classic) .config-trigger-changed > .config-trigger-line > .trigger-id::after {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background-color: var(--cfg-accent);
+  vertical-align: 2px;
+}
+
+:root:not(.config-classic) .config-compact > .trigger > .comment {
+  display: none;
+  padding: 0 8px 6px;
+  color: var(--cfg-muted);
+  font-size: 12.5px;
+}
+
+:root:not(.config-classic) .config-compact > .trigger.config-trigger-open > .comment {
+  display: block;
+}
+
+:root:not(.config-classic) .config-compact > .trigger:not(.config-trigger-open) + .trigger-details {
+  display: none;
+}
+
+:root:not(.config-classic) .trigger-file-options.config-compact > .trigger-details {
+  padding: 4px 8px 14px;
+}
+
 /* ===== Timeline editor (timeline_editor.ts) ===== */
 
 :root:not(.config-classic) .config-tl-editor {
-  padding: 4px 12px 12px;
+  padding: 0 0 6px;
 }
 
 :root:not(.config-classic) .config-tl-tabs {
-  margin: 4px 0 12px;
+  margin: 8px 12px;
+}
+
+/* The bar on top stays under the fight's header (its top is set from the header's height). */
+:root:not(.config-classic) .config-tl-sticky {
+  position: sticky;
+  z-index: 1;
+  border-top: 1px solid var(--cfg-line);
+  border-bottom: 1px solid var(--cfg-line);
+  background-color: var(--cfg-surface);
 }
 
 :root:not(.config-classic) .config-tl-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: 8px;
+  padding: 8px 12px;
+}
+
+:root:not(.config-classic) .config-tl-layer-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+:root:not(.config-classic) .config-tl-layer-group select {
+  width: 160px;
 }
 
 :root:not(.config-classic) .config-tl-toolbar input[type="text"].config-tl-search {
-  flex: 0 1 260px;
+  flex: 1 1 150px;
   min-width: 120px;
+  max-width: 260px;
   width: auto;
   text-align: left;
   font-family: var(--cfg-font);
@@ -1672,12 +1827,165 @@ html:not(.config-classic) {
 
 :root:not(.config-classic) .config-tl-count {
   color: var(--cfg-accent);
+  font-weight: 700;
+}
+
+:root:not(.config-classic) .config-tl-count:not(:empty) {
+  margin-left: 2px;
+}
+
+/* The less used tools, in a menu. */
+:root:not(.config-classic) .config-tl-more {
+  position: relative;
+}
+
+:root:not(.config-classic) .config-tl-more-button {
+  width: 32px;
+  padding: 0;
+  font-size: 16px;
+  line-height: 1;
+}
+
+:root:not(.config-classic) .config-tl-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 3;
+  display: grid;
+  gap: 6px;
+  min-width: 210px;
+  padding: 8px;
+  border: 1px solid var(--cfg-line-strong);
+  border-radius: 10px;
+  background-color: var(--cfg-surface);
+  box-shadow: var(--cfg-shadow);
+}
+
+:root:not(.config-classic) .config-tl-menu-item {
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 8px;
+  text-align: left;
+}
+
+:root:not(.config-classic) .config-tl-menu > select {
+  width: 100%;
+}
+
+:root:not(.config-classic) .config-tl-tool {
+  height: 28px;
+  padding: 0 11px;
+  border-radius: 99px;
   font-size: 12px;
   font-weight: 600;
 }
 
+:root:not(.config-classic) .config-tl-tool.config-active,
+:root:not(.config-classic) .config-tl-pick-chip.config-active {
+  border-color: var(--cfg-accent);
+  color: var(--cfg-accent);
+  background-color: var(--cfg-accent-bg);
+}
+
+/* The parts of a timeline with jumps. */
+:root:not(.config-classic) .config-tl-parts {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px 8px;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+:root:not(.config-classic) .config-tl-parts::-webkit-scrollbar {
+  height: 4px;
+}
+
+:root:not(.config-classic) .config-tl-part {
+  flex: none;
+  max-width: 180px;
+  height: 24px;
+  padding: 0 10px;
+  overflow: hidden;
+  border: none;
+  border-radius: 99px;
+  color: var(--cfg-muted);
+  background-color: var(--cfg-hover);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+}
+
+:root:not(.config-classic) .config-tl-part.config-active {
+  color: var(--cfg-accent);
+  background-color: var(--cfg-accent-bg);
+}
+
+/* The colors to highlight with. */
+:root:not(.config-classic) .config-tl-colors {
+  display: grid;
+  gap: 6px;
+  margin: 10px 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--cfg-line);
+  border-radius: 8px;
+  background-color: var(--cfg-surface-2);
+}
+
+:root:not(.config-classic) .config-tl-colors-title,
+:root:not(.config-classic) .config-tl-lost-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 650;
+}
+
+:root:not(.config-classic) .config-tl-color-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+:root:not(.config-classic) .config-tl-color-label {
+  width: 56px;
+  color: var(--cfg-muted);
+  font-size: 12px;
+}
+
+:root:not(.config-classic) .config-tl-colors input[type="text"].config-tl-color-name {
+  flex: 1 1 140px;
+  max-width: 240px;
+  width: auto;
+  text-align: left;
+  font-family: var(--cfg-font);
+}
+
+:root:not(.config-classic) .config-tl-colors input[type="text"].config-tl-hex {
+  width: 84px;
+  text-align: left;
+  font-size: 12px;
+}
+
+:root:not(.config-classic) .config-tl-hex.config-invalid {
+  border-color: var(--cfg-alarm);
+}
+
+:root:not(.config-classic) .config-tl-color-add {
+  justify-self: start;
+}
+
+:root:not(.config-classic) .config-tl-color-add,
+:root:not(.config-classic) .config-tl-color-remove,
+:root:not(.config-classic) .config-tl-action {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 99px;
+  font-size: 12px;
+}
+
 :root:not(.config-classic) .config-tl-lost {
-  margin-bottom: 12px;
+  margin: 10px 12px;
   padding: 10px 12px;
   border: 1px solid var(--cfg-alert);
   border-radius: 8px;
@@ -1685,11 +1993,8 @@ html:not(.config-classic) {
 }
 
 :root:not(.config-classic) .config-tl-lost-title {
-  display: inline-block;
   margin-bottom: 6px;
   color: var(--cfg-alert);
-  font-weight: 650;
-  cursor: help;
 }
 
 :root:not(.config-classic) .config-tl-lost-row {
@@ -1702,70 +2007,167 @@ html:not(.config-classic) {
   white-space: pre-wrap;
 }
 
-/* Rows: time, the timeline's text, shown text, hidden, highlight. */
+/* Entries: single lines that open. */
+:root:not(.config-classic) .config-tl-section {
+  padding: 12px 12px 4px 14px;
+  color: var(--cfg-accent);
+  font-size: 11.5px;
+  font-weight: 650;
+}
+
 :root:not(.config-classic) .config-tl-row {
   --config-tl-color: transparent;
 
   display: grid;
-  grid-template-columns: 64px minmax(120px, 1fr) minmax(160px, 1.3fr) 40px 236px;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 10px;
-  padding: 6px 8px 6px 10px;
+  gap: 8px;
+  min-height: 30px;
+  padding: 0 12px 0 14px;
   border-top: 1px solid var(--cfg-line);
   box-shadow: inset 3px 0 0 var(--config-tl-color);
+  cursor: pointer;
 }
 
-/* A job's edits have a button to go back to the common ones. */
-:root:not(.config-classic) .config-tl-job > .config-tl-row {
-  grid-template-columns: 64px minmax(120px, 1fr) minmax(160px, 1.3fr) 40px 266px;
+:root:not(.config-classic) .config-tl-row:hover {
+  background-color: var(--cfg-hover);
 }
 
-:root:not(.config-classic) .config-tl-head {
-  border-top: none;
-  color: var(--cfg-faint);
-  font-size: 11.5px;
-  font-weight: 600;
+:root:not(.config-classic) .config-tl-row:focus-visible {
+  outline: 2px solid var(--cfg-accent);
+  outline-offset: -2px;
+}
+
+:root:not(.config-classic) .config-tl-row.config-tl-open {
+  background-color: var(--cfg-surface-2);
 }
 
 :root:not(.config-classic) .config-tl-time {
   color: var(--cfg-muted);
   font-family: var(--cfg-font-accent);
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 560;
 }
 
 :root:not(.config-classic) .config-tl-name {
   min-width: 0;
-  font-weight: 560;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
-:root:not(.config-classic) .config-tl-highlighted .config-tl-name {
-  color: var(--cfg-tl-name, var(--config-tl-color));
+:root:not(.config-classic) .config-tl-shown {
+  font-weight: 560;
+}
+
+:root:not(.config-classic) .config-tl-edited .config-tl-shown {
   font-weight: 700;
 }
 
-:root:not(.config-classic) .config-tl-hidden .config-tl-name,
+:root:not(.config-classic) .config-tl-highlighted .config-tl-shown {
+  color: var(--cfg-tl-name, var(--config-tl-color));
+}
+
+:root:not(.config-classic) .config-tl-hidden .config-tl-shown,
 :root:not(.config-classic) .config-tl-hidden .config-tl-time {
   color: var(--cfg-faint);
   text-decoration: line-through;
 }
 
-:root:not(.config-classic) .config-tl-dup,
-:root:not(.config-classic) .config-tl-moved {
-  display: block;
-  margin-top: 2px;
+:root:not(.config-classic) .config-tl-was,
+:root:not(.config-classic) .config-tl-dup {
+  margin-left: 6px;
   color: var(--cfg-faint);
   font-size: 11px;
   font-weight: 450;
 }
 
-:root:not(.config-classic) .config-tl-moved {
-  color: var(--cfg-alert);
-  cursor: help;
+:root:not(.config-classic) .config-tl-badge {
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 99px;
+  color: var(--cfg-muted);
+  background-color: var(--cfg-hover);
+  font-size: 10.5px;
+  font-weight: 600;
 }
 
-:root:not(.config-classic) .config-tl-row input[type="text"].config-tl-text {
+:root:not(.config-classic) .config-tl-state {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+:root:not(.config-classic) .config-tl-state > .config-tl-badge {
+  margin-left: 0;
+}
+
+:root:not(.config-classic) .config-tl-hidden-chip {
+  color: var(--cfg-alert);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+:root:not(.config-classic) .config-tl-dot {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: var(--config-tl-color);
+}
+
+/* An open entry. */
+:root:not(.config-classic) .config-tl-panel {
+  display: grid;
+  gap: 10px;
+  padding: 10px 12px 12px 78px;
+  border-top: 1px solid var(--cfg-line);
+  background-color: var(--cfg-surface-2);
+  box-shadow: inset 3px 0 0 var(--cfg-accent);
+}
+
+:root:not(.config-classic) .config-tl-notes p {
+  margin: 0;
+  color: var(--cfg-muted);
+  font-size: 12px;
+}
+
+:root:not(.config-classic) .config-tl-notes p.config-tl-warn {
+  color: var(--cfg-alert);
+}
+
+:root:not(.config-classic) .config-tl-panel-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+:root:not(.config-classic) .config-tl-field {
+  display: grid;
+  gap: 3px;
+}
+
+:root:not(.config-classic) .config-tl-field-label {
+  color: var(--cfg-faint);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+:root:not(.config-classic) .config-tl-f-text {
+  flex: 1 1 220px;
+  max-width: 460px;
+}
+
+:root:not(.config-classic) .config-tl-f-time {
+  width: 72px;
+}
+
+:root:not(.config-classic) .config-tl-f-duration {
+  width: 90px;
+}
+
+:root:not(.config-classic) .config-tl-field > input[type="text"] {
   width: 100%;
   text-align: left;
   font-family: var(--cfg-font);
@@ -1773,118 +2175,63 @@ html:not(.config-classic) {
   font-weight: 450;
 }
 
-:root:not(.config-classic) .config-tl-highlight {
-  display: flex;
-  flex-wrap: wrap;
+:root:not(.config-classic) .config-tl-hide,
+:root:not(.config-classic) .config-tl-remove {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 12.5px;
+}
+
+:root:not(.config-classic) .config-tl-hide.config-active {
+  border-color: var(--cfg-alert);
+  color: var(--cfg-alert);
+}
+
+:root:not(.config-classic) .config-tl-remove {
+  color: var(--cfg-alarm);
+}
+
+:root:not(.config-classic) .config-tl-pick-line {
   align-items: center;
-  gap: 6px;
 }
 
-:root:not(.config-classic) .config-tl-highlight select {
-  width: 150px;
-  min-width: 0;
+:root:not(.config-classic) .config-tl-pick-line > .config-tl-field-label {
+  margin-right: 2px;
 }
 
-:root:not(.config-classic) .config-tl-highlight .config-tl-all {
-  height: 24px;
-  padding: 0 8px;
-  border-radius: 99px;
-  font-size: 11.5px;
-}
-
-:root:not(.config-classic) .config-tl-custom {
-  display: flex;
-  flex-basis: 100%;
-  align-items: center;
-  gap: 6px;
-}
-
-:root:not(.config-classic) .config-tl-custom input[type="text"].config-tl-hex {
-  width: 84px;
-  height: 26px;
-  text-align: left;
-  font-size: 12px;
-}
-
-:root:not(.config-classic) .config-tl-hex.config-invalid {
-  border-color: var(--cfg-alarm);
-}
-
-:root:not(.config-classic) .config-tl-swatches {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px;
-}
-
-:root:not(.config-classic) .config-tl-swatches > button {
-  width: 16px;
-  height: 16px;
-  padding: 0;
-  border: 1px solid rgb(0 0 0 / 30%);
-  border-radius: 50%;
-}
-
-:root:not(.config-classic) .config-tl-layer-label {
+:root:not(.config-classic) .config-tl-pick-chip {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  color: var(--cfg-muted);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: help;
-}
-
-:root:not(.config-classic) .config-tl-layer-label select {
-  width: 170px;
-  cursor: pointer;
-}
-
-:root:not(.config-classic) .config-tl-toolbar select.config-tl-copy {
-  width: 170px;
-}
-
-/* A part of a timeline with jumps. */
-:root:not(.config-classic) .config-tl-section {
-  margin-top: 10px;
-  padding: 8px 10px 6px;
-  border-top: 1px solid var(--cfg-line);
-  color: var(--cfg-accent);
-  font-size: 12px;
-  font-weight: 650;
-  cursor: help;
-}
-
-:root:not(.config-classic) .config-tl-offset {
-  display: block;
-  color: var(--cfg-faint);
-  font-size: 11px;
-}
-
-:root:not(.config-classic) .config-tl-badge {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 0 6px;
-  border-radius: 99px;
-  background-color: var(--cfg-hover);
-  color: var(--cfg-muted);
-  font-size: 11px;
-  font-weight: 600;
-  vertical-align: 1px;
-  cursor: help;
-}
-
-:root:not(.config-classic) .config-tl-fixed {
-  color: var(--cfg-muted);
-  font-size: 13px;
-  cursor: help;
-}
-
-:root:not(.config-classic) .config-tl-highlight .config-tl-reset {
-  width: 24px;
+  gap: 5px;
   height: 24px;
-  padding: 0;
+  padding: 0 10px;
   border-radius: 99px;
-  font-size: 13px;
+  font-size: 12px;
+}
+
+:root:not(.config-classic) .config-tl-pick-chip > .config-tl-dot {
+  width: 10px;
+  height: 10px;
+}
+
+:root:not(.config-classic) .config-tl-swatch {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background-clip: padding-box;
+}
+
+:root:not(.config-classic) .config-tl-swatch.config-active {
+  border-color: var(--cfg-text);
+}
+
+:root:not(.config-classic) .config-tl-pick-name {
+  margin-left: 4px;
+  color: var(--cfg-muted);
+  font-size: 12px;
 }
 
 :root:not(.config-classic) .config-tl-empty {
@@ -2012,30 +2359,13 @@ html:not(.config-classic) {
   margin-right: 10px;
 }
 
-/* config.css sets these widths with !important. */
-.config-w600:not(.config-classic) .config-tl-row,
-.config-w600:not(.config-classic) .config-tl-job > .config-tl-row {
-  grid-template-columns: 52px minmax(0, 1fr) 40px;
+/* Narrow: an open entry takes the whole width. */
+.config-w600:not(.config-classic) .config-tl-panel {
+  padding-left: 14px;
 }
 
-/* Narrow: time, name and the hide switch on a line, then the text, then the highlight. */
-.config-w600:not(.config-classic) .config-tl-row > input[type="checkbox"] {
-  grid-row: 1;
-  grid-column: 3;
-}
-
-.config-w600:not(.config-classic) .config-tl-row > .config-tl-text {
-  grid-row: 2;
-  grid-column: 2 / -1;
-}
-
-.config-w600:not(.config-classic) .config-tl-row > .config-tl-highlight {
-  grid-row: 3;
-  grid-column: 2 / -1;
-}
-
-.config-w600:not(.config-classic) .config-tl-head {
-  display: none;
+.config-w600:not(.config-classic) .config-tl-toolbar input[type="text"].config-tl-search {
+  max-width: none;
 }
 
 .config-w480:not(.config-classic) .timeline-add-container .timeline-add-row-time {

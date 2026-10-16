@@ -34,7 +34,8 @@ export type PerTriggerOption = Partial<{
 export type TimelineConfig = Partial<{
   Ignore: string[];
   Rename: { [text: string]: string };
-  Add: { time: number; text: string; duration?: number }[];
+  // Fork: job, for an entry added for one job only.
+  Add: { time: number; text: string; duration?: number; job?: string }[];
   // Fork: edits of single entries (see timeline_entries.ts).
   Entries: TimelineEntryEdit[];
   // Fork: edits for one job, over the common ones, by job.

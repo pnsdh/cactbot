@@ -234,7 +234,11 @@ export class TimelineParser {
       this.ignores[text] = true;
 
     let uniqueId = 0;
+    // Fork: entries added for one job are for that job only.
+    const job = editJob(this.options.TimelineJob ?? '');
     for (const event of this.timelineConfig.Add ?? []) {
+      if (event.job !== undefined && event.job !== job)
+        continue;
       this.events.push({
         id: `${++uniqueId}`,
         time: event.time,

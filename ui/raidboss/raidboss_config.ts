@@ -1,7 +1,7 @@
 import { isLang, Lang } from '../../resources/languages';
 import { buildNetRegexForTrigger } from '../../resources/netregexes';
 import { UnreachableCode } from '../../resources/not_reached';
-import PartyTracker from '../../resources/party';
+import PartyTracker, { jobLocalizedFull } from '../../resources/party';
 import Regexes from '../../resources/regexes';
 import { triggerOutputFunctions } from '../../resources/responses';
 import { translateRegex, translateRegexBuildParam } from '../../resources/translations';
@@ -45,8 +45,15 @@ import {
 import raidbossFileData from './data/raidboss_manifest.txt';
 import { RaidbossTriggerField, RaidbossTriggerOutput } from './popup-text';
 import raidbossOptions, { RaidbossOptions } from './raidboss_options';
-import { addedRow, AddedRowChange, buildTimelineEditor } from './timeline_editor';
-import { parseEntryEdits } from './timeline_entries';
+import { buildTimelineEditor } from './timeline_editor';
+import {
+  highlightId,
+  kNoHighlight,
+  paletteColor,
+  parseEntryEdits,
+  readPalette,
+  TimelineEntryEdit,
+} from './timeline_entries';
 import { TimelineParser } from './timeline_parser';
 
 type RaidbossFileInfo = ConfigProcessedFile<ConfigLooseTriggerSet>;
@@ -826,11 +833,14 @@ class RaidbossConfigurator {
         typeof s === 'string' ? s : this.base.translate(s)
       );
       const comment = trig.comment?.[this.base.lang] ?? trig.comment?.en ?? '';
-      const severity = severities.find((s) => trig.configOutput?.[`${s}Text`] !== undefined);
+      // What it says: its output, or else (with output strings) the first of them.
+      const severity = severities.find((s) => trig.configOutput?.[`${s}Text`] !== undefined) ??
+        severities.find((s) => `${s}Text` in trig);
+      const said = severity !== undefined ? trig.configOutput?.[`${severity}Text`] : outputs[0];
       triggers.push({
         id: trigId,
         text: [trigId, ...outputs, ...strings, comment].join(' ').toLowerCase(),
-        preview: severity !== undefined ? trig.configOutput?.[`${severity}Text`] : outputs[0],
+        preview: said ?? strings[0],
         severity: severity,
       });
     }
@@ -1152,8 +1162,11 @@ class RaidbossConfigurator {
             get: (path) => this.base.getJsonOption('raidboss', [...zonePath, ...path], ''),
             set: (path, value) =>
               this.base.setJsonOption('raidboss', [...zonePath, ...path], value),
+            getColors: () => this.base.getJsonOption('raidboss', ['timelineColors'], {}),
+            setColor: (id, value) =>
+              this.base.setJsonOption('raidboss', ['timelineColors', id], value),
+            jobName: (job) => this.base.translate(jobLocalizedFull[job as Job] ?? { en: job }),
             buildByName: (pane) => this.buildTimelineTextUI(zoneId, timeline, pane),
-            buildAdded: (pane, onRowChange) => this.buildTimelineAddUI(zoneId, pane, onRowChange),
           });
         } else {
           this.buildTimelineListingUI(timeline, text, container);
@@ -1222,8 +1235,6 @@ class RaidbossConfigurator {
   buildTimelineAddUI(
     zoneId: number,
     parent: HTMLElement,
-    // Fork: told of each row's time and text before and after a change (none: removed).
-    onRowChange?: AddedRowChange,
   ): void {
     const addId = ['timeline', zoneId.toString(), 'add'];
 
@@ -1261,19 +1272,11 @@ class RaidbossConfigurator {
     const storeRows = () => this.base.setJsonOption('raidboss', addId, rows);
 
     const addRow = (obj: { [name: string]: SavedConfigEntry }): void => {
-      // Fork: the row as last saved with a time and text.
-      let last = addedRow(obj);
       const setFunc = () => {
         obj.time = timeInput.value;
         obj.text = textInput.value;
         obj.duration = durationInput.value;
         storeRows();
-        const now = addedRow(obj);
-        if (now !== undefined) {
-          if (last !== undefined)
-            onRowChange?.(last, now);
-          last = now;
-        }
       };
 
       const timeInput = document.createElement('input');
@@ -1323,8 +1326,6 @@ class RaidbossConfigurator {
         rows.splice(idx, 1);
 
         storeRows();
-        if (last !== undefined)
-          onRowChange?.(last);
       });
     };
 
@@ -1931,6 +1932,8 @@ const processPerZoneTimelineConfig = (options: RaidbossOptions, savedConfig: Sav
   const timeline = savedConfig['timeline'];
   if (typeof timeline !== 'object' || Array.isArray(timeline))
     return;
+  // Fork: the user's highlight colors.
+  const palette = readPalette(savedConfig['timelineColors']);
 
   for (const [zoneKey, zoneEntry] of Object.entries(timeline)) {
     const zoneId = parseInt(zoneKey);
@@ -1971,20 +1974,36 @@ const processPerZoneTimelineConfig = (options: RaidbossOptions, savedConfig: Sav
         if (text.trim() === '' || isNaN(time))
           continue;
 
-        (timelineConfig.Add ??= []).push({ time, text, duration });
+        // Fork: an entry added for one job only (timeline_editor.ts).
+        const job = typeof row.job === 'string' && row.job !== '' ? row.job : undefined;
+        (timelineConfig.Add ??= []).push({
+          time,
+          text,
+          duration,
+          ...job !== undefined ? { job } : {},
+        });
       }
     }
 
     // Fork: * 'timeline', zoneId, 'entries', 'time|name', { text, hide, highlight, color }
     //       * 'timeline', zoneId, 'jobEntries', job, 'time|name', { ... }
-    // (see timeline_entries.ts).
-    const entries = parseEntryEdits(zoneEntry['entries']);
+    // (see timeline_entries.ts).  Highlights get their colors from the user's list.
+    const resolve = (edits: TimelineEntryEdit[]) => {
+      for (const edit of edits) {
+        if (edit.highlight === undefined || edit.highlight === kNoHighlight)
+          continue;
+        edit.color = paletteColor(palette, edit.highlight, edit.color);
+        edit.highlight = highlightId(edit.highlight);
+      }
+      return edits;
+    };
+    const entries = resolve(parseEntryEdits(zoneEntry['entries']));
     if (entries.length > 0)
       timelineConfig.Entries = entries;
     const jobEntries = zoneEntry['jobEntries'];
     if (typeof jobEntries === 'object' && !Array.isArray(jobEntries)) {
       for (const [job, saved] of Object.entries(jobEntries)) {
-        const edits = parseEntryEdits(saved);
+        const edits = resolve(parseEntryEdits(saved));
         if (edits.length > 0)
           (timelineConfig.JobEntries ??= {})[job] = edits;
       }
