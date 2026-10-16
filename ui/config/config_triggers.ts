@@ -3,11 +3,12 @@ import { LocaleText } from '../../types/trigger';
 
 import { DefaultValue, setDefault } from './config_dirty';
 import { addTooltipsIn } from './config_rows';
+import { setTip } from './config_tooltip';
 
 // Fork: a browser over the trigger lists that raidboss_config.ts and oopsyraidsy_config.ts build
 // (expansion > file > trigger rows): expansions and content types as chips, files as cards that
-// open in place, and trigger search for config_tabs.ts.  Those build the lists as before and
-// register each file here.
+// open to a page of their own (triggers, timeline and options as tabs), and trigger search for
+// config_tabs.ts.  Those build the lists as before and register each file here.
 
 export type TriggerEntry = {
   id: string;
@@ -52,9 +53,25 @@ const kOtherType: LocaleText = { en: 'Other', ko: '기타' };
 const kOpenAll: LocaleText = { en: 'Open all', ko: '모두 펼치기' };
 const kTriggerGroup: LocaleText = { en: 'Edit Triggers', ko: '트리거 편집' };
 const kCloseAll: LocaleText = { en: 'Close all', ko: '모두 접기' };
+const kBack: LocaleText = { en: 'List', ko: '목록' };
+const kBackHelp: LocaleText = { en: 'Back to the list (Esc)', ko: '목록으로 (Esc)' };
+const kPrevFight: LocaleText = { en: 'Previous fight', ko: '이전 전투' };
+const kNextFight: LocaleText = { en: 'Next fight', ko: '다음 전투' };
+const kTabTriggers: LocaleText = { en: 'Triggers', ko: '트리거' };
+const kTabTimeline: LocaleText = { en: 'Timeline', ko: '타임라인' };
+const kTabOptions: LocaleText = { en: 'Fight options', ko: '전투 옵션' };
+const kChanged: LocaleText = { en: 'changed', ko: '변경' };
+
+// A file's page shows one of these at a time.
+type PageTab = 'triggers' | 'timeline' | 'options';
 
 const files: { [group: string]: TriggerFile[] } = {};
-const browsers: { [group: string]: { showFile: (file: TriggerFile) => void } } = {};
+const browsers: {
+  [group: string]: {
+    showFile: (file: TriggerFile) => void;
+    openFile: (file: TriggerFile, tab?: PageTab) => void;
+  };
+} = {};
 let context: Context = {
   translate: (text) => text.en,
   readSaved: () => undefined,
@@ -114,14 +131,30 @@ const differs = (entry: SavedConfigEntry | null | undefined, value: string): boo
   return entry.toString() !== value;
 };
 
+const settingChanged = (file: TriggerFile, setting: FileSetting): boolean => {
+  const saved = context.readSaved(file.group, setting.path);
+  if (setting.default === undefined)
+    return isChange(saved);
+  return differs(
+    saved,
+    typeof setting.default === 'function' ? setting.default() : setting.default,
+  );
+};
+
+const changedTriggers = (file: TriggerFile): number =>
+  file.triggers.filter((t) => isChange(context.readSaved(file.group, ['triggers', t.id]))).length;
+
+// What a page's tab has changed: timeline edits, or the set's options.
+const changedIn = (file: TriggerFile, tab: PageTab): number => {
+  if (tab === 'triggers')
+    return changedTriggers(file);
+  return file.settings.filter((s) =>
+    (s.path[0] === 'timeline') === (tab === 'timeline') && settingChanged(file, s)
+  ).length;
+};
+
 const changedCount = (file: TriggerFile): number =>
-  file.triggers.filter((t) => isChange(context.readSaved(file.group, ['triggers', t.id]))).length +
-  file.settings.filter((s) => {
-    const saved = context.readSaved(file.group, s.path);
-    if (s.default === undefined)
-      return isChange(saved);
-    return differs(saved, typeof s.default === 'function' ? s.default() : s.default);
-  }).length;
+  changedTriggers(file) + file.settings.filter((s) => settingChanged(file, s)).length;
 
 const format = (text: LocaleText, n: number): string =>
   context.translate(text).replace('${n}', n.toLocaleString());
@@ -415,13 +448,6 @@ export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void 
     file.container.addEventListener('input', update);
     // Timeline rows are removed with a button, saving without an input event.
     file.container.addEventListener('click', update);
-    // Opening a card scrolls it into view, as it moves to a row of its own.
-    header.addEventListener('click', () => {
-      if (file.container.classList.contains('collapsed'))
-        return;
-      compactTriggers(file);
-      file.container.scrollIntoView({ block: 'start' });
-    });
   }
   // Headers that open things can be reached and used with the keyboard.
   for (
@@ -613,6 +639,258 @@ export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void 
     count.textContent = triggerCount(group).toLocaleString();
   context.onTriggersChanged();
 
+  // ---- A file opens to a page of its own, not among the other cards: its header (with the way
+  // back and to the fights around it) on top, then its triggers, timeline or options as tabs.
+  // The page shown last comes back with the config page. ----
+  type Page = {
+    file: TriggerFile;
+    header: HTMLElement;
+    panels: Map<PageTab, HTMLElement>;
+    tabs: Map<PageTab, HTMLButtonElement>;
+    prev: HTMLButtonElement;
+    next: HTMLButtonElement;
+    tab: PageTab;
+    update: () => void;
+  };
+  const kTabNames: { [tab in PageTab]: LocaleText } = {
+    triggers: kTabTriggers,
+    timeline: kTabTimeline,
+    options: kTabOptions,
+  };
+  const pageKey = `cactbot-config-page-${group}`;
+  const tabKey = `cactbot-config-page-tab-${group}`;
+  const pages = new Map<TriggerFile, Page>();
+  let page: Page | undefined;
+  let listScroll = 0;
+  // Set while a file's header is clicked for its own toggle (see below).
+  let toggling = false;
+  const scroller = () => groupDiv.closest<HTMLElement>('.config-scroll');
+
+  const makeButton = (className: string, text: string, onclick: () => void) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.classList.add(className);
+    button.textContent = text;
+    // Not the header's click, which opens and closes the file.
+    button.addEventListener('click', (e) => {
+      e.stopPropagation();
+      onclick();
+    });
+    return button;
+  };
+
+  // The files around a page, as the list shows them.
+  const sequence = () =>
+    current !== undefined
+      ? filesIn(current).filter((c) => !c.classList.contains('config-filter-miss'))
+      : [];
+
+  const showTab = (p: Page, tab: PageTab) => {
+    p.tab = tab;
+    for (const [t, panel] of p.panels) {
+      const shown = t === tab;
+      panel.classList.toggle('config-page-shown', shown);
+      const button = p.tabs.get(t);
+      button?.classList.toggle('config-active', shown);
+      button?.setAttribute('aria-selected', shown ? 'true' : 'false');
+    }
+    // Never folded in a page; the timeline editor is built when first opened.
+    const panel = p.panels.get(tab);
+    if (panel?.classList.contains('collapsed')) {
+      const header = panel.querySelector<HTMLElement>(':scope > .timeline-edit-header');
+      if (tab === 'timeline' && header !== null)
+        header.click();
+      panel.classList.remove('collapsed');
+    }
+    storageSet(tabKey, tab);
+  };
+
+  const leavePage = (p: Page) => {
+    p.file.container.classList.remove('config-page');
+    p.file.container.classList.add('collapsed');
+    p.header.setAttribute('role', 'button');
+    p.header.tabIndex = 0;
+  };
+
+  let openPage: (file: TriggerFile, tab?: PageTab) => void = () => undefined;
+
+  const closePage = () => {
+    if (page === undefined)
+      return;
+    const header = page.header;
+    leavePage(page);
+    page = undefined;
+    groupDiv.classList.remove('config-page-open');
+    storageSet(pageKey, '');
+    // Its changes may change what the list shows ("changed only").
+    apply();
+    const s = scroller();
+    if (s !== null)
+      s.scrollTop = listScroll;
+    header.focus({ preventScroll: true });
+  };
+
+  const step = (by: number) => {
+    if (page === undefined)
+      return;
+    const shown = sequence();
+    const index = shown.indexOf(page.file.container);
+    const target = index < 0 ? undefined : shown[index + by];
+    const file = target !== undefined ? fileOf.get(target) : undefined;
+    if (file !== undefined)
+      openPage(file, page.tab);
+  };
+
+  const buildPage = (file: TriggerFile, header: HTMLElement): Page => {
+    const container = file.container;
+    const panels = new Map<PageTab, HTMLElement>();
+    const triggers = container.querySelector<HTMLElement>(':scope > .config-trigger-group');
+    const timeline = container.querySelector<HTMLElement>(
+      ':scope > .timeline-edit-container:not(.config-trigger-group)',
+    );
+    const options = container.querySelector<HTMLElement>(':scope > .overlay-options');
+    if (triggers !== null)
+      panels.set('triggers', triggers);
+    if (timeline !== null)
+      panels.set('timeline', timeline);
+    if (options !== null)
+      panels.set('options', options);
+
+    const back = makeButton('config-page-back', context.translate(kBack), () => closePage());
+    setTip(back, context.translate(kBackHelp));
+    const prev = makeButton('config-page-step', '‹', () => step(-1));
+    prev.setAttribute('aria-label', context.translate(kPrevFight));
+    setTip(prev, context.translate(kPrevFight));
+    const next = makeButton('config-page-step', '›', () => step(1));
+    next.setAttribute('aria-label', context.translate(kNextFight));
+    setTip(next, context.translate(kNextFight));
+    const steps = document.createElement('div');
+    steps.classList.add('config-page-steps');
+    steps.append(prev, next);
+    const tabBar = document.createElement('div');
+    tabBar.classList.add('config-page-tabs');
+    tabBar.setAttribute('role', 'tablist');
+    // One part only (oopsy's triggers): no tabs.
+    tabBar.classList.toggle('config-hidden', panels.size < 2);
+    const p: Page = {
+      file: file,
+      header: header,
+      panels: panels,
+      tabs: new Map(),
+      prev: prev,
+      next: next,
+      tab: 'triggers',
+      update: () => undefined,
+    };
+    for (const tab of panels.keys()) {
+      const button = makeButton('config-page-tab', '', () => showTab(p, tab));
+      button.setAttribute('role', 'tab');
+      p.tabs.set(tab, button);
+      tabBar.appendChild(button);
+    }
+    // Its name, how many triggers, and what was changed in it.
+    p.update = () => {
+      for (const [tab, button] of p.tabs) {
+        button.replaceChildren(context.translate(kTabNames[tab]));
+        if (tab === 'triggers') {
+          const n = document.createElement('span');
+          n.classList.add('config-page-tab-count');
+          n.textContent = file.triggers.length.toLocaleString();
+          button.appendChild(n);
+        }
+        const changed = changedIn(file, tab);
+        if (changed > 0) {
+          const mark = document.createElement('span');
+          mark.classList.add('config-page-tab-changed');
+          mark.textContent = tab === 'timeline'
+            ? context.translate(kChanged)
+            : format(kChangedCount, changed);
+          button.appendChild(mark);
+        }
+      }
+    };
+    container.addEventListener('change', p.update);
+    container.addEventListener('input', p.update);
+    container.addEventListener('click', p.update);
+    // Appended (the header's first part is styled as its first child).
+    header.append(back, steps, tabBar);
+    return p;
+  };
+
+  openPage = (file: TriggerFile, tab?: PageTab) => {
+    const header = file.container.querySelector<HTMLElement>(':scope > .trigger-file-header');
+    if (header === null)
+      return;
+    const s = scroller();
+    if (page === undefined && s !== null)
+      listScroll = s.scrollTop;
+    else if (page !== undefined && page.file !== file)
+      leavePage(page);
+    // Its own toggle builds its triggers the first time (an event of its own: click() does
+    // nothing while the header's click, e.g. by the keyboard, is still being handled).
+    if (file.container.classList.contains('collapsed')) {
+      toggling = true;
+      header.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      toggling = false;
+    }
+    compactTriggers(file);
+    const p = pages.get(file) ?? buildPage(file, header);
+    pages.set(file, p);
+    page = p;
+    file.container.classList.add('config-page');
+    groupDiv.classList.add('config-page-open');
+    // Not a button while it is the page's header.
+    header.removeAttribute('role');
+    header.tabIndex = -1;
+    const saved = tab ?? storageGet(tabKey);
+    const tabs = [...p.panels.keys()];
+    showTab(p, tabs.find((t) => t === saved) ?? tabs[0] ?? 'triggers');
+    p.update();
+    const shown = sequence();
+    const index = shown.indexOf(file.container);
+    p.prev.disabled = index <= 0;
+    p.next.disabled = index < 0 || index >= shown.length - 1;
+    storageSet(pageKey, file.title);
+    if (s !== null)
+      s.scrollTop = 0;
+  };
+
+  for (const file of list) {
+    const header = file.container.querySelector<HTMLElement>(':scope > .trigger-file-header');
+    if (header === null)
+      continue;
+    // A card's header opens its page, and does nothing on its page; this comes before the
+    // header's own toggle (which only runs for openPage).
+    file.container.addEventListener('click', (e) => {
+      if (toggling || !(e.target instanceof Element))
+        return;
+      // Its buttons (on a page) stop the click themselves.
+      if (
+        e.target.closest('.trigger-file-header') !== header || e.target.closest('button') !== null
+      )
+        return;
+      e.stopPropagation();
+      if (page?.file !== file)
+        openPage(file);
+    }, true);
+  }
+
+  // Esc (but not in a box, where it undoes the typing) and the mouse's back button go back.
+  const visible = () => page !== undefined && groupDiv.offsetParent !== null;
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || e.defaultPrevented || !visible())
+      return;
+    if (e.target instanceof Element && e.target.closest('input, select, textarea') !== null)
+      return;
+    closePage();
+  });
+  document.addEventListener('mouseup', (e) => {
+    if (e.button !== 3 || !visible())
+      return;
+    e.preventDefault();
+    closePage();
+  });
+
   browsers[group] = {
     showFile: (file: TriggerFile) => {
       const expansion = groups.find((e) => e.containers.some((c) => c.contains(file.container)));
@@ -622,7 +900,18 @@ export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void 
       if (expansion !== undefined)
         selectExpansion(expansion);
     },
+    openFile: (file, tab) => openPage(file, tab),
   };
+
+  // The page shown last.
+  const last = storageGet(pageKey);
+  const lastFile = last !== null && last !== '' ? list.find((f) => f.title === last) : undefined;
+  if (lastFile !== undefined) {
+    const expansion = groups.find((e) => e.containers.some((c) => c.contains(lastFile.container)));
+    if (expansion !== undefined && expansion !== current)
+      selectExpansion(expansion);
+    openPage(lastFile);
+  }
 };
 
 export type TriggerHit = { file: TriggerFile; trigger?: TriggerEntry };
@@ -675,14 +964,11 @@ export const revealTrigger = (hit: TriggerHit): void => {
   const { file, trigger } = hit;
   context.showTriggers(file.group);
   browsers[file.group]?.showFile(file);
+  browsers[file.group]?.openFile(file, trigger !== undefined ? 'triggers' : undefined);
   const header = file.container.querySelector<HTMLElement>(':scope > .trigger-file-header');
-  if (file.container.classList.contains('collapsed'))
-    header?.click();
   const row = trigger !== undefined ? findTriggerRow(file, trigger.id) : undefined;
-  row?.closest('.config-trigger-group')?.classList.remove('collapsed');
   if (row === undefined) {
     flash([file.container]);
-    file.container.scrollIntoView({ block: 'start' });
     return;
   }
   openTriggerRow(row, true);

@@ -704,12 +704,17 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
 
     const fileHeader = parent.closest('.trigger-file-container')
       ?.querySelector<HTMLElement>(':scope > .trigger-file-header');
+    // Under the bars on top, in one step: where the page can't scroll that far (its end), it
+    // goes as far as it can rather than past the heading and back.
     const goTo = (heading: HTMLElement) => {
-      heading.scrollIntoView({ block: 'start' });
-      const s = heading.closest('.config-scroll');
+      const s = heading.closest<HTMLElement>('.config-scroll');
+      if (s === null)
+        return;
       // offsetHeight, unlike rects, is in the page's own pixels whatever its scale.
-      if (s !== null)
-        s.scrollTop -= (fileHeader?.offsetHeight ?? 0) + sticky.offsetHeight + 4;
+      const rect = heading.getBoundingClientRect();
+      const k = rect.height > 0 ? heading.offsetHeight / rect.height : 1;
+      const top = (rect.top - s.getBoundingClientRect().top) * k;
+      s.scrollTop += top - ((fileHeader?.offsetHeight ?? 0) + sticky.offsetHeight + 4);
     };
 
     const save = (e: Event, value: Edit) => {

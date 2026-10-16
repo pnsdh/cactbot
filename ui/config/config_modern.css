@@ -1149,6 +1149,172 @@ html:not(.config-classic) {
   color: var(--cfg-muted);
 }
 
+/* ===== A fight's page (config_triggers.ts) ===== */
+
+/* Only the page: no list, filters or other cards. */
+:root:not(.config-classic) .config-page-open > .config-trigger-toolbar,
+:root:not(.config-classic) .config-page-open > .config-trigger-empty,
+:root:not(.config-classic) .config-page-open > .trigger-expansion-container > :not(.config-page) {
+  display: none;
+}
+
+:root:not(.config-classic) .config-trigger-browser.config-page-open > .trigger-expansion-container.config-active {
+  display: block;
+}
+
+/* Its header: the way back, the fight, the fights around it, then its tabs. */
+:root:not(.config-classic) .config-trigger-browser .trigger-file-container.config-page > .trigger-file-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 12px;
+  padding: 10px 14px 0;
+  background-color: var(--cfg-surface);
+  cursor: default;
+}
+
+:root:not(.config-classic) .config-trigger-browser .trigger-file-container.config-page > .trigger-file-header::after {
+  display: none;
+}
+
+:root:not(.config-classic) .config-page > .trigger-file-header > .trigger-file-header-part:first-child {
+  grid-column: 2;
+  grid-row: 1;
+  overflow: hidden;
+  font-size: 15px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+:root:not(.config-classic) .config-page > .trigger-file-header > .config-file-meta {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+:root:not(.config-classic) .config-page-back,
+:root:not(.config-classic) .config-page-steps,
+:root:not(.config-classic) .config-page-tabs {
+  display: none;
+}
+
+:root:not(.config-classic) .config-page > .trigger-file-header > .config-page-back {
+  grid-column: 1;
+  grid-row: 1 / 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  padding: 0 12px 0 9px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+:root:not(.config-classic) .config-page-back::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border: solid currentcolor;
+  border-width: 0 0 2px 2px;
+  transform: rotate(45deg);
+}
+
+:root:not(.config-classic) .config-page > .trigger-file-header > .config-page-steps {
+  grid-column: 3;
+  grid-row: 1 / 3;
+  display: flex;
+  gap: 6px;
+}
+
+:root:not(.config-classic) .config-page-step {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 8px;
+  font-size: 16px;
+  line-height: 1;
+}
+
+:root:not(.config-classic) .config-page-step:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* Tabs as the top bar's: underlined. */
+:root:not(.config-classic) .config-page > .trigger-file-header > .config-page-tabs {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+  overflow-x: auto;
+}
+
+:root:not(.config-classic) .config-page > .trigger-file-header > .config-page-tabs.config-hidden {
+  display: none;
+}
+
+:root:not(.config-classic) .config-page-tabs::-webkit-scrollbar {
+  height: 0;
+}
+
+:root:not(.config-classic) .config-page-tab {
+  flex: none;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 0;
+  background: none;
+  color: var(--cfg-muted);
+  font-weight: 560;
+  white-space: nowrap;
+}
+
+:root:not(.config-classic) .config-page-tab:hover {
+  background: none;
+  color: var(--cfg-text);
+}
+
+:root:not(.config-classic) .config-page-tab.config-active {
+  color: var(--cfg-text);
+}
+
+:root:not(.config-classic) .config-page-tab.config-active::after {
+  content: "";
+  position: absolute;
+  right: 10px;
+  bottom: 0;
+  left: 10px;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background-color: var(--cfg-accent);
+}
+
+:root:not(.config-classic) .config-page-tab-count {
+  color: var(--cfg-faint);
+  font-family: var(--cfg-font-accent);
+  font-size: 11.5px;
+}
+
+:root:not(.config-classic) .config-page-tab-changed {
+  color: var(--cfg-accent);
+  font-size: 11.5px;
+}
+
+/* One part at a time, never folded (its own header is the tab). */
+:root:not(.config-classic) .config-page > :not(.trigger-file-header):not(.config-page-shown),
+:root:not(.config-classic) .config-page > .timeline-edit-container > .timeline-edit-header {
+  display: none;
+}
+
+:root:not(.config-classic) .config-trigger-browser .config-page > .config-page-shown {
+  margin-top: 12px;
+}
+
 /* Where a search result was opened. */
 :root:not(.config-classic) .config-flash {
   border-radius: 6px;
