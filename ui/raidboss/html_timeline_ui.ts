@@ -164,13 +164,31 @@ export class HTMLTimelineUI extends TimelineUI {
       helper.style.gridTemplateRows = `repeat(${this.options.MaxNumberOfTimerBars}, min-content)`;
       if (this.options.ReverseTimeline)
         helper.classList.add('reversed');
-      // Built only while unlocked, as timer bars draw every frame.
-      const isUnlocked = () => document.documentElement.classList.contains('resize-handle');
+      // Built only while unlocked, as timer bars draw every frame, and not for a hidden timeline.
+      const isUnlocked = () =>
+        document.documentElement.classList.contains('resize-handle') &&
+        this.options.TimelineEnabled;
       const update = () => this.ShowResizeHelper(helper, isUnlocked());
       new MutationObserver(update).observe(document.documentElement, {
         attributes: true,
         attributeFilter: ['class'],
       });
+      // The skin's and user's style sheets come after this (user_config.ts handleSkin): built
+      // again once each loads, as bars read some of their style only when made.
+      new MutationObserver((records) => {
+        for (const record of records) {
+          for (const node of record.addedNodes) {
+            if (!(node instanceof HTMLLinkElement))
+              continue;
+            node.addEventListener('load', () => {
+              if (this.resizeHelperTimer === undefined)
+                return;
+              this.ShowResizeHelper(helper, false);
+              update();
+            });
+          }
+        }
+      }).observe(document.head, { childList: true });
       update();
     }
 
@@ -236,7 +254,9 @@ export class HTMLTimelineUI extends TimelineUI {
         const text = instructions[i] ?? `${i + 1}`;
         if (bar.lefttext !== text)
           bar.lefttext = text;
-        div.style.order = (sign * i).toString();
+        const order = (sign * i).toString();
+        if (div.style.order !== order)
+          div.style.order = order;
       });
     };
     tick();
