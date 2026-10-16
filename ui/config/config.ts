@@ -393,6 +393,11 @@ export class CactbotConfigurator {
       readSaved: (group, path) => this._getOptionLeafHelper(group, path),
     });
     this.buildButterBar();
+    // Fork: changes the overlays haven't loaded, as when this page reloaded for its style.
+    document.getElementById('butter-margin')?.classList.toggle(
+      'hidden',
+      !differsFromBaseline(this.savedConfig),
+    );
 
     const container = document.getElementById('container');
     if (!container)
@@ -429,11 +434,16 @@ export class CactbotConfigurator {
   }
 
   async flushConfigData(): Promise<void> {
-    await callOverlayHandler({
-      call: 'cactbotSaveData',
-      overlay: 'options',
-      data: this.savedConfig,
-    });
+    try {
+      await callOverlayHandler({
+        call: 'cactbotSaveData',
+        overlay: 'options',
+        data: this.savedConfig,
+      });
+    } catch (e) {
+      // Fork: a failed save mustn't stop the reload button (which waits for saves).
+      console.error(e);
+    }
 
     // Fork: only while the config differs from what the overlays run with (see config_dirty.ts).
     document.getElementById('butter-margin')?.classList.toggle(

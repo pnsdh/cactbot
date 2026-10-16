@@ -43,6 +43,9 @@ const isDefault = (group: string, path: string[], value: SavedConfigEntry): bool
   return false;
 };
 
+// Options of this page alone: the overlays don't need a reload for them.
+const kPageOptions = ['ConfigStyle', 'ConfigTheme', 'ConfigZoom'];
+
 // The config without anything that means the default, with keys in order.
 const normalize = (
   group: string,
@@ -50,6 +53,8 @@ const normalize = (
   value: SavedConfigEntry | null | undefined,
 ): SavedConfigEntry | undefined => {
   if (value === undefined || value === null)
+    return undefined;
+  if (group === 'general' && path.length === 1 && kPageOptions.includes(path[0] ?? ''))
     return undefined;
   if (Array.isArray(value)) {
     const items = value.map((v) => normalize(group, path, v)).filter((v) => v !== undefined);
