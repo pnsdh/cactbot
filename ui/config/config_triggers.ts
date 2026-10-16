@@ -124,6 +124,7 @@ const format = (text: LocaleText, n: number): string =>
   context.translate(text).replace('${n}', n.toLocaleString());
 
 const storageKey = (group: string) => `cactbot-config-expansion-${group}`;
+const changedKey = (group: string) => `cactbot-config-changed-${group}`;
 
 const storageGet = (key: string): string | null => {
   try {
@@ -361,7 +362,8 @@ export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void 
 
   let current = groups[0];
   let type: string | undefined;
-  let changedOnly = false;
+  // "Changed only" stays as it was left.
+  let changedOnly = storageGet(changedKey(group)) === '1';
 
   const apply = () => {
     let shown = 0;
@@ -422,6 +424,7 @@ export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void 
   };
   changedToggle.onclick = () => {
     changedOnly = !changedOnly;
+    storageSet(changedKey(group), changedOnly ? '1' : '0');
     apply();
   };
 
@@ -460,6 +463,7 @@ export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void 
       const expansion = groups.find((e) => e.containers.some((c) => c.contains(file.container)));
       type = undefined;
       changedOnly = false;
+      storageSet(changedKey(group), '0');
       if (expansion !== undefined)
         selectExpansion(expansion);
     },

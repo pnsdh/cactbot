@@ -428,9 +428,19 @@ html:not(.config-classic) {
   overflow: hidden;
 }
 
+/* Rows are one height whatever their control (a switch is lower than a list), with the name
+   and the control in the middle of it. */
 :root:not(.config-classic) .overlay-options > * {
+  box-sizing: border-box;
+  min-height: 54px;
   padding: 10px 16px;
   border-top: 1px solid var(--cfg-line);
+  align-content: center;
+}
+
+/* Name cells: some come without config.css's grid (a fight's alert output). */
+:root:not(.config-classic) .overlay-options > div:not([class]) {
+  display: grid;
 }
 
 :root:not(.config-classic) .overlay-options > :nth-child(-n + 2) {
@@ -1364,14 +1374,14 @@ html:not(.config-classic) {
 
 /* Controls of a kind have one width, so a card's controls line up; long choices are cut. */
 :root:not(.config-classic) .option-input-container select {
-  width: 220px;
+  width: 300px;
   max-width: 100%;
   min-width: 0;
   text-overflow: ellipsis;
 }
 
 :root:not(.config-classic) input[type="text"].input-string-field {
-  width: 220px;
+  width: 300px;
 }
 
 /* ===== Descriptions ===== */
