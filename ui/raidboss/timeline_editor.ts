@@ -45,86 +45,91 @@ type Edit = { text?: string; hide?: boolean; highlight?: string; color?: string 
 type Layer = string;
 
 const t = {
-  entries: { en: 'Each entry', ko: '항목별 편집' },
+  entries: { en: 'By entry', ko: '항목별' },
   byName: { en: 'By name', ko: '이름별' },
   layer: { en: 'Edits for', ko: '편집 대상' },
-  common: { en: 'Everyone', ko: '공통 (모든 직업)' },
+  common: { en: 'All jobs', ko: '공통 (모든 직업)' },
   layerHelp: {
     en:
-      '<p>Edits for a job go over the common ones for players of that job, each of text, hidden and highlight on its own. The overlay picks them by your job.</p><p>Entries added while editing for a job are for that job only.</p><p>"Copy from" copies another job\'s (or the common) edits here; entries already edited here stay.</p>',
+      '<p>A job\'s edits override the common ones when you play that job; text, hiding and highlight are each overridden on their own. The overlay picks them by your job.</p><p>Entries added while editing for a job are for that job only.</p><p>"Copy from" copies the edits of another job (or the common ones) here; entries already edited here stay as they are.</p>',
     ko:
-      '<p>직업 편집은 그 직업일 때 공통 편집 위에 덮어씁니다(문구·숨기기·강조 각각). 오버레이가 지금 직업에 맞춰 자동으로 고릅니다.</p><p>직업 편집 중에 추가한 항목은 그 직업에서만 보입니다.</p><p>"다른 편집 가져오기"는 다른 직업(또는 공통)의 편집을 여기로 복사합니다. 여기서 이미 편집한 항목은 그대로 둡니다.</p>',
+      '<p>직업 편집은 그 직업으로 플레이할 때 공통 편집보다 우선합니다. 문구·숨기기·강조를 각각 따로 덮어쓰며, 오버레이가 지금 직업에 맞춰 자동으로 고릅니다.</p><p>직업 편집 중에 추가한 항목은 그 직업에서만 보입니다.</p><p>"다른 대상에서 가져오기"는 다른 직업(또는 공통)의 편집을 여기로 복사합니다. 여기서 이미 편집한 항목은 그대로 둡니다.</p>',
   },
   search: { en: 'Find an ability', ko: '기술 이름으로 찾기' },
-  editedOnly: { en: 'Edited only', ko: '편집한 것만' },
-  copyFrom: { en: 'Copy from…', ko: '다른 편집 가져오기…' },
-  add: { en: '+ Add', ko: '+ 항목 추가' },
+  editedOnly: { en: 'Changed only', ko: '변경한 것만' },
+  copyFrom: { en: 'Copy from…', ko: '다른 대상에서 가져오기…' },
+  add: { en: '+ Add entry', ko: '+ 항목 추가' },
   newEntry: { en: 'New entry', ko: '새 항목' },
   colors: { en: 'Colors', ko: '강조 색' },
-  part: { en: 'Part', ko: '구간' },
-  prevPart: { en: 'Previous part', ko: '이전 구간' },
-  nextPart: { en: 'Next part', ko: '다음 구간' },
-  movedFlag: { en: 'Moved', ko: '옮겨짐' },
+  part: { en: 'Section', ko: '구간' },
+  prevPart: { en: 'Previous section', ko: '이전 구간' },
+  nextPart: { en: 'Next section', ko: '다음 구간' },
+  movedFlag: { en: 'Time changed', ko: '시간 바뀜' },
+  editingFor: { en: 'Editing for ${job}', ko: '${job} 편집 중' },
+  toCommon: { en: 'Use common', ko: '공통으로' },
+  hiddenByNameShort: { en: 'Hidden by name', ko: '이름별에서 숨김' },
   details: { en: 'Details', ko: '자세히' },
   hide: { en: 'Hide', ko: '숨기기' },
   show: { en: 'Show', ko: '보이기' },
   sectionsHelp: {
     en:
-      '<p>The timeline jumps between its parts as the fight goes (e.g. by the boss\'s pattern), so times are where entries are in the timeline file (in seconds), not times in the fight.</p><p>Go to another part with the list or ‹ ›.</p>',
+      '<p>The timeline jumps between its sections as the fight goes (e.g. by the boss\'s pattern), so times are where entries are in the timeline file (in seconds), not times in the fight.</p><p>Go to another section with the list or the ‹ › buttons.</p><p>In a text box, ↑ ↓ and Enter go to the entries above and below; Esc puts the text back.</p>',
     ko:
-      '<p>타임라인은 전투 진행(보스 패턴 등)에 따라 구간 사이를 건너뛰므로, 시간은 전투 경과 시간이 아니라 타임라인 파일 안의 위치(초)입니다.</p><p>구간 목록이나 ‹ ›로 다른 구간으로 갈 수 있습니다.</p>',
+      '<p>타임라인은 전투 진행(보스 패턴 등)에 따라 구간 사이를 건너뛰므로, 시간은 전투 경과 시간이 아니라 타임라인 파일 안의 위치(초)입니다.</p><p>구간 목록이나 ‹ › 버튼으로 다른 구간으로 이동할 수 있습니다.</p><p>문구 칸에서 ↑ ↓와 Enter로 위아래 항목으로 옮겨 가고, Esc로 고치기 전으로 되돌립니다.</p>',
   },
   start: { en: 'Start', ko: '시작' },
   twin: {
     en: 'Another entry has this time and name, so edits apply to both.',
-    ko: '같은 시각에 같은 이름의 항목이 또 있어서, 편집이 함께 적용됩니다.',
+    ko: '같은 시각에 같은 이름의 항목이 하나 더 있어 편집이 함께 적용됩니다.',
   },
   from: { en: 'from ${time}s', ko: '${time}초부터' },
-  addedBadge: { en: 'Added', ko: '추가' },
+  addedBadge: { en: 'Added', ko: '직접 추가' },
   highlight: { en: 'Highlight', ko: '강조' },
   none: { en: 'None', ko: '없음' },
-  inherit: { en: 'As common', ko: '공통 따름' },
-  applyAll: { en: 'This highlight for all ${n}', ko: '같은 이름 ${n}개 모두 이 강조로' },
-  resetTip: {
-    en: 'Removes this job\'s edit of this entry, so the common one applies.',
-    ko: '이 항목의 직업 편집을 지우고 공통 편집을 따릅니다.',
+  inherit: { en: 'Same as all jobs', ko: '공통 따름' },
+  applyAll: { en: 'Apply to all ${n} with this name', ko: '같은 이름 ${n}개 모두 이 강조로' },
+  jobEditNote: {
+    en: 'This entry has an edit for ${job}; "↺ Use common" removes it, so the common one applies.',
+    ko: '이 항목에 ${job} 편집이 있습니다. "↺ 공통으로"를 누르면 지우고 공통 편집을 따릅니다.',
   },
   remove: { en: 'Remove', ko: '삭제' },
   time: { en: 'Time (s)', ko: '시간(초)' },
   duration: { en: 'Duration (s)', ko: '지속 시간(초)' },
   offset: {
-    en: '+${s}s from the start of this part (in the timeline file).',
-    ko: '이 구간 시작부터 +${s}초 (타임라인 파일 기준).',
+    en: '${s}s after the start of this section (in the timeline file).',
+    ko: '이 구간 시작으로부터 ${s}초 뒤입니다(타임라인 파일 기준).',
   },
   moved: {
-    en: 'The timeline changed: this edit was made for the entry at ${time}s, and follows it here.',
-    ko: '타임라인이 바뀌어서, ${time}초에 있던 항목에 했던 편집이 이 항목으로 따라왔습니다.',
+    en:
+      'The timeline was updated: this edit was made for the entry at ${time}s, and has moved here with it.',
+    ko: '타임라인이 업데이트되어 ${time}초 항목에 했던 편집을 이 항목으로 옮겼습니다.',
   },
   renamed: {
-    en: '"By name" renames this name to "${text}"; text here goes over it.',
-    ko: '"이름별"에서 이 이름을 "${text}"(으)로 바꿨습니다. 여기서 쓴 문구가 그보다 먼저입니다.',
+    en: '"By name" renames this name to "${text}"; text entered here takes priority.',
+    ko: '"이름별"에서 이 이름을 "${text}"(으)로 바꿨습니다. 여기서 입력한 문구가 있으면 그 문구가 우선합니다.',
   },
   hiddenByName: {
     en: '"By name" hides every entry with this name, so it can\'t be shown here.',
-    ko: '"이름별"에서 이 이름의 모든 항목을 숨겨서, 여기서는 켤 수 없습니다.',
+    ko: '"이름별"에서 이 이름의 모든 항목을 숨겼으므로 여기서는 다시 표시할 수 없습니다.',
   },
   addedNote: { en: 'An entry you added.', ko: '직접 추가한 항목입니다.' },
   addedJobNote: { en: 'An entry you added for ${job} only.', ko: '${job} 전용으로 추가한 항목입니다.' },
   addedCommonNote: {
-    en: 'An entry added for everyone: its own time and text are changed in the common edits.',
-    ko: '공통으로 추가한 항목입니다. 시간과 문구 자체는 공통 편집에서 바꿉니다.',
+    en: 'An entry added for all jobs: its own time and text are changed under "All jobs".',
+    ko: '모든 직업에 추가한 항목입니다. 시간과 문구는 "공통 (모든 직업)"에서 바꿀 수 있습니다.',
   },
   lost: { en: 'Edits whose entry is no longer in the timeline', ko: '타임라인에서 찾을 수 없는 편집' },
   lostHelp: {
     en:
-      'The timeline was updated and these entries are gone (or moved more than ${s}s). They do nothing: remove them, or make them again on the right entries.',
-    ko: '타임라인이 업데이트되면서 이 항목들이 없어졌거나 ${s}초 넘게 옮겨졌습니다. 지금은 적용되지 않으니, 지우거나 맞는 항목에 다시 편집해 주세요.',
+      'The timeline was updated and these entries are gone (or moved more than ${s}s, or can\'t be told apart). They no longer apply: remove them, or make them again on the right entries.',
+    ko:
+      '타임라인이 업데이트되면서 이 항목들이 없어졌거나 ${s}초 넘게 옮겨졌습니다(또는 어느 항목인지 알 수 없습니다). 지금은 적용되지 않으니, 삭제하거나 맞는 항목에서 다시 편집해 주세요.',
   },
   colorsHelp: {
     en:
-      '<p>The colors to highlight with, for all fights.  A name you give a color shows when picking it.</p><p>Changing a color changes every entry with it.</p>',
+      '<p>The colors to highlight with, for all fights. A name you give a color shows when picking it.</p><p>Changing a color changes every entry with it.</p>',
     ko:
-      '<p>강조에 쓸 색 목록입니다(모든 전투 공통). 색에 이름을 붙여 두면 고를 때 함께 보입니다.</p><p>색을 바꾸면 그 색을 쓴 모든 항목이 같이 바뀝니다.</p>',
+      '<p>강조에 쓸 색 목록이며, 모든 전투에서 함께 쓰입니다. 색에 이름을 붙여 두면 고를 때 함께 보입니다.</p><p>색을 바꾸면 그 색을 쓴 모든 항목이 같이 바뀝니다.</p>',
   },
   colorName: { en: 'Name (e.g. tank buster)', ko: '이름 (예: 탱버)' },
   addColor: { en: '+ Add a color', ko: '+ 색 추가' },
@@ -135,17 +140,18 @@ const t = {
   blue: { en: 'Blue', ko: '파랑' },
   purple: { en: 'Purple', ko: '보라' },
   ownColor: { en: 'Color ${n}', ko: '내 색 ${n}' },
-  customColor: { en: 'Other color', ko: '그 밖의 색' },
+  customColor: { en: 'Unlisted color', ko: '목록에 없는 색' },
   shownLower: { en: 'shown', ko: '보임' },
   hiddenLower: { en: 'hidden', ko: '숨김' },
   noMatch: { en: 'No entry matches.', ko: '일치하는 항목이 없습니다.' },
+  noChanged: { en: 'No entry has changes.', ko: '변경한 항목이 없습니다.' },
   seconds: { en: '${s}s', ko: '${s}초' },
-  info: { en: 'Info', ko: '설명' },
+  info: { en: 'Description', ko: '설명' },
   tank: { en: 'Tanks', ko: '탱커' },
   healer: { en: 'Healers', ko: '힐러' },
-  melee: { en: 'Melee', ko: '근거리 딜러' },
-  ranged: { en: 'Physical ranged', ko: '원거리 물리 딜러' },
-  caster: { en: 'Casters', ko: '원거리 마법 딜러' },
+  melee: { en: 'Melee DPS', ko: '근거리 딜러' },
+  ranged: { en: 'Physical ranged DPS', ko: '원거리 물리 딜러' },
+  caster: { en: 'Magical ranged DPS', ko: '원거리 마법 딜러' },
 } as const;
 
 const kBuiltInNames: { [id: string]: LocaleText } = {
@@ -168,6 +174,22 @@ const kNewColors = [
 ];
 
 const kLayerStorageKey = 'cactbot-config-timeline-layer';
+
+// Line icons for hidden or not (colored emoji don't take the text's color).
+const kEye =
+  '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const kEyeOff =
+  '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.9 10.9 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4.1M6.6 6.6A17.4 17.4 0 0 0 2 12s3.6 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
+
+// Relative luminance (0 dark to 1 light) of #rrggbb.
+const luminance = (hex: string): number => {
+  const n = parseInt(hex.slice(1), 16);
+  const c = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => {
+    const x = v / 255;
+    return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * (c[0] ?? 0) + 0.7152 * (c[1] ?? 0) + 0.0722 * (c[2] ?? 0);
+};
 
 const formatSeconds = (seconds: number): string => parseFloat(seconds.toFixed(1)).toString();
 
@@ -549,6 +571,8 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
     const count = make('span', 'config-tl-count');
     const editedOnly = make('button', 'config-changed-toggle');
     editedOnly.classList.toggle('config-active', filters.onlyEdited);
+    editedOnly.setAttribute('role', 'switch');
+    editedOnly.setAttribute('aria-checked', filters.onlyEdited ? 'true' : 'false');
     editedOnly.append(make('span', 'config-mini-switch'), tr(t.editedOnly), count);
     const addButton = make('button', 'config-tl-tool', tr(t.add));
     const colorsButton = make('button', 'config-tl-tool', `🎨 ${tr(t.colors)}`);
@@ -582,6 +606,11 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
       help(() => tr(t.sectionsHelp)),
     );
     head.append(layerGroup, colorsButton);
+    // Which edits are made stays in view (it is kept across fights and sessions).
+    if (isJob)
+      toolbar.appendChild(
+        make('span', 'config-tl-editing', format(t.editingFor, { job: ctx.jobName(layer) })),
+      );
     toolbar.append(search, editedOnly, addButton);
     if (sections.length > 0)
       toolbar.appendChild(partGroup);
@@ -726,6 +755,8 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
         notes.push({ text: tr(t.hiddenByName), warn: true });
       if (hasTwin(e))
         notes.push({ text: tr(t.twin), warn: false });
+      if (isJob && !isOwnAdded(e) && !isEmpty(edit(e)))
+        notes.push({ text: format(t.jobEditNote, { job: ctx.jobName(layer) }), warn: false });
       const key = own.state.get(canon(e))?.key;
       const at = key !== undefined ? parseEntryKey(key) : undefined;
       if (at !== undefined && Math.abs(at.time - e.time) > 0.001)
@@ -783,20 +814,22 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
       const flag = make('button', 'config-tl-flag', tr(t.movedFlag));
       side.appendChild(flag);
       // A job's edit of this entry, which goes back to the common one.
-      const jobChip = make('button', 'config-tl-job-chip', isJob ? `${ctx.jobName(layer)} ↺` : '');
-      jobChip.title = tr(t.resetTip);
+      const jobChip = make('button', 'config-tl-job-chip', '↺');
+      jobChip.appendChild(make('span', 'config-tl-chip-text', ` ${tr(t.toCommon)}`));
+      jobChip.setAttribute('aria-label', tr(t.toCommon));
       if (isJob && !isOwnAdded(e))
         side.appendChild(jobChip);
       const eye = make('button', 'config-tl-icon config-tl-eye');
       eye.disabled = hiddenByName(e);
+      eye.setAttribute('aria-label', tr(t.hide));
+      eye.title = tr(hiddenByName(e) ? t.hiddenByNameShort : t.hide);
       const colorButton = make('button', 'config-tl-icon config-tl-color-button');
-      colorButton.title = tr(t.highlight);
-      colorButton.setAttribute('aria-label', tr(t.highlight));
       const dot = make('span', 'config-tl-dot');
       colorButton.appendChild(dot);
       const more = make('button', 'config-tl-icon config-tl-more', '▾');
       more.title = tr(t.details);
       more.setAttribute('aria-label', tr(t.details));
+      more.setAttribute('aria-expanded', 'false');
       side.append(eye, colorButton, more);
       row.append(time, cell, side);
       list.appendChild(row);
@@ -808,13 +841,25 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
         was.textContent = shownText(e) !== e.text ? `← ${e.text}` : '';
         const color = paletteColor(palette, effective(e).highlight, effective(e).color);
         row.style.setProperty('--config-tl-color', color ?? 'transparent');
+        // A light wash of it on the line, and the text in it unless too dark to read.
+        row.style.setProperty(
+          '--config-tl-tint',
+          color !== undefined ? `${color}24` : 'transparent',
+        );
+        row.style.setProperty(
+          '--config-tl-ink',
+          color !== undefined && luminance(color) >= 0.3 ? color : 'var(--cfg-text)',
+        );
         dot.classList.toggle('config-tl-dot-none', color === undefined);
+        const label = `${tr(t.highlight)}: ${highlightName(effective(e))}`;
+        colorButton.title = label;
+        colorButton.setAttribute('aria-label', label);
         row.classList.toggle('config-tl-highlighted', color !== undefined);
         const hidden = isHidden(e);
         row.classList.toggle('config-tl-hidden', hidden);
-        eye.textContent = hidden ? '⦸' : '👁';
+        // Static icons only.
+        eye.innerHTML = hidden ? kEyeOff : kEye;
         eye.classList.toggle('config-active', hidden);
-        eye.title = tr(hidden ? t.show : t.hide);
         eye.setAttribute('aria-pressed', hidden ? 'true' : 'false');
         flag.classList.toggle('config-hidden', !isMoved(e));
         jobChip.classList.toggle('config-hidden', isEmpty(edit(e)));
@@ -889,7 +934,7 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
         if (picker?.r === r)
           closePicker();
         else
-          openPicker(r);
+          openPicker(r, true);
       };
       more.onclick = () => toggleDetails(r);
       flag.onclick = () => toggleDetails(r);
@@ -917,7 +962,7 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
       picker?.r.colorButton.classList.remove('config-active');
       picker = undefined;
     };
-    const openPicker = (r: Row) => {
+    const openPicker = (r: Row, focus = false) => {
       closePicker();
       const { e } = r;
       const pop = make('div', 'config-tl-pop');
@@ -997,6 +1042,8 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
       r.row.appendChild(pop);
       r.colorButton.classList.add('config-active');
       picker = { r: r, pop: pop };
+      if (focus)
+        (pop.querySelector<HTMLElement>('.config-active') ?? pop.querySelector('button'))?.focus();
     };
     closeOpenPicker = closePicker;
     pickerOf = () => picker?.pop;
@@ -1052,6 +1099,7 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
         return;
       open.panel.remove();
       open.r.row.classList.remove('config-tl-open');
+      open.r.row.querySelector('.config-tl-more')?.setAttribute('aria-expanded', 'false');
       open = undefined;
       openId = undefined;
     };
@@ -1063,6 +1111,7 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
       const panel = buildDetails(r);
       r.row.after(panel);
       r.row.classList.add('config-tl-open');
+      r.row.querySelector('.config-tl-more')?.setAttribute('aria-expanded', 'true');
       open = { r: r, panel: panel };
       openId = idOf(r.e);
     };
@@ -1179,6 +1228,7 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
         const none = rows.every((x) => x.classList.contains('config-hidden'));
         heading.classList.toggle('config-hidden', none);
       }
+      empty.textContent = tr(filters.onlyEdited && query === '' ? t.noChanged : t.noMatch);
       empty.classList.toggle('config-hidden', shown > 0);
       onScroll();
     };
@@ -1195,6 +1245,7 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
     editedOnly.onclick = () => {
       filters.onlyEdited = !filters.onlyEdited;
       editedOnly.classList.toggle('config-active', filters.onlyEdited);
+      editedOnly.setAttribute('aria-checked', filters.onlyEdited ? 'true' : 'false');
       filter();
     };
     filter();

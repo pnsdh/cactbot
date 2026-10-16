@@ -190,6 +190,56 @@ export const matchEdits = <E extends { time: number; name: string; lineNumber?: 
   return result;
 };
 
+// The events a timeline's edits are applied to (timeline_parser.ts's).
+type EditedEvent = {
+  time: number;
+  name: string;
+  text: string;
+  lineNumber?: number;
+  hidden?: boolean;
+  highlight?: string;
+  highlightColor?: string;
+};
+
+// Edits of a fight's timeline on its events: the common ones, then those for the player's job
+// over them, field by field.  Entries at the same time with the same name can't be told apart:
+// all of them.
+export const applyEntryEdits = (
+  events: EditedEvent[],
+  config: { Entries?: TimelineEntryEdit[]; JobEntries?: { [job: string]: TimelineEntryEdit[] } },
+  playerJob: string,
+): void => {
+  const job = editJob(playerJob);
+  // Job keys from user files might be base classes too.
+  const jobEdits = Object.entries(config.JobEntries ?? {})
+    .filter(([key]) => editJob(key) === job)
+    .flatMap(([, edits]) => edits);
+  for (const edits of [config.Entries ?? [], jobEdits]) {
+    matchEdits(events, edits).forEach((matched, i) => {
+      const edit = edits[i];
+      if (matched === undefined || edit === undefined)
+        return;
+      const twins = events.filter((e) =>
+        e.name === matched.name && Math.abs(e.time - matched.time) < 0.001 &&
+        (e.lineNumber === undefined) === (matched.lineNumber === undefined)
+      );
+      for (const e of twins) {
+        if (edit.text !== undefined)
+          e.text = edit.text;
+        if (edit.hide !== undefined)
+          e.hidden = edit.hide;
+        if (edit.highlight === kNoHighlight) {
+          delete e.highlight;
+          delete e.highlightColor;
+        } else if (edit.highlight !== undefined) {
+          e.highlight = edit.highlight;
+          e.highlightColor = edit.color;
+        }
+      }
+    });
+  }
+};
+
 // Jobs that can have their own edits, by role.  Base classes use their job's.
 export const kEditJobs: { role: 'tank' | 'healer' | 'melee' | 'ranged' | 'caster'; jobs: Job[] }[] =
   [

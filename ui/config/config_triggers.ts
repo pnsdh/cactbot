@@ -50,7 +50,7 @@ const kUserFiles: LocaleText = { en: 'User files', ko: '사용자 파일' };
 const kContentType: LocaleText = { en: 'Content', ko: '콘텐츠' };
 const kOtherType: LocaleText = { en: 'Other', ko: '기타' };
 const kOpenAll: LocaleText = { en: 'Open all', ko: '모두 펼치기' };
-const kTriggerGroup: LocaleText = { en: 'Edit triggers', ko: '트리거 편집' };
+const kTriggerGroup: LocaleText = { en: 'Edit Triggers', ko: '트리거 편집' };
 const kCloseAll: LocaleText = { en: 'Close all', ko: '모두 접기' };
 
 const files: { [group: string]: TriggerFile[] } = {};
@@ -239,7 +239,7 @@ const groupTriggers = (file: TriggerFile): void => {
     const changed =
       file.triggers.filter((t) => isChange(context.readSaved(file.group, ['triggers', t.id])))
         .length;
-    const parts = [file.triggers.length.toLocaleString()];
+    const parts = [format(kTriggerCount, file.triggers.length)];
     if (changed > 0)
       parts.push(format(kChangedCount, changed));
     meta.textContent = file.triggers.length > 0 ? parts.join(' · ') : '';

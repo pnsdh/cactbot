@@ -13,7 +13,7 @@ import { NetParams } from '../../types/net_props';
 import { LooseTimelineTrigger, TimelineReplacement, TriggerAutoConfig } from '../../types/trigger';
 
 import defaultOptions, { RaidbossOptions, TimelineConfig } from './raidboss_options';
-import { editJob, kNoHighlight, matchEdits } from './timeline_entries';
+import { applyEntryEdits, editJob } from './timeline_entries';
 
 const isLogDefinitionName = (type: string): type is LogDefinitionName => {
   return type in logDefinitions;
@@ -237,7 +237,7 @@ export class TimelineParser {
     // Fork: entries added for one job are for that job only.
     const job = editJob(this.options.TimelineJob ?? '');
     for (const event of this.timelineConfig.Add ?? []) {
-      if (event.job !== undefined && event.job !== job)
+      if (event.job !== undefined && editJob(event.job) !== job)
         continue;
       this.events.push({
         id: `${++uniqueId}`,
@@ -483,35 +483,8 @@ export class TimelineParser {
       }
     }
 
-    // Fork: edits of single entries from the config page: the common ones, then the player's
-    // job's over them.
-    const job = editJob(this.options.TimelineJob ?? '');
-    const layers = [this.timelineConfig.Entries ?? [], this.timelineConfig.JobEntries?.[job] ?? []];
-    for (const edits of layers) {
-      matchEdits(this.events, edits).forEach((matched, i) => {
-        const edit = edits[i];
-        if (matched === undefined || edit === undefined)
-          return;
-        // Entries at the same time with the same name can't be told apart: all of them.
-        const twins = this.events.filter((e) =>
-          e.name === matched.name && Math.abs(e.time - matched.time) < 0.001 &&
-          (e.lineNumber === undefined) === (matched.lineNumber === undefined)
-        );
-        for (const e of twins) {
-          if (edit.text !== undefined)
-            e.text = edit.text;
-          if (edit.hide !== undefined)
-            e.hidden = edit.hide;
-          if (edit.highlight === kNoHighlight) {
-            delete e.highlight;
-            delete e.highlightColor;
-          } else if (edit.highlight !== undefined) {
-            e.highlight = edit.highlight;
-            e.highlightColor = edit.color;
-          }
-        }
-      });
-    }
+    // Fork: edits of single entries from the config page (see timeline_entries.ts).
+    applyEntryEdits(this.events, this.timelineConfig, this.options.TimelineJob ?? '');
 
     // Sort by time, but when the time is the same, sort by file order.
     // Then assign a sortKey to each event so that we can maintain that order.

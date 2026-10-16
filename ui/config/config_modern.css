@@ -1875,7 +1875,7 @@ html:not(.config-classic) {
 }
 
 :root:not(.config-classic) .config-tl-toolbar select.config-tl-copy {
-  width: 150px;
+  width: 190px;
 }
 
 :root:not(.config-classic) .config-tl-part-label {
@@ -2058,7 +2058,22 @@ html:not(.config-classic) {
 }
 
 :root:not(.config-classic) .config-tl-highlighted input[type="text"].config-tl-inline {
-  color: var(--cfg-tl-name, var(--config-tl-color));
+  color: var(--cfg-tl-name, var(--config-tl-ink));
+}
+
+:root:not(.config-classic) .config-tl-row.config-tl-highlighted {
+  background-color: var(--config-tl-tint);
+}
+
+/* Which edits are made, in the bar that stays in view. */
+:root:not(.config-classic) .config-tl-editing {
+  padding: 2px 10px;
+  border-radius: 99px;
+  color: var(--cfg-accent-ink);
+  background-color: var(--cfg-accent);
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
 }
 
 :root:not(.config-classic) .config-tl-hidden input[type="text"].config-tl-inline:not(:focus),
@@ -2114,9 +2129,13 @@ html:not(.config-classic) {
   padding: 0;
   border: 1px solid transparent;
   border-radius: 6px;
-  color: var(--cfg-faint);
+  color: var(--cfg-muted);
   background-color: transparent;
   font-size: 13px;
+}
+
+:root:not(.config-classic) .config-tl-more[aria-expanded="true"] {
+  transform: rotate(180deg);
 }
 
 :root:not(.config-classic) .config-tl-icon:hover:not(:disabled) {
@@ -2129,7 +2148,7 @@ html:not(.config-classic) {
 }
 
 :root:not(.config-classic) .config-tl-dot.config-tl-dot-none {
-  border: 1.5px dashed var(--cfg-faint);
+  border: 1.5px dashed var(--cfg-muted);
   background-color: transparent;
 }
 
@@ -2414,7 +2433,8 @@ html:not(.config-classic) {
 }
 
 .config-w480:not(.config-classic) .config-tl-was,
-.config-w480:not(.config-classic) .config-tl-side > .config-tl-dup {
+.config-w480:not(.config-classic) .config-tl-side > .config-tl-dup,
+.config-w480:not(.config-classic) .config-tl-chip-text {
   display: none;
 }
 
