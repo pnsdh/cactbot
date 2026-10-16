@@ -99,6 +99,7 @@ let zoom = 1;
 const updateWidthClasses = (): void => {
   const width = window.innerWidth / zoom;
   const root = document.documentElement.classList;
+  root.toggle('config-w760', width < 760);
   root.toggle('config-w600', width <= 600);
   root.toggle('config-w480', width <= 480);
 };

@@ -420,7 +420,7 @@ html:not(.config-classic) {
   margin: 0;
 
   /* Names keep room even next to the widest controls (a fight's own options can be long). */
-  grid-template-columns: minmax(140px, 1fr) auto;
+  grid-template-columns: minmax(140px, 1fr) fit-content(55%);
   grid-gap: 0;
   background-color: var(--cfg-surface);
   border: 1px solid var(--cfg-line);
@@ -447,7 +447,9 @@ html:not(.config-classic) {
   border-top-color: transparent;
 }
 
+/* Controls narrow with the window (rather than leave the card): see .config-ctl. */
 :root:not(.config-classic) .overlay-options > .option-input-container {
+  min-width: 0;
   justify-items: end;
 }
 
@@ -468,13 +470,23 @@ html:not(.config-classic) {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Narrowing, the default's button goes first (down to its icon), then the list. */
+:root:not(.config-classic) .config-ctl > select {
+  flex: 0 1 300px;
+  min-width: 120px;
 }
 
 /* "Default <value>": a small text button, so it isn't taken for a reload button. */
 :root:not(.config-classic) .config-ctl > .config-reset {
   display: inline-flex;
+  flex: 0 4 auto;
   align-items: center;
   gap: 5px;
+  min-width: 26px;
   max-width: 180px;
   height: 24px;
   padding: 0 9px 0 7px;
@@ -1593,6 +1605,16 @@ html:not(.config-classic) {
 }
 
 /* ===== Small windows ===== */
+
+/* The default's button is only its icon (its name on hover), for the controls' room. */
+.config-w760:not(.config-classic) .config-ctl > .config-reset {
+  flex: none;
+  padding: 0 7px;
+}
+
+.config-w760:not(.config-classic) .config-ctl > .config-reset > span {
+  display: none;
+}
 
 /* config-w600 and config-w480 are set on html from the page's width over its scale. */
 .config-w600:not(.config-classic) .config-tab-bar {
