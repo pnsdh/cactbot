@@ -171,8 +171,9 @@ html:not(.config-classic) {
   border-bottom: 1px solid var(--cfg-line);
 }
 
+/* The tabs keep their room: the search gives way first (down to its minimum). */
 :root:not(.config-classic) .config-tab-list {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
   display: flex;
   align-items: stretch;
@@ -304,8 +305,8 @@ html:not(.config-classic) {
 /* ===== Search ===== */
 
 :root:not(.config-classic) .config-search {
-  flex: 0 1 240px;
-  min-width: 120px;
+  flex: 0 1000 240px;
+  min-width: 100px;
   align-self: center;
   display: flex;
   align-items: center;
@@ -475,7 +476,8 @@ html:not(.config-classic) {
 }
 
 /* Narrowing, the default's button goes first (down to its icon), then the list. */
-:root:not(.config-classic) .config-ctl > select {
+:root:not(.config-classic) .option-input-container .config-ctl > select,
+:root:not(.config-classic) .option-input-container .config-ctl > input[type="text"].input-string-field {
   flex: 0 1 300px;
   min-width: 120px;
 }
@@ -1330,7 +1332,7 @@ html:not(.config-classic) {
 :root:not(.config-classic) .config-trigger-browser .trigger-file-container:not(.collapsed) > .trigger-file-header {
   position: sticky;
   top: 0;
-  z-index: 2;
+  z-index: 3;
   margin-bottom: 8px;
   border-bottom: 1px solid var(--cfg-line);
   border-radius: 10px 10px 0 0;
@@ -1394,6 +1396,8 @@ html:not(.config-classic) {
 
 :root:not(.config-classic) input[type="text"].input-string-field {
   width: 300px;
+  max-width: 100%;
+  min-width: 0;
 }
 
 /* ===== Descriptions ===== */

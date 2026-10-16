@@ -6,7 +6,7 @@ import { setTooltip } from './config_tooltip';
 
 // Fork: arranges a section's option rows (a name cell and a control cell each, as
 // CactbotConfigurator.buildUI makes them) into titled cards, and adds units, sliders for 0-1
-// values, a mark on options changed from their default and a button to reset them.
+// values, and a button to reset options changed from their default.
 
 type Topic = { title: LocaleText; ids: string[] };
 
@@ -534,8 +534,13 @@ const addReset = (
   reset.innerHTML =
     '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>';
   reset.appendChild(label);
-  // Its name when it is only its icon (in narrow windows).
-  reset.title = label.textContent;
+  reset.setAttribute('aria-label', label.textContent);
+  // Its text as a tooltip only where it isn't all shown: only its icon (in narrow windows), or
+  // a long default cut short.
+  reset.addEventListener('mouseenter', () => {
+    const cut = label.offsetWidth === 0 || label.scrollWidth > label.clientWidth + 1;
+    reset.title = cut ? label.textContent ?? '' : '';
+  });
   reset.onclick = () => {
     // Its control is disabled by another option's value.
     if (control.disabled)
@@ -563,7 +568,6 @@ const addReset = (
 
   const refresh = () => {
     const changed = !isDefault();
-    left.classList.toggle('config-modified', changed);
     reset.classList.toggle('config-hidden', !changed);
   };
   inputDiv.addEventListener('input', refresh);
