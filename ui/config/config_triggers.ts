@@ -1,6 +1,7 @@
 import { SavedConfigEntry } from '../../types/event';
 import { LocaleText } from '../../types/trigger';
 
+import { setDefault } from './config_dirty';
 import { addTooltipsIn } from './config_rows';
 
 // Fork: a browser over the trigger lists that raidboss_config.ts and oopsyraidsy_config.ts build
@@ -74,6 +75,10 @@ export const registerTriggerFile = (
   triggers: TriggerEntry[],
   settings: FileSetting[] = [],
 ): void => {
+  for (const setting of settings) {
+    if (setting.default !== undefined)
+      setDefault(group, setting.path, setting.default);
+  }
   (files[group] ??= []).push({
     group: group,
     container: container,

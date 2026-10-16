@@ -22,6 +22,7 @@ import {
   LooseTriggerSet,
 } from '../../types/trigger';
 
+import { differsFromBaseline, initBaseline, setBaseline } from './config_dirty';
 import defaultOptions, { ConfigOptions } from './config_options';
 import { tagOptionRow } from './config_rows';
 import {
@@ -375,6 +376,7 @@ export class CactbotConfigurator {
     // Otherwise, use the operating system language as a default for the config tool.
     this.lang = this.configOptions.DisplayLanguage ?? this.configOptions.ShortLocale;
     this.savedConfig = savedConfig ?? {};
+    initBaseline(this.savedConfig);
     this.developerOptions = this.getBooleanOption('general', 'ShowDeveloperOptions', false);
 
     const templates = UserConfig.optionTemplates;
@@ -433,7 +435,11 @@ export class CactbotConfigurator {
       data: this.savedConfig,
     });
 
-    document.getElementById('butter-margin')?.classList.remove('hidden');
+    // Fork: only while the config differs from what the overlays run with (see config_dirty.ts).
+    document.getElementById('butter-margin')?.classList.toggle(
+      'hidden',
+      !differsFromBaseline(this.savedConfig),
+    );
   }
 
   // Helper translate function.  Takes in an object with language keys
@@ -630,6 +636,7 @@ export class CactbotConfigurator {
     buttonInput.onclick = () => {
       // Fork: a change made just before is saved first (see saveConfigData).
       void this.flushPendingSave().then(() => {
+        setBaseline(this.savedConfig);
         void callOverlayHandler({ call: 'cactbotReloadOverlays' });
         // Fork: shown again on the next change.
         document.getElementById('butter-margin')?.classList.add('hidden');
@@ -718,7 +725,7 @@ export class CactbotConfigurator {
           if (!ret)
             continue;
           elements.set(opt, ret.elements);
-          tagOptionRow(ret.elements, opt, getOptDefault(opt, this.configOptions));
+          tagOptionRow(ret.elements, opt, getOptDefault(opt, this.configOptions), group);
           values[opt.id] = ret.value;
         }
 

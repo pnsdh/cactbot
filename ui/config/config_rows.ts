@@ -1,6 +1,7 @@
 import { ConfigEntry, ConfigValue } from '../../resources/user_config';
 import { LocaleText } from '../../types/trigger';
 
+import { setDefault } from './config_dirty';
 import { setTooltip } from './config_tooltip';
 
 // Fork: arranges a section's option rows (a name cell and a control cell each, as
@@ -309,7 +310,9 @@ export const tagOptionRow = (
   elements: HTMLElement[],
   opt: ConfigEntry,
   defaultValue: ConfigValue,
+  group: string,
 ): void => {
+  setDefault(group, [opt.id], defaultValue.toString());
   for (const element of elements) {
     element.dataset.optionId = opt.id;
     element.dataset.optionType = opt.type;
