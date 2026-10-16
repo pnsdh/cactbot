@@ -156,6 +156,9 @@ export class HTMLTimelineUI extends TimelineUI {
     const helper = document.getElementById('timeline-resize-helper');
     if (!helper)
       return;
+    // Fork: a helper of real timer bars instead (see SetUpResizeHelper).
+    if (this.SetUpResizeHelper(helper))
+      return;
     const rows = Math.max(6, this.options.MaxNumberOfTimerBars);
     helper.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
 
@@ -178,6 +181,120 @@ export class HTMLTimelineUI extends TimelineUI {
     this.debugElement = document.getElementById('timeline-debug');
     if (!this.debugElement)
       this.debugElement = document.createElement('div');
+  }
+
+  // Fork: the helper for positioning/resizing when unlocked, of real timer bars (see
+  // ShowResizeHelper).  True when set up (then AddDebugInstructions is done).
+  private SetUpResizeHelper(helper: HTMLElement): boolean {
+    // The language (and skin) classes are needed for the helper's size before any timeline
+    // loads too.
+    const root = document.getElementById('timeline-container');
+    if (root) {
+      root.classList.add(`lang-${this.lang}`);
+      root.lang = langToLocale(this.lang);
+      if (this.options.Skin !== undefined)
+        root.classList.add(`skin-${this.options.Skin}`);
+    }
+    helper.style.gridTemplateRows = `repeat(${this.options.MaxNumberOfTimerBars}, min-content)`;
+    if (this.options.ReverseTimeline)
+      helper.classList.add('reversed');
+    // Built only while unlocked, as timer bars draw every frame, and not for a hidden timeline.
+    const isUnlocked = () =>
+      document.documentElement.classList.contains('resize-handle') &&
+      this.options.TimelineEnabled;
+    const update = () => this.ShowResizeHelper(helper, isUnlocked());
+    new MutationObserver(update).observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class'],
+    });
+    // The skin's and user's style sheets come after this (user_config.ts handleSkin): built
+    // again once each loads, as bars read some of their style only when made.
+    new MutationObserver((records) => {
+      for (const record of records) {
+        for (const node of record.addedNodes) {
+          if (!(node instanceof HTMLLinkElement))
+            continue;
+          node.addEventListener('load', () => {
+            if (this.resizeHelperTimer === undefined)
+              return;
+            this.ShowResizeHelper(helper, false);
+            update();
+          });
+        }
+      }
+    }).observe(document.head, { childList: true });
+    update();
+
+    // For simplicity in code, always make debugElement valid,
+    // however it does not exist in the raid emulator.
+    this.debugElement = document.getElementById('timeline-debug');
+    if (!this.debugElement)
+      this.debugElement = document.createElement('div');
+    return true;
+  }
+
+  // Fork: the helper is made of real timer bars counting down in a loop, so it shows the skin's
+  // look and sizes (including .soon and the taller .next bar) to place the overlay by.
+  private resizeHelperTimer?: number;
+
+  private ShowResizeHelper(helper: HTMLElement, show: boolean): void {
+    if (show === (this.resizeHelperTimer !== undefined))
+      return;
+    window.clearInterval(this.resizeHelperTimer);
+    this.resizeHelperTimer = undefined;
+    while (helper.lastChild)
+      helper.removeChild(helper.lastChild);
+    if (!show)
+      return;
+
+    const lang = this.lang in timelineInstructions ? this.lang : 'en';
+    const instructions = timelineInstructions[lang];
+    const barColor = computeBackgroundFrom(helper, 'timeline-bar-color');
+    const soonColor = computeBackgroundFrom(helper, 'timeline-bar-color.soon');
+    const count = this.options.MaxNumberOfTimerBars;
+    const duration = this.options.ShowTimerBarsAtSeconds;
+    const bars: TimerBar[] = [];
+    for (let i = 0; i < count; ++i) {
+      const div = document.createElement('div');
+      div.classList.add('timer-bar', 'resize-helper-bar');
+      const bar = TimerBar.create();
+      div.appendChild(bar);
+      bar.righttext = 'remain';
+      bar.toward = 'right';
+      bar.stylefill = 'fill';
+      bar.loop = true;
+      bar.duration = duration;
+      // Spread over the shown time so that the first bar is about to expire.
+      bar.value = duration * (i + 1) / count;
+      helper.appendChild(div);
+      bars.push(bar);
+    }
+
+    const sign = this.options.ReverseTimeline ? -1 : 1;
+    const tick = () => {
+      // Rows keep their text in order while the bars move through them.
+      const sorted = bars.map((bar) => ({ bar: bar, value: bar.value }))
+        .sort((a, b) => a.value - b.value);
+      sorted.forEach(({ bar, value }, i) => {
+        const div = bar.parentElement;
+        if (!div)
+          return;
+        const soon = value <= this.options.BarExpiresSoonSeconds;
+        div.classList.toggle('soon', soon);
+        div.classList.toggle('next', i === 0);
+        const fg = soon ? soonColor : barColor;
+        if (bar.fg !== fg)
+          bar.fg = fg;
+        const text = instructions[i] ?? `${i + 1}`;
+        if (bar.lefttext !== text)
+          bar.lefttext = text;
+        const order = (sign * i).toString();
+        if (div.style.order !== order)
+          div.style.order = order;
+      });
+    };
+    tick();
+    this.resizeHelperTimer = window.setInterval(tick, 100);
   }
 
   public override SetPopupTextInterface(popupText: PopupTextGenerator): void {
