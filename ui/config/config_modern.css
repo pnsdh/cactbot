@@ -1880,9 +1880,17 @@ html:not(.config-classic) {
 }
 
 :root:not(.config-classic) .config-tl-part-label {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
   color: var(--cfg-muted);
   font-size: 12px;
   font-weight: 600;
+  white-space: nowrap;
+}
+
+:root:not(.config-classic) .config-tl-part-label > .config-help {
+  margin-left: 5px;
 }
 
 :root:not(.config-classic) .config-tl-part-group {

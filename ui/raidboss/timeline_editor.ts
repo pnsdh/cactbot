@@ -1,6 +1,6 @@
 import { SavedConfigEntry } from '../../types/event';
 import { LocaleText } from '../../types/trigger';
-import { setTooltip } from '../config/config_tooltip';
+import { setTip, setTooltip } from '../config/config_tooltip';
 
 import {
   entryKey,
@@ -576,8 +576,14 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
     }
     layerSelect.value = layer;
     layerSelect.setAttribute('aria-label', tr(t.layer));
+    // A control's ⓘ goes on its name, not in the way of its control.
+    const nameWithHelp = (text: LocaleText, html: () => string) => {
+      const element = make('span', 'config-tl-part-label', tr(text));
+      element.appendChild(help(html));
+      return element;
+    };
     const layerGroup = make('span', 'config-tl-layer-group');
-    layerGroup.append(layerSelect, help(() => tr(t.layerHelp)));
+    layerGroup.append(nameWithHelp(t.layer, () => tr(t.layerHelp)), layerSelect);
 
     const search = make('input', 'config-tl-search');
     search.type = 'text';
@@ -610,16 +616,15 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
     partSelect.setAttribute('aria-label', tr(t.part));
     const prevPart = make('button', 'config-tl-tool config-tl-step', '‹');
     prevPart.setAttribute('aria-label', tr(t.prevPart));
-    prevPart.title = tr(t.prevPart);
+    setTip(prevPart, tr(t.prevPart));
     const nextPart = make('button', 'config-tl-tool config-tl-step', '›');
     nextPart.setAttribute('aria-label', tr(t.nextPart));
-    nextPart.title = tr(t.nextPart);
+    setTip(nextPart, tr(t.nextPart));
     partGroup.append(
-      make('span', 'config-tl-part-label', tr(t.part)),
+      nameWithHelp(t.part, () => tr(t.sectionsHelp)),
       partSelect,
       prevPart,
       nextPart,
-      help(() => tr(t.sectionsHelp)),
     );
     head.append(layerGroup, colorsButton);
     // Which edits are made stays in view (it is kept across fights and sessions).
@@ -840,12 +845,12 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
       const eye = make('button', 'config-tl-icon config-tl-eye');
       eye.disabled = hiddenByName(e);
       eye.setAttribute('aria-label', tr(t.hide));
-      eye.title = tr(hiddenByName(e) ? t.hiddenByNameShort : t.hide);
+      setTip(eye, tr(hiddenByName(e) ? t.hiddenByNameShort : t.hide));
       const colorButton = make('button', 'config-tl-icon config-tl-color-button');
       const dot = make('span', 'config-tl-dot');
       colorButton.appendChild(dot);
       const more = make('button', 'config-tl-icon config-tl-more', '▾');
-      more.title = tr(t.details);
+      setTip(more, tr(t.details));
       more.setAttribute('aria-label', tr(t.details));
       more.setAttribute('aria-expanded', 'false');
       side.append(eye, colorButton, more);
@@ -874,7 +879,7 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
         );
         dot.classList.toggle('config-tl-dot-none', color === undefined);
         const label = `${tr(t.highlight)}: ${highlightName(effective(e))}`;
-        colorButton.title = label;
+        setTip(colorButton, label);
         colorButton.setAttribute('aria-label', label);
         row.classList.toggle('config-tl-highlighted', color !== undefined);
         const hidden = isHidden(e);
