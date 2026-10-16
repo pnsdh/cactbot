@@ -2046,7 +2046,7 @@ html:not(.config-classic) {
 }
 
 :root:not(.config-classic) .config-tl-row input[type="text"].config-tl-inline {
-  flex: 1 1 auto;
+  flex: 1 1 0;
   width: 100%;
   min-width: 0;
   height: 26px;
@@ -2100,9 +2100,13 @@ html:not(.config-classic) {
   text-decoration: line-through;
 }
 
+/* The original name, when the text was changed: room of its own, not squeezed by the box. */
 :root:not(.config-classic) .config-tl-was {
-  flex: 0 1 auto;
-  max-width: 40%;
+  flex: 0 0 auto;
+  max-width: 45%;
+  color: var(--cfg-muted);
+  font-size: 12px;
+  font-weight: 450;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -2195,7 +2199,6 @@ html:not(.config-classic) {
   font-weight: 560;
 }
 
-:root:not(.config-classic) .config-tl-was,
 :root:not(.config-classic) .config-tl-dup {
   color: var(--cfg-faint);
   font-size: 11px;

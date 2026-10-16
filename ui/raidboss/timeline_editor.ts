@@ -78,6 +78,7 @@ const t = {
       '<p>타임라인은 전투 진행(보스 패턴 등)에 따라 구간 사이를 건너뛰므로, 시간은 전투 경과 시간이 아니라 타임라인 파일 안의 위치(초)입니다.</p><p>구간 목록이나 ‹ › 버튼으로 다른 구간으로 이동할 수 있습니다.</p><p>문구 칸에서 ↑ ↓와 Enter로 위아래 항목으로 옮겨 가고, Esc로 고치기 전으로 되돌립니다.</p>',
   },
   start: { en: 'Start', ko: '시작' },
+  original: { en: 'Was: ${text}', ko: '원래: ${text}' },
   twin: {
     en: 'Another entry has this time and name, so edits apply to both.',
     ko: '같은 시각에 같은 이름의 항목이 하나 더 있어 편집이 함께 적용됩니다.',
@@ -845,7 +846,7 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
         if (document.activeElement !== input)
           input.value = shownText(e);
         input.placeholder = inherited(e);
-        was.textContent = shownText(e) !== e.text ? `← ${e.text}` : '';
+        was.textContent = shownText(e) !== e.text ? format(t.original, { text: e.text }) : '';
         const color = paletteColor(palette, effective(e).highlight, effective(e).color);
         row.style.setProperty('--config-tl-color', color ?? 'transparent');
         // A light wash of it on the line, and the text in it unless too dark to read.
