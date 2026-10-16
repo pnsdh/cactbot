@@ -37,6 +37,7 @@ import {
 import { isClassic } from '../config/config_tabs';
 import {
   buildTriggerBrowser,
+  describeTimeline,
   FileSetting,
   registerTriggerFile,
   TriggerEntry,
@@ -48,6 +49,7 @@ import raidbossOptions, { RaidbossOptions } from './raidboss_options';
 import { buildTimelineEditor } from './timeline_editor';
 import {
   countEntryEdits,
+  countTimelineEdits,
   highlightId,
   kNoHighlight,
   paletteColor,
@@ -1154,14 +1156,39 @@ class RaidbossConfigurator {
 
     let hasEverBeenExpanded = false;
 
+    // Fork: read once, for the editor or for its count on a fight's page (config_triggers.ts).
+    let parsed: { text: string; timeline: TimelineParser } | undefined;
+    const parse = () => {
+      if (parsed === undefined) {
+        const text = this.timelineTextFromSet(set);
+        parsed = {
+          text: text,
+          timeline: new TimelineParser(text, set.timelineReplace ?? [], [], [], options),
+        };
+      }
+      return parsed;
+    };
+    describeTimeline(container, {
+      // As the editor lists them (hideall ones aside).
+      size: () => {
+        const { timeline } = parse();
+        return timeline.events.filter((e) =>
+          e.lineNumber !== undefined && !(e.name in timeline.ignores)
+        ).length;
+      },
+      edits: () =>
+        countTimelineEdits(
+          this.base.getJsonOption('raidboss', ['timeline', zoneId.toString()], {}),
+        ),
+    });
+
     const headerDiv = document.createElement('div');
     headerDiv.classList.add('timeline-edit-header');
     headerDiv.onclick = () => {
       container.classList.toggle('collapsed');
       // Build the rest of this UI on demand lazily.
       if (!hasEverBeenExpanded) {
-        const text = this.timelineTextFromSet(set);
-        const timeline = new TimelineParser(text, set.timelineReplace ?? [], [], [], options);
+        const { text, timeline } = parse();
         // Fork: the new config page also edits single entries (timeline_editor.ts).
         if (!isClassic()) {
           const zonePath = ['timeline', zoneId.toString()];

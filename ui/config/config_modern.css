@@ -1162,10 +1162,10 @@ html:not(.config-classic) {
   display: block;
 }
 
-/* Its header: the way back, the fight, the fights around it, then its tabs. */
+/* Its header: the way back, the fight and its kind on one line, then its tabs. */
 :root:not(.config-classic) .config-trigger-browser .trigger-file-container.config-page > .trigger-file-header {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   column-gap: 12px;
   padding: 10px 14px 0;
@@ -1178,28 +1178,35 @@ html:not(.config-classic) {
 }
 
 :root:not(.config-classic) .config-page > .trigger-file-header > .trigger-file-header-part:first-child {
-  grid-column: 2;
-  grid-row: 1;
+  order: 1;
+  flex: 0 1 auto;
+  min-width: 0;
   overflow: hidden;
   font-size: 15px;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
+/* Its counts are on its tabs. */
 :root:not(.config-classic) .config-page > .trigger-file-header > .config-file-meta {
-  grid-column: 2;
-  grid-row: 2;
+  order: 2;
+  flex: none;
+  margin-top: 0;
+}
+
+:root:not(.config-classic) .config-page > .trigger-file-header .config-file-count,
+:root:not(.config-classic) .config-page > .trigger-file-header .config-file-changed {
+  display: none;
 }
 
 :root:not(.config-classic) .config-page-back,
-:root:not(.config-classic) .config-page-steps,
 :root:not(.config-classic) .config-page-tabs {
   display: none;
 }
 
 :root:not(.config-classic) .config-page > .trigger-file-header > .config-page-back {
-  grid-column: 1;
-  grid-row: 1 / 3;
+  order: 0;
+  flex: none;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -1219,31 +1226,10 @@ html:not(.config-classic) {
   transform: rotate(45deg);
 }
 
-:root:not(.config-classic) .config-page > .trigger-file-header > .config-page-steps {
-  grid-column: 3;
-  grid-row: 1 / 3;
-  display: flex;
-  gap: 6px;
-}
-
-:root:not(.config-classic) .config-page-step {
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  border-radius: 8px;
-  font-size: 16px;
-  line-height: 1;
-}
-
-:root:not(.config-classic) .config-page-step:disabled {
-  opacity: 0.35;
-  cursor: default;
-}
-
 /* Tabs as the top bar's: underlined. */
 :root:not(.config-classic) .config-page > .trigger-file-header > .config-page-tabs {
-  grid-column: 1 / -1;
-  grid-row: 3;
+  order: 3;
+  flex: 0 0 100%;
   display: flex;
   gap: 4px;
   margin-top: 8px;
@@ -1296,13 +1282,14 @@ html:not(.config-classic) {
 
 :root:not(.config-classic) .config-page-tab-count {
   color: var(--cfg-faint);
-  font-family: var(--cfg-font-accent);
   font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
 }
 
 :root:not(.config-classic) .config-page-tab-changed {
   color: var(--cfg-accent);
   font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
 }
 
 /* One part at a time, never folded (its own header is the tab). */

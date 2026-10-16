@@ -92,6 +92,28 @@ export const countEntryEdits = (zone: SavedConfigEntry | undefined): number => {
   return count(zone.entries) + jobs.reduce((n: number, j) => n + count(j), 0) + jobAdded.length;
 };
 
+// Every edit of a zone's timeline, for the config page: single entries (common and per job),
+// added entries, and by name hidden or renamed ones.
+export const countTimelineEdits = (zone: SavedConfigEntry | undefined): number => {
+  if (!isObject(zone))
+    return 0;
+  const count = (saved: SavedConfigEntry | undefined) => parseEntryEdits(saved).length;
+  const jobs = isObject(zone.jobEntries) ? Object.values(zone.jobEntries) : [];
+  const add = Array.isArray(zone.add) ? zone.add : [];
+  const added = add.filter((row) =>
+    isObject(row) && typeof row.text === 'string' && row.text.trim() !== '' &&
+    typeof row.time === 'string' && !isNaN(parseFloat(row.time))
+  );
+  const hidden = isObject(zone.enable)
+    ? Object.values(zone.enable).filter((v) => v === false).length
+    : 0;
+  const renamed = isObject(zone.globalReplace)
+    ? Object.values(zone.globalReplace).filter((v) => typeof v === 'string' && v !== '').length
+    : 0;
+  return count(zone.entries) + jobs.reduce((n: number, j) => n + count(j), 0) + added.length +
+    hidden + renamed;
+};
+
 // The entry each edit is for: the one with its name at its time, or else one with its name moved
 // within kEntryMoveSeconds (see below).  Undefined when there is none.
 export const matchEntries = <E extends { time: number; name: string }>(
