@@ -2,7 +2,7 @@ import { ConfigEntry, ConfigValue } from '../../resources/user_config';
 import { LocaleText } from '../../types/trigger';
 
 import { setDefault } from './config_dirty';
-import { setTooltip } from './config_tooltip';
+import { setTip, setTooltip } from './config_tooltip';
 
 // Fork: arranges a section's option rows (a name cell and a control cell each, as
 // CactbotConfigurator.buildUI makes them) into titled cards, and adds units, sliders for 0-1
@@ -522,25 +522,21 @@ const addReset = (
     return isNumberType(type) && parseFloat(value) === parseFloat(defaultValue);
   };
 
-  // Says what the default is, so it reads as "back to <that>" rather than as a reload button.
+  // "Default", and what the default is in its tooltip (it would be cut short in the row).
   const reset = document.createElement('button');
   reset.type = 'button';
   reset.classList.add('config-reset');
   const shownDefault = describeDefault(id, type, defaultValue, control, translate);
   const label = document.createElement('span');
-  label.textContent = shownDefault !== ''
-    ? `${translate(kDefault)}: ${shownDefault}`
-    : translate(kDefault);
+  label.textContent = translate(kDefault);
   reset.innerHTML =
     '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>';
   reset.appendChild(label);
-  reset.setAttribute('aria-label', label.textContent);
-  // Its text as a tooltip only where it isn't all shown: only its icon (in narrow windows), or
-  // a long default cut short.
-  reset.addEventListener('mouseenter', () => {
-    const cut = label.offsetWidth === 0 || label.scrollWidth > label.clientWidth + 1;
-    reset.title = cut ? label.textContent ?? '' : '';
-  });
+  const full = shownDefault !== ''
+    ? `${translate(kDefault)}: ${shownDefault}`
+    : translate(kDefault);
+  reset.setAttribute('aria-label', full);
+  setTip(reset, full);
   reset.onclick = () => {
     // Its control is disabled by another option's value.
     if (control.disabled)
@@ -621,7 +617,20 @@ export const addOptionTooltip = (
   icon.setAttribute('role', 'img');
   icon.setAttribute('aria-label', translate(kInfo));
   icon.textContent = 'i';
-  name.appendChild(icon);
+  // With the name's last word, so that it never goes to a line of its own.
+  const tail = document.createElement('span');
+  tail.classList.add('config-name-tail');
+  const last = name.lastChild;
+  if (last instanceof Text) {
+    const text = last.data.trimEnd();
+    const cut = text.search(/\S+$/);
+    if (cut >= 0) {
+      last.data = text.slice(0, cut);
+      tail.textContent = text.slice(cut);
+    }
+  }
+  tail.appendChild(icon);
+  name.appendChild(tail);
   setTooltip(icon, () => parts.map((p) => `<p>${p}</p>`).join(''));
 };
 

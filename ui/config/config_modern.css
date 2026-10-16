@@ -34,6 +34,9 @@
   --cfg-hover: #232835;
   --cfg-line: rgb(255 255 255 / 7%);
   --cfg-line-strong: rgb(255 255 255 / 13%);
+  --cfg-scroll: rgb(255 255 255 / 30%);
+  --cfg-scroll-hover: rgb(255 255 255 / 46%);
+  --cfg-scroll-track: rgb(255 255 255 / 4%);
   --cfg-text: #e9edf5;
   --cfg-muted: #8b93a6;
   --cfg-faint: #5d6476;
@@ -59,6 +62,9 @@
   --cfg-hover: #eef1f8;
   --cfg-line: rgb(16 24 40 / 8%);
   --cfg-line-strong: rgb(16 24 40 / 15%);
+  --cfg-scroll: rgb(16 24 40 / 30%);
+  --cfg-scroll-hover: rgb(16 24 40 / 46%);
+  --cfg-scroll-track: rgb(16 24 40 / 5%);
   --cfg-text: #1a1f2b;
   --cfg-muted: #636b7e;
   --cfg-faint: #9aa1b2;
@@ -84,6 +90,9 @@
     --cfg-hover: #eef1f8;
     --cfg-line: rgb(16 24 40 / 8%);
     --cfg-line-strong: rgb(16 24 40 / 15%);
+    --cfg-scroll: rgb(16 24 40 / 30%);
+    --cfg-scroll-hover: rgb(16 24 40 / 46%);
+    --cfg-scroll-track: rgb(16 24 40 / 5%);
     --cfg-text: #1a1f2b;
     --cfg-muted: #636b7e;
     --cfg-faint: #9aa1b2;
@@ -125,22 +134,27 @@ html:not(.config-classic) {
 }
 
 :root:not(.config-classic) ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
 }
 
+/* Easy to find: ACT's light window is often right next to it. */
 :root:not(.config-classic) ::-webkit-scrollbar-thumb {
-  background-color: var(--cfg-line-strong);
+  background-color: var(--cfg-scroll);
   background-clip: padding-box;
   border: 2px solid transparent;
   border-radius: 99px;
 }
 
-:root:not(.config-classic) ::-webkit-scrollbar-thumb:hover {
-  background-color: var(--cfg-faint);
+:root:not(.config-classic) ::-webkit-scrollbar-thumb:hover,
+:root:not(.config-classic) ::-webkit-scrollbar-thumb:active {
+  background-color: var(--cfg-scroll-hover);
 }
 
-:root:not(.config-classic) ::-webkit-scrollbar-track,
+:root:not(.config-classic) ::-webkit-scrollbar-track {
+  background-color: var(--cfg-scroll-track);
+}
+
 :root:not(.config-classic) ::-webkit-scrollbar-corner {
   background: transparent;
 }
@@ -456,10 +470,17 @@ html:not(.config-classic) {
 
 /* Flex rather than config.css's grid, so the changed mark sits after the name. */
 :root:not(.config-classic) .option-name {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  display: block;
   font-weight: 560;
+}
+
+/* A name's last word and its ⓘ, kept on one line. */
+:root:not(.config-classic) .config-name-tail {
+  white-space: nowrap;
+}
+
+:root:not(.config-classic) .option-name .config-help {
+  vertical-align: -2px;
 }
 
 /* Trigger lists are rows that span the card, so only the first has no line above. */
@@ -485,11 +506,9 @@ html:not(.config-classic) {
 /* "Default <value>": a small text button, so it isn't taken for a reload button. */
 :root:not(.config-classic) .config-ctl > .config-reset {
   display: inline-flex;
-  flex: 0 4 auto;
+  flex: none;
   align-items: center;
   gap: 5px;
-  min-width: 26px;
-  max-width: 180px;
   height: 24px;
   padding: 0 9px 0 7px;
   border: 1px solid var(--cfg-line);
@@ -499,11 +518,6 @@ html:not(.config-classic) {
   font-size: 11.5px;
   font-weight: 560;
   white-space: nowrap;
-}
-
-:root:not(.config-classic) .config-ctl > .config-reset > span {
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 :root:not(.config-classic) .config-ctl > .config-reset:hover {
@@ -1565,7 +1579,14 @@ html:not(.config-classic) {
   color: var(--cfg-text);
 }
 
+:root:not(.config-classic) .config-changed-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
 :root:not(.config-classic) .config-mini-switch {
+  display: inline-block;
   flex: none;
   width: 26px;
   height: 15px;
@@ -1611,12 +1632,11 @@ html:not(.config-classic) {
 /* ===== Small windows ===== */
 
 /* The default's button is only its icon (its name on hover), for the controls' room. */
-.config-w760:not(.config-classic) .config-ctl > .config-reset {
-  flex: none;
+.config-w600:not(.config-classic) .config-ctl > .config-reset {
   padding: 0 7px;
 }
 
-.config-w760:not(.config-classic) .config-ctl > .config-reset > span {
+.config-w600:not(.config-classic) .config-ctl > .config-reset > span {
   display: none;
 }
 
