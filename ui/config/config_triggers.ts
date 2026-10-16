@@ -95,13 +95,13 @@ export const registerTriggerFile = (
 
 // Anything saved other than empty boxes, "default" and shown timeline entries (true) counts as a
 // change.  A config edited by hand could have null too.
-const isChange = (entry: SavedConfigEntry | null | undefined): boolean => {
-  if (entry === undefined || entry === null || entry === true)
+const isChange = (entry: SavedConfigEntry | null | undefined, shown = false): boolean => {
+  if (entry === undefined || entry === null || entry === true && shown)
     return false;
   if (typeof entry === 'string')
     return entry !== '' && entry !== 'default';
   if (typeof entry === 'object')
-    return Object.values(entry).some(isChange);
+    return Object.entries(entry).some(([key, value]) => isChange(value, shown || key === 'enable'));
   return true;
 };
 
@@ -248,7 +248,6 @@ const groupTriggers = (file: TriggerFile): void => {
   group.addEventListener('input', update);
   group.addEventListener('change', update);
   header.addEventListener('click', () => group.classList.toggle('collapsed'));
-  makeKeyboardButton(header);
   options.before(group);
   group.append(header, options);
 };
@@ -268,32 +267,54 @@ const compactTriggers = (file: TriggerFile): void => {
   const rows = [...options.querySelectorAll<HTMLElement>(':scope > .trigger')];
   if (rows.length === 0)
     return;
-  options.classList.add('config-compact');
   const entries = new Map(file.triggers.map((t) => [t.id, t]));
+  // Rows with more to open, and "open all" for them.
+  const openable: HTMLElement[] = [];
+  const all = document.createElement('button');
+  all.type = 'button';
+  const updateAll = () => {
+    const open = openable.every((r) => r.classList.contains('config-trigger-open'));
+    all.textContent = context.translate(open ? kCloseAll : kOpenAll);
+  };
+  all.onclick = () => {
+    const open = !openable.every((r) => r.classList.contains('config-trigger-open'));
+    for (const row of openable)
+      openTriggerRow(row, open);
+    updateAll();
+  };
+  let compacted = false;
   for (const row of rows) {
     const details = row.nextElementSibling;
-    const id = row.querySelector('.trigger-id');
     if (!(details instanceof HTMLElement) || !details.classList.contains('trigger-details'))
       continue;
-    if (id === null)
-      continue;
+    // Oopsy's rows have the trigger's id as text: it gets an element as raidboss's has.
+    let id = row.querySelector<HTMLElement>('.trigger-id');
+    if (id === null) {
+      const text = row.firstChild;
+      if (!(text instanceof Text))
+        continue;
+      id = document.createElement('div');
+      id.classList.add('trigger-id');
+      id.textContent = text.textContent;
+      text.replaceWith(id);
+    }
+    compacted = true;
     const line = document.createElement('div');
     line.classList.add('config-trigger-line');
     const entry = entries.get(id.textContent ?? '');
+    const dot = document.createElement('span');
+    dot.classList.add('config-trigger-dot');
     const preview = document.createElement('span');
     preview.classList.add('config-trigger-preview');
     if (entry?.severity !== undefined)
       preview.classList.add(`config-trigger-${entry.severity}`);
     preview.textContent = entry?.preview ?? '';
-    line.append(id, preview);
+    line.append(id, dot, preview);
     // Its output (shown, muted, ...) can be changed without opening it.
     const output = details.querySelector<HTMLElement>(':scope > .trigger-options');
     if (output !== null)
       line.appendChild(output);
     row.prepend(line);
-    row.tabIndex = 0;
-    row.setAttribute('role', 'button');
-    openTriggerRow(row, false);
     const update = () => {
       const changed = entry !== undefined &&
         isChange(context.readSaved(file.group, ['triggers', entry.id]));
@@ -303,7 +324,19 @@ const compactTriggers = (file: TriggerFile): void => {
     details.addEventListener('input', update);
     details.addEventListener('change', update);
     output?.addEventListener('change', update);
-    const toggle = () => openTriggerRow(row, !row.classList.contains('config-trigger-open'));
+    // Nothing more (as oopsy's, whose only setting is the output): nothing to open.
+    if (details.childElementCount === 0 && row.querySelector('.comment') === null) {
+      row.classList.add('config-trigger-plain');
+      continue;
+    }
+    openable.push(row);
+    row.tabIndex = 0;
+    row.setAttribute('role', 'button');
+    openTriggerRow(row, false);
+    const toggle = () => {
+      openTriggerRow(row, !row.classList.contains('config-trigger-open'));
+      updateAll();
+    };
     row.addEventListener('click', (e) => {
       if (e.target instanceof Element && e.target.closest('select, input, button, a') !== null)
         return;
@@ -316,19 +349,16 @@ const compactTriggers = (file: TriggerFile): void => {
       toggle();
     });
   }
-  const tools = document.createElement('div');
-  tools.classList.add('config-trigger-tools');
-  const all = document.createElement('button');
-  all.type = 'button';
-  all.textContent = context.translate(kOpenAll);
-  all.onclick = () => {
-    const open = !rows.every((r) => r.classList.contains('config-trigger-open'));
-    for (const row of rows)
-      openTriggerRow(row, open);
-    all.textContent = context.translate(open ? kCloseAll : kOpenAll);
-  };
-  tools.appendChild(all);
-  options.prepend(tools);
+  if (!compacted)
+    return;
+  options.classList.add('config-compact');
+  if (openable.length > 0) {
+    updateAll();
+    const tools = document.createElement('div');
+    tools.classList.add('config-trigger-tools');
+    tools.appendChild(all);
+    options.prepend(tools);
+  }
 };
 
 export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void => {
@@ -663,4 +693,6 @@ export const revealTrigger = (hit: TriggerHit): void => {
     scroller.scrollTop -= header.offsetHeight + 8;
   const details = row.nextElementSibling;
   flash(details instanceof HTMLElement ? [row, details] : [row]);
+  if (row.tabIndex >= 0)
+    row.focus({ preventScroll: true });
 };

@@ -439,6 +439,9 @@ export class Timeline {
           name: e.name,
           text: `${this.activeText} ${e.text}`,
           isDur: true,
+          // Fork: a highlighted entry's duration bar is highlighted too.
+          ...e.highlight !== undefined ? { highlight: e.highlight } : {},
+          ...e.highlightColor !== undefined ? { highlightColor: e.highlightColor } : {},
         };
         events.push(durationEvent);
         this.activeEvents.splice(i, 1);

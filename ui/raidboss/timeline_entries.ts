@@ -27,6 +27,8 @@ export const kNoHighlight = 'none';
 
 // How far an entry may have moved (in seconds) and still be found by its name.
 export const kEntryMoveSeconds = 5;
+// How much nearer the entry an edit follows must be than any other with its name in its place.
+const kEntryAmbiguousSeconds = 1;
 
 // The saved config key of an entry: "time|name", or "+time|text" for an added entry.
 export const entryKey = (time: number, name: string, added?: boolean): string =>
@@ -45,13 +47,19 @@ export const parseEntryKey = (
 };
 
 // Saved edits ({ 'time|name': { text, hide, highlight, color } }) as TimelineEntryEdits.
+// A config edited by hand could have null anywhere.
+const isObject = (
+  value: SavedConfigEntry | null | undefined,
+): value is { [key: string]: SavedConfigEntry } =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
 export const parseEntryEdits = (saved: SavedConfigEntry | undefined): TimelineEntryEdit[] => {
-  if (typeof saved !== 'object' || Array.isArray(saved))
+  if (!isObject(saved))
     return [];
   const edits: TimelineEntryEdit[] = [];
   for (const [key, value] of Object.entries(saved)) {
     const at = parseEntryKey(key);
-    if (at === undefined || typeof value !== 'object' || Array.isArray(value))
+    if (at === undefined || !isObject(value))
       continue;
     const edit: TimelineEntryEdit = { time: at.time, name: at.name };
     if (at.added)
@@ -70,8 +78,8 @@ export const parseEntryEdits = (saved: SavedConfigEntry | undefined): TimelineEn
   return edits;
 };
 
-// The entry each edit is for: the one with its name at its time, or else the nearest one with its
-// name within kEntryMoveSeconds that no other edit has.  Undefined when there is none.
+// The entry each edit is for: the one with its name at its time, or else one with its name moved
+// within kEntryMoveSeconds (see below).  Undefined when there is none.
 export const matchEntries = <E extends { time: number; name: string }>(
   entries: E[],
   edits: { time: number; name: string }[],
@@ -87,25 +95,72 @@ export const matchEntries = <E extends { time: number; name: string }>(
       result[i] = entry;
     }
   });
-  edits.forEach((edit, i) => {
-    if (result[i] !== undefined)
-      return;
-    let best: E | undefined;
-    let bestDistance = Infinity;
-    for (const e of entries) {
-      const distance = Math.abs(e.time - edit.time);
-      if (e.name !== edit.name || taken.has(e) || distance > kEntryMoveSeconds)
-        continue;
-      if (distance < bestDistance) {
-        best = e;
-        bestDistance = distance;
+  // Then, name by name, the others: in the order of their times (a part of the timeline moved,
+  // its entries in the same order), each within kEntryMoveSeconds, the least moving in all.
+  // Times in milliseconds keep the sums exact.
+  const ms = (seconds: number) => Math.round(seconds * 1000);
+  const limit = ms(kEntryMoveSeconds);
+  const names = new Set(edits.filter((_, i) => result[i] === undefined).map((e) => e.name));
+  for (const name of names) {
+    const ed = edits.map((edit, i) => ({ time: ms(edit.time), i: i }))
+      .filter(({ i }) => result[i] === undefined && edits[i]?.name === name)
+      .sort((x, y) => x.time - y.time);
+    const en = entries.filter((e) => e.name === name && !taken.has(e))
+      .map((e) => ({ time: ms(e.time), e: e }))
+      .sort((x, y) => x.time - y.time);
+    const w = en.length + 1;
+    const distance = (i: number, j: number) => Math.abs((ed[i]?.time ?? 0) - (en[j]?.time ?? 0));
+    // cost[i * w + j]: the least for the first i edits and the first j entries; an edit left
+    // without an entry costs more than any move.
+    const skip = limit + 1;
+    const cost: number[] = new Array<number>((ed.length + 1) * w).fill(0);
+    const at = (i: number, j: number) => cost[i * w + j] ?? Infinity;
+    for (let i = 1; i <= ed.length; ++i) {
+      cost[i * w] = i * skip;
+      for (let j = 1; j <= en.length; ++j) {
+        const d = distance(i - 1, j - 1);
+        cost[i * w + j] = Math.min(
+          at(i, j - 1),
+          at(i - 1, j) + skip,
+          d <= limit ? at(i - 1, j - 1) + d : Infinity,
+        );
       }
     }
-    if (best !== undefined) {
-      taken.add(best);
-      result[i] = best;
+    const pairs: [number, number][] = [];
+    for (let i = ed.length, j = en.length; i > 0;) {
+      const d = j > 0 ? distance(i - 1, j - 1) : Infinity;
+      if (j > 0 && at(i, j) === at(i, j - 1)) {
+        j--;
+      } else if (d <= limit && at(i, j) === at(i - 1, j - 1) + d) {
+        pairs.unshift([i - 1, j - 1]);
+        i--;
+        j--;
+      } else {
+        i--;
+      }
     }
-  });
+    // Not when another entry in its place is about as near (e.g. the edited one of a repeated
+    // cast was removed and those around it are left): which one it was for can't be told.
+    const used = new Set(pairs.map(([, j]) => j));
+    pairs.forEach(([i, j], k) => {
+      const lo = pairs[k - 1]?.[1] ?? -1;
+      const hi = pairs[k + 1]?.[1] ?? en.length;
+      const d = distance(i, j);
+      for (let other = lo + 1; other < hi; ++other) {
+        if (other === j || used.has(other))
+          continue;
+        const od = distance(i, other);
+        if (od <= limit && od - d < ms(kEntryAmbiguousSeconds))
+          return;
+      }
+      const edit = ed[i];
+      const entry = en[j];
+      if (edit === undefined || entry === undefined)
+        return;
+      taken.add(entry.e);
+      result[edit.i] = entry.e;
+    });
+  }
   return result;
 };
 
@@ -188,7 +243,7 @@ export type PaletteColor = { id: string; color: string; name?: string; custom: b
 export const isHexColor = (color: string): boolean => /^#[0-9a-f]{6}$/i.test(color);
 
 const asObject = (value: SavedConfigEntry | undefined): { [key: string]: SavedConfigEntry } =>
-  typeof value === 'object' && !Array.isArray(value) ? value : {};
+  isObject(value) ? value : {};
 
 // The list of colors: the built in ones (as the user changed them), then the user's own.
 export const readPalette = (saved: SavedConfigEntry | undefined): PaletteColor[] => {

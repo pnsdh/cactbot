@@ -488,20 +488,27 @@ export class TimelineParser {
     const job = editJob(this.options.TimelineJob ?? '');
     const layers = [this.timelineConfig.Entries ?? [], this.timelineConfig.JobEntries?.[job] ?? []];
     for (const edits of layers) {
-      matchEdits(this.events, edits).forEach((e, i) => {
+      matchEdits(this.events, edits).forEach((matched, i) => {
         const edit = edits[i];
-        if (e === undefined || edit === undefined)
+        if (matched === undefined || edit === undefined)
           return;
-        if (edit.text !== undefined)
-          e.text = edit.text;
-        if (edit.hide !== undefined)
-          e.hidden = edit.hide;
-        if (edit.highlight === kNoHighlight) {
-          delete e.highlight;
-          delete e.highlightColor;
-        } else if (edit.highlight !== undefined) {
-          e.highlight = edit.highlight;
-          e.highlightColor = edit.color;
+        // Entries at the same time with the same name can't be told apart: all of them.
+        const twins = this.events.filter((e) =>
+          e.name === matched.name && Math.abs(e.time - matched.time) < 0.001 &&
+          (e.lineNumber === undefined) === (matched.lineNumber === undefined)
+        );
+        for (const e of twins) {
+          if (edit.text !== undefined)
+            e.text = edit.text;
+          if (edit.hide !== undefined)
+            e.hidden = edit.hide;
+          if (edit.highlight === kNoHighlight) {
+            delete e.highlight;
+            delete e.highlightColor;
+          } else if (edit.highlight !== undefined) {
+            e.highlight = edit.highlight;
+            e.highlightColor = edit.color;
+          }
         }
       });
     }

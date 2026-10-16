@@ -2001,7 +2001,7 @@ const processPerZoneTimelineConfig = (options: RaidbossOptions, savedConfig: Sav
     if (entries.length > 0)
       timelineConfig.Entries = entries;
     const jobEntries = zoneEntry['jobEntries'];
-    if (typeof jobEntries === 'object' && !Array.isArray(jobEntries)) {
+    if (typeof jobEntries === 'object' && jobEntries !== null && !Array.isArray(jobEntries)) {
       for (const [job, saved] of Object.entries(jobEntries)) {
         const edits = resolve(parseEntryEdits(saved));
         if (edits.length > 0)

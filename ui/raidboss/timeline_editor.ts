@@ -9,6 +9,7 @@ import {
   kEditJobs,
   kEntryMoveSeconds,
   kNoHighlight,
+  kPalette,
   matchEdits,
   PaletteColor,
   paletteColor,
@@ -69,11 +70,15 @@ const t = {
   show: { en: 'Show', ko: '보이기' },
   sectionsHelp: {
     en:
-      '<p>The timeline jumps between its parts as the fight goes (e.g. by the boss\'s pattern), so times are where entries are in the timeline file (in seconds), not times in the fight.</p><p>Click a part to go to it.</p>',
+      '<p>The timeline jumps between its parts as the fight goes (e.g. by the boss\'s pattern), so times are where entries are in the timeline file (in seconds), not times in the fight.</p><p>Go to another part with the list or ‹ ›.</p>',
     ko:
-      '<p>타임라인은 전투 진행(보스 패턴 등)에 따라 구간 사이를 건너뛰므로, 시간은 전투 경과 시간이 아니라 타임라인 파일 안의 위치(초)입니다.</p><p>누르면 그 구간으로 이동합니다.</p>',
+      '<p>타임라인은 전투 진행(보스 패턴 등)에 따라 구간 사이를 건너뛰므로, 시간은 전투 경과 시간이 아니라 타임라인 파일 안의 위치(초)입니다.</p><p>구간 목록이나 ‹ ›로 다른 구간으로 갈 수 있습니다.</p>',
   },
   start: { en: 'Start', ko: '시작' },
+  twin: {
+    en: 'Another entry has this time and name, so edits apply to both.',
+    ko: '같은 시각에 같은 이름의 항목이 또 있어서, 편집이 함께 적용됩니다.',
+  },
   from: { en: 'from ${time}s', ko: '${time}초부터' },
   addedBadge: { en: 'Added', ko: '추가' },
   highlight: { en: 'Highlight', ko: '강조' },
@@ -244,7 +249,10 @@ const findSections = (text: string): Section[] => {
 export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorContext): void => {
   const tr = (text: LocaleText) => ctx.translate(text);
   const format = (text: LocaleText, values: { [key: string]: string | number }) =>
-    Object.entries(values).reduce((s, [k, v]) => s.replace(`\${${k}}`, v.toString()), tr(text));
+    Object.entries(values).reduce(
+      (s, [k, v]) => s.replace(`\${${k}}`, () => v.toString()),
+      tr(text),
+    );
 
   const make = <K extends keyof HTMLElementTagNameMap>(
     tag: K,
@@ -318,17 +326,26 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
     change(rows);
     ctx.set(['add'], rows as [SavedConfigEntry]);
   };
-  // An added entry's edits go with it when its time or text changes, in every layer.
-  const moveKeys = (from: string, to?: string) => {
-    for (const l of ['', ...Object.keys(asObject(ctx.get(['jobEntries'])))]) {
-      const saved = asObject(ctx.get(layerPath(l)));
+  const allLayers = () => ['', ...Object.keys(asObject(ctx.get(['jobEntries'])))];
+  const filled = (value: SavedConfigEntry | undefined) => value !== undefined && value !== '';
+  // An added entry's edits go with it when its time or text changes, in every layer; not over
+  // another entry's edits (which would be lost), and then not at all.  False then.
+  const moveKeys = (from: string, to?: string): boolean => {
+    const layers = allLayers().map((l) => ({
+      path: layerPath(l),
+      saved: asObject(ctx.get(layerPath(l))),
+    }));
+    if (to !== undefined && layers.some(({ saved }) => filled(saved[from]) && filled(saved[to])))
+      return false;
+    for (const { path, saved } of layers) {
       const value = saved[from];
-      if (value === undefined || value === '')
+      if (!filled(value) || value === undefined)
         continue;
-      if (to !== undefined && (saved[to] === undefined || saved[to] === ''))
-        ctx.set([...layerPath(l), to], value);
-      ctx.set([...layerPath(l), from], '');
+      if (to !== undefined)
+        ctx.set([...path, to], value);
+      ctx.set([...path, from], '');
     }
+    return true;
   };
   const layerCount = (l: Layer) =>
     Object.values(asObject(ctx.get(layerPath(l)))).filter((v) => !isEmpty(asEdit(v))).length +
@@ -370,6 +387,17 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
   };
 
   const buildEntries = (pane: HTMLElement): void => {
+    // Edits taken back are saved empty; they go when the editor opens.
+    for (const l of allLayers()) {
+      const saved = asObject(ctx.get(layerPath(l)));
+      const kept = Object.keys(saved).filter((k) => filled(saved[k]));
+      if (kept.length !== Object.keys(saved).length) {
+        const value: { [key: string]: SavedConfigEntry } = {};
+        for (const k of kept)
+          value[k] = saved[k] ?? '';
+        ctx.set(layerPath(l), value);
+      }
+    }
     let palette = readPalette(ctx.getColors());
     const isJob = layer !== '';
 
@@ -403,6 +431,23 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
     const isOwnAdded = (e: Event) => isAdded(e) && (addedInfo.get(e)?.job ?? '') === layer;
     const idOf = (e: Event) =>
       isAdded(e) ? `A${addedInfo.get(e)?.index ?? ''}` : `L${e.lineNumber ?? ''}`;
+    // The key an added entry's edits are saved under (kept when moving them couldn't be done).
+    const addedKey = new Map<Event, string>(
+      addedEvents.map((e) => [e, entryKey(e.time, e.name, true)]),
+    );
+    // Entries at the same time with the same name have the same key: their edits are one, on
+    // the first of them.
+    const firstOf = new Map<string, Event>();
+    const canonOf = new Map<Event, Event>();
+    for (const e of events) {
+      const key = entryKey(e.time, e.name, isAdded(e));
+      const first = firstOf.get(key);
+      if (first === undefined)
+        firstOf.set(key, e);
+      canonOf.set(e, first ?? e);
+    }
+    const canon = (e: Event): Event => canonOf.get(e) ?? e;
+    const hasTwin = (e: Event) => events.some((x) => x !== e && canon(x) === canon(e));
 
     const sameName = new Map<string, Event[]>();
     for (const e of fileEvents)
@@ -445,8 +490,8 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
       if (isJob)
         loadLayer(layer, own);
     };
-    const edit = (e: Event): Edit => own.state.get(e)?.edit ?? {};
-    const commonEdit = (e: Event): Edit => isJob ? common.state.get(e)?.edit ?? {} : {};
+    const edit = (e: Event): Edit => own.state.get(canon(e))?.edit ?? {};
+    const commonEdit = (e: Event): Edit => isJob ? common.state.get(canon(e))?.edit ?? {} : {};
     const isEdited = (e: Event) => !isEmpty(edit(e)) || isOwnAdded(e);
 
     const colorName = (p: PaletteColor) => {
@@ -616,37 +661,43 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
     };
 
     const save = (e: Event, value: Edit) => {
-      const current = own.state.get(e);
-      const key = entryKey(e.time, e.name, isAdded(e));
+      const c = canon(e);
+      const current = own.state.get(c);
+      const key = addedKey.get(c) ?? entryKey(c.time, c.name, false);
       // A moved edit is saved again at its entry's new time.
       if (current !== undefined && current.key !== key)
         ctx.set([...layerPath(layer), current.key], '');
       ctx.set([...layerPath(layer), key], toSaved(value));
-      own.state.set(e, { edit: value, key: key });
+      own.state.set(c, { edit: value, key: key });
       updateCount();
+      for (const r of rows) {
+        if (r.e !== e && canon(r.e) === c)
+          r.refresh();
+      }
     };
     const rebuild = () => {
       entriesPane.replaceChildren();
       buildEntries(entriesPane);
     };
     // An entry added here: its time, text or duration changed (its edits go with it).
+    // Not saved without a time and text (it would be gone): false then.
     const updateAdded = (e: Event, change: { [key: string]: string }): boolean => {
       const index = addedInfo.get(e)?.index ?? -1;
-      const before = entryKey(e.time, e.name, true);
+      const a = addedRow({ ...asObject(addRows()[index]), ...change });
+      if (a === undefined)
+        return false;
       writeAddRows((all) => {
         const target = all[index];
         if (target !== undefined)
           Object.assign(target, change);
       });
-      const a = addedRow(addRows()[index]);
-      if (a === undefined)
-        return false;
       e.time = a.time;
       e.name = a.text;
       e.text = a.text;
+      const before = addedKey.get(e) ?? entryKey(e.time, e.name, true);
       const after = entryKey(e.time, e.name, true);
-      if (after !== before) {
-        moveKeys(before, after);
+      if (after !== before && moveKeys(before, after)) {
+        addedKey.set(e, after);
         reload();
       }
       return true;
@@ -673,14 +724,16 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
         notes.push({ text: format(t.renamed, { text: baseText(e) }), warn: false });
       if (hiddenByName(e))
         notes.push({ text: tr(t.hiddenByName), warn: true });
-      const key = own.state.get(e)?.key;
+      if (hasTwin(e))
+        notes.push({ text: tr(t.twin), warn: false });
+      const key = own.state.get(canon(e))?.key;
       const at = key !== undefined ? parseEntryKey(key) : undefined;
       if (at !== undefined && Math.abs(at.time - e.time) > 0.001)
         notes.push({ text: format(t.moved, { time: formatSeconds(at.time) }), warn: true });
       return notes;
     };
     const isMoved = (e: Event) => {
-      const key = own.state.get(e)?.key;
+      const key = own.state.get(canon(e))?.key;
       const at = key !== undefined ? parseEntryKey(key) : undefined;
       return at !== undefined && Math.abs(at.time - e.time) > 0.001;
     };
@@ -718,7 +771,7 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
       const was = make('span', 'config-tl-was');
       cell.append(input, was);
       const side = make('span', 'config-tl-side');
-      const same = sameName.get(e.name) ?? [];
+      const same = isAdded(e) ? [] : sameName.get(e.name) ?? [];
       if (same.length > 1)
         side.appendChild(make('span', 'config-tl-dup', `#${same.indexOf(e) + 1}/${same.length}`));
       if (isAdded(e)) {
@@ -783,17 +836,21 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
           return;
         }
         const v = input.value;
-        save(e, { ...edit(e), text: v === '' || v === inherited(e) ? undefined : v });
+        save(e, { ...edit(e), text: v.trim() === '' || v === inherited(e) ? undefined : v });
         refresh();
       };
       input.onblur = () => {
-        if (input.value === '')
+        if (input.value.trim() === '')
           input.value = shownText(e);
       };
       input.onkeydown = (ev) => {
+        if (ev.isComposing)
+          return;
         if (ev.key === 'Escape') {
-          input.value = before;
-          input.dispatchEvent(new window.Event('input'));
+          if (input.value !== before) {
+            input.value = before;
+            input.dispatchEvent(new window.Event('input'));
+          }
           input.blur();
           return;
         }
@@ -909,7 +966,7 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
       }
       pop.appendChild(pickName);
       // The same highlight for every entry with this name.
-      const same = sameName.get(e.name) ?? [];
+      const same = isAdded(e) ? [] : sameName.get(e.name) ?? [];
       if (same.length > 1) {
         const all = make('button', 'config-tl-action', format(t.applyAll, { n: same.length }));
         all.onclick = () => {
@@ -971,10 +1028,12 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
         timeInput.onchange = () => {
           if (updateAdded(e, { time: timeInput.value }))
             rebuild();
+          else
+            timeInput.value = typeof saved.time === 'string' ? saved.time : '';
         };
         const remove = make('button', 'config-tl-remove', tr(t.remove));
         remove.onclick = () => {
-          moveKeys(entryKey(e.time, e.name, true));
+          moveKeys(addedKey.get(e) ?? entryKey(e.time, e.name, true));
           writeAddRows((all) => all.splice(addedInfo.get(e)?.index ?? -1, 1));
           openId = undefined;
           rebuild();
@@ -1032,22 +1091,32 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
         hex.value = p.color;
         const store = () => {
           const value: { [key: string]: SavedConfigEntry } = {};
-          const builtIn = palette.find((c) => c.id === p.id && !c.custom);
-          const color = hex.value.trim();
-          if (isHexColor(color) && (p.custom || color.toLowerCase() !== builtIn?.color))
+          const builtIn = kPalette.find((c) => c.id === p.id)?.color;
+          // A box that isn't a color (yet) keeps the color it had.
+          const typed = hex.value.trim();
+          const color = isHexColor(typed)
+            ? typed
+            : palette.find((c) => c.id === p.id)?.color ?? p.color;
+          if (p.custom || color.toLowerCase() !== builtIn)
             value.color = color;
           if (name.value.trim() !== '')
             value.name = name.value.trim();
           ctx.setColor(p.id, Object.keys(value).length > 0 ? value : '');
           palette = readPalette(ctx.getColors());
           dot.style.backgroundColor = palette.find((c) => c.id === p.id)?.color ?? p.color;
-          refreshAll();
         };
-        name.oninput = store;
+        // A name shows only in the color picker.
+        name.oninput = () => {
+          store();
+          if (picker !== undefined)
+            openPicker(picker.r);
+        };
         hex.oninput = () => {
           hex.classList.toggle('config-invalid', !isHexColor(hex.value.trim()));
-          if (isHexColor(hex.value.trim()))
+          if (isHexColor(hex.value.trim())) {
             store();
+            refreshAll();
+          }
         };
         line.append(dot, make('span', 'config-tl-color-label', label), name, hex);
         if (p.custom) {
@@ -1107,6 +1176,7 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
         heading.classList.toggle('config-hidden', none);
       }
       empty.classList.toggle('config-hidden', shown > 0);
+      onScroll();
     };
     search.oninput = () => {
       filters.query = search.value;
@@ -1143,7 +1213,14 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
         if (!isEmpty(asEdit(value)) && isEmpty(asEdit(here[k])))
           ctx.set([...layerPath(layer), k], value);
       }
-      if (from !== '') {
+      if (from !== '' && layer === '') {
+        writeAddRows((all) => {
+          for (const x of all) {
+            if (x.job === from)
+              delete x.job;
+          }
+        });
+      } else if (from !== '') {
         writeAddRows((all) => {
           const have = new Set(all.map((x) => {
             const a = addedRow(x);
@@ -1171,10 +1248,16 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
     addButton.onclick = () => {
       const at = topRow()?.e.time ?? 0;
       let index = 0;
+      const taken = new Set(
+        addRows().map((x) => addedRow(x)).filter((a) => a?.time === at).map((a) => a?.text),
+      );
+      let text = tr(t.newEntry);
+      for (let n = 2; taken.has(text); ++n)
+        text = `${tr(t.newEntry)} ${n}`;
       writeAddRows((all) => {
         const added: { [key: string]: SavedConfigEntry } = {
           time: formatSeconds(at),
-          text: tr(t.newEntry),
+          text: text,
           duration: '',
         };
         if (layer !== '')
@@ -1199,23 +1282,44 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
       });
       return current;
     };
-    const goToPart = (i: number) => {
-      const target = headings[Math.max(0, Math.min(headings.length - 1, i))];
-      if (target !== undefined)
+    // The parts shown (a filter can leave some without entries): the one before or after a part.
+    const shownPart = (from: number, step: number): number | undefined => {
+      for (let i = from + step; i >= 0 && i < headings.length; i += step) {
+        if (!headings[i]?.heading.classList.contains('config-hidden'))
+          return i;
+      }
+      return undefined;
+    };
+    const goToPart = (i: number | undefined) => {
+      const target = i !== undefined ? headings[i] : undefined;
+      if (target !== undefined && !target.heading.classList.contains('config-hidden'))
         goTo(target.heading);
     };
     partSelect.onchange = () => goToPart(parseInt(partSelect.value));
-    prevPart.onclick = () => goToPart(currentPart() - 1);
-    nextPart.onclick = () => goToPart(currentPart() + 1);
-    sticky.style.top = `${fileHeader?.offsetHeight ?? 0}px`;
+    prevPart.onclick = () => goToPart(shownPart(currentPart(), -1));
+    nextPart.onclick = () => goToPart(shownPart(currentPart(), 1));
+    const placeSticky = () => {
+      const top = `${fileHeader?.offsetHeight ?? 0}px`;
+      if (sticky.style.top !== top)
+        sticky.style.top = top;
+    };
+    placeSticky();
     onScroll = () => {
-      sticky.style.top = `${fileHeader?.offsetHeight ?? 0}px`;
+      // Not while the fight's timeline edits are closed.
+      if (editor.offsetParent === null)
+        return;
+      placeSticky();
       if (headings.length === 0)
         return;
       const current = currentPart();
       partSelect.value = current.toString();
-      prevPart.disabled = current === 0;
-      nextPart.disabled = current === headings.length - 1;
+      headings.forEach(({ heading }, i) => {
+        const option = partSelect.options[i];
+        if (option !== undefined)
+          option.disabled = heading.classList.contains('config-hidden');
+      });
+      prevPart.disabled = shownPart(current, -1) === undefined;
+      nextPart.disabled = shownPart(current, 1) === undefined;
     };
     listenScroll();
     onScroll();

@@ -1762,15 +1762,27 @@ html:not(.config-classic) {
 }
 
 /* A changed trigger has a dot after its name. */
-:root:not(.config-classic) .config-trigger-changed > .config-trigger-line > .trigger-id::after {
-  content: "";
-  display: inline-block;
+:root:not(.config-classic) .config-trigger-dot {
+  display: none;
+  flex: none;
   width: 6px;
   height: 6px;
-  margin-left: 6px;
+  margin-left: -4px;
   border-radius: 50%;
   background-color: var(--cfg-accent);
-  vertical-align: 2px;
+}
+
+:root:not(.config-classic) .config-trigger-changed > .config-trigger-line > .config-trigger-dot {
+  display: block;
+}
+
+/* Nothing more to open (as oopsy's). */
+:root:not(.config-classic) .config-compact > .trigger.config-trigger-plain {
+  cursor: default;
+}
+
+:root:not(.config-classic) .config-trigger-plain > .config-trigger-line::after {
+  display: none;
 }
 
 :root:not(.config-classic) .config-compact > .trigger > .comment {
@@ -1805,7 +1817,7 @@ html:not(.config-classic) {
 /* The bar on top stays under the fight's header (its top is set from the header's height). */
 :root:not(.config-classic) .config-tl-sticky {
   position: sticky;
-  z-index: 1;
+  z-index: 3;
   border-top: 1px solid var(--cfg-line);
   border-bottom: 1px solid var(--cfg-line);
   background-color: var(--cfg-surface);
@@ -2209,11 +2221,6 @@ html:not(.config-classic) {
   font-weight: 600;
 }
 
-:root:not(.config-classic) .config-tl-f-text {
-  flex: 1 1 220px;
-  max-width: 460px;
-}
-
 :root:not(.config-classic) .config-tl-f-time {
   width: 72px;
 }
@@ -2406,7 +2413,8 @@ html:not(.config-classic) {
   max-width: none;
 }
 
-.config-w480:not(.config-classic) .config-tl-was {
+.config-w480:not(.config-classic) .config-tl-was,
+.config-w480:not(.config-classic) .config-tl-side > .config-tl-dup {
   display: none;
 }
 
