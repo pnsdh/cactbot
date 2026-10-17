@@ -1,3 +1,12 @@
 # Results (screenshots, traces, measurements) and this folder's own packages.
 out/
 node_modules/
+
+# Results written elsewhere by mistake: screenshots and recordings may show game screens or
+# names, logs may hold party members' names.  Keep them out of the repo.
+*.png
+*.jpg
+*.webm
+*.mp4
+*.log
+*.trace.json
