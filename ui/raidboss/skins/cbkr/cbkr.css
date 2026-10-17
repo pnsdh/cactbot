@@ -379,7 +379,22 @@
     animation: cbkr-cast-in 260ms ease-out;
   }
 
-  .timer-bar.channeling timer-bar::part(timerbar-runner-fixed) {
+  /* The stripes on a layer one stripe wider that moves by a stripe, rather than a moving
+     background, which is painted again every frame (#timeline: over the rule below). */
+  #timeline .timer-bar.channeling timer-bar::part(timerbar-runner-fixed) {
+    background: none;
+  }
+
+  .timer-bar.channeling timer-bar::part(timerbar-runner-fixed-inner) {
+    left: -11.31px;
+    width: calc(100% + 11.31px);
+    background:
+      repeating-linear-gradient(
+        -45deg,
+        rgb(var(--cbkr-cast) / 30%) 0 4px,
+        rgb(var(--cbkr-cast) / 13%) 4px 8px
+      );
+    background-size: 11.31px 100%;
     animation: cbkr-stripes-flow 1.6s linear infinite;
   }
 
@@ -660,8 +675,8 @@
 }
 
 @keyframes cbkr-stripes-flow {
-  0% { background-position: 0 0; }
-  100% { background-position: 11.31px 0; }
+  0% { transform: none; }
+  100% { transform: translateX(11.31px); }
 }
 
 @keyframes cbkr-stripes {

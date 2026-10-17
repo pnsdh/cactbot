@@ -93,6 +93,7 @@ UserConfig.getUserConfigLocation('raidboss', defaultOptions, () => {
   const timelineController = new TimelineController(options, timelineUI, raidbossFileData);
   const timelineLoader = new TimelineLoader(timelineController);
   const popupText = new PopupText(options, timelineLoader, raidbossFileData);
+  popupText.PreloadSounds();
 
   // Connect the timelines to the popup text, if alerts are desired.
   if (options.AlertsEnabled)

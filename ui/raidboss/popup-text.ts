@@ -579,6 +579,8 @@ export class PopupText {
   protected ttsSay: (text: string) => void;
   protected partyTracker: PartyTracker;
   protected readonly kMaxRowsOfText = 2;
+  // Fork: players kept per sound (see _playAudioFile).
+  private audioPlayers = new Map<string, HTMLAudioElement[]>();
   protected data: RaidbossData;
   protected me = '';
   protected job: Job = 'NONE';
@@ -629,7 +631,8 @@ export class PopupText {
 
     // check to see if we need user interaction to play audio
     // only if audio is enabled in options
-    if (this.options.AudioAllowed)
+    // Fork: and only where alerts play (an overlay without them loads no triggers).
+    if (this.options.AudioAllowed && this.options.AlertsEnabled)
       AutoplayHelper.CheckAndPrompt();
 
     this.Reset();
@@ -1738,8 +1741,36 @@ export class PopupText {
     updateCountdown(); // Initial call to set the countdown immediately
   }
 
-  _playAudioFile(_triggerHelper: TriggerHelper, url: string, volume?: number): void {
+  // Fork: an idle player of the sound, made (and its file loaded) only the first time, as a new
+  // one builds its media pipeline before it plays; another while all of them are playing.
+  private audioPlayer(url: string): HTMLAudioElement | undefined {
+    if (url === '')
+      return undefined;
+    const players = (this.audioPlayers.get(url) ?? []).filter((p) => p.error === null);
+    this.audioPlayers.set(url, players);
+    const idle = players.find((p) => p.paused);
+    if (idle !== undefined) {
+      idle.currentTime = 0;
+      return idle;
+    }
     const audio = new Audio(url);
+    audio.preload = 'auto';
+    if (players.length < 4)
+      players.push(audio);
+    return audio;
+  }
+
+  // Fork: loads the usual sounds ahead (raidboss.ts).
+  PreloadSounds(): void {
+    if (!this.options.AudioAllowed || !this.options.AlertsEnabled)
+      return;
+    const o = this.options;
+    for (const url of [o.InfoSound, o.AlertSound, o.AlarmSound, o.LongSound, o.PullSound])
+      this.audioPlayer(url);
+  }
+
+  _playAudioFile(_triggerHelper: TriggerHelper, url: string, volume?: number): void {
+    const audio = this.audioPlayer(url) ?? new Audio(url);
     // Fork: times the master volume, kept within what audio allows.
     const master = isFinite(this.options.MasterVolume) ? this.options.MasterVolume : 1;
     audio.volume = Math.min(Math.max((volume ?? 1) * master, 0), 1);

@@ -36,7 +36,12 @@ export default class AutoplayHelper {
   }
 
   static CheckAndPrompt(): void {
-    if (!AutoplayHelper.CheckIfAlreadyRunning())
+    if (!AutoplayHelper.CheckIfAlreadyRunning()) {
       AutoplayHelper.Prompt();
+      return;
+    }
+    // Fork: only made for the check; a running one keeps an audio stream and its thread busy.
+    void AutoplayHelper.context?.close();
+    AutoplayHelper.context = undefined;
   }
 }
