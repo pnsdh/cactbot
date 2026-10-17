@@ -116,5 +116,13 @@ namespace Cactbot {
         return null;
       }
     }
+
+    // Fork: FFXIV_ACT_Plugin's data (its IDataRepository, as dynamic), for SelfCheck.
+    public dynamic GetDataRepository() {
+      if (ffxiv_plugin_ == null)
+        return null;
+      dynamic plugin_derived = ffxiv_plugin_;
+      return plugin_derived.DataRepository;
+    }
   }
 }

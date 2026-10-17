@@ -70,3 +70,10 @@ node fx-compare.mjs diff before after
 4. 끝나면 파일과 주소 옵션을 지웁니다.
 
 두 타이머 항목은 Windows 타이머 간격(15.6ms) 때문에 문제가 없어도 약 12ms씩 늦게 나옵니다.
+
+## 게임 패치 뒤 메모리 구조 자가 점검
+
+cactbot 플러그인은 내 캐릭터 정보(이름, 직업, 레벨, HP/MP, 위치, 방향)를 메모리에서 직접 읽습니다(`plugin/CactbotEventSource/FFXIVProcess*.cs`).
+ACT를 시작할 때 `%TEMP%\op-selfcheck.enable` 파일이 있으면, 게임 중 3초마다 이 값을 FFXIV_ACT_Plugin 값과 비교해
+1분마다 `%TEMP%\op-selfcheck.log`에 필드별로 다른 비율을 남깁니다(`BROKEN?` = 절반 넘게 다름). 포크 OverlayPlugin도 같은 파일로
+자기 메모리 읽기를 비교해 같은 로그에 남깁니다(OverlayPlugin `tools/README.md`). 시그니처 점검은 OverlayPlugin `tools/PatchCheck`입니다.
