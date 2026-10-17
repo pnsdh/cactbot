@@ -1,0 +1,3 @@
+# Results (screenshots, traces, measurements) and this folder's own packages.
+out/
+node_modules/

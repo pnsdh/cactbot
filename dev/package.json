@@ -1,0 +1,14 @@
+{
+  "name": "cactbot-dev-tools",
+  "private": true,
+  "description": "Fork's development tools (not shipped): measurements and checks against dist/",
+  "type": "module",
+  "scripts": {
+    "config-tests": "node config-tests/run.mjs",
+    "ended-check": "node ended-check.mjs",
+    "layer-area": "node layer-area.mjs"
+  },
+  "dependencies": {
+    "puppeteer-core": "^23.11.1"
+  }
+}
