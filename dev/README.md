@@ -36,6 +36,9 @@ npm install          # 이 폴더 전용 패키지(puppeteer-core)
 | `fx-compare.mjs capture <이름> [page] [--chrome95]`, `fx-compare.mjs diff <A> <B>` | cbkr 효과(착지, 다음 막대로 넘어감, 시전 시작)를 같은 시점에 멈춰 찍고, 두 빌드를 픽셀 비교한 표를 만듭니다. |
 | `layer-area.mjs [page]` | 브라우저가 만든 합성 층의 개수와 면적(GPU 합성 비용의 지표). |
 | `ended-check.mjs [page]` | 막대의 남은 시간 글자가 0.1초 단위로 빠짐없이 바뀌는지, 끝 표시가 얼마나 늦는지. |
+| `timeline-edits-e2e.mjs --log <로그> --from <줄> --to <줄> --zone <ID> --edits <json>` | 실제 전투 재생에 타임라인 편집(문구·숨기기·강조색·직업별·추가 항목)을 넣고, 직업마다 보여야 할 것/안 보여야 할 것을 확인합니다. 예시: `examples/timeline-edits-1368.json`. |
+| `oopsy-replay.mjs <로그> [--sets <파일들>] [--grep] [--print] [--me]` | 로그를 웁시 실수 감지에 그대로 통과시켜 잡힌 실수를 셉니다. 빌드 없이 소스로 돌므로 저장소 루트에서 `node --loader=ts-node/esm dev/oopsy-replay.mjs ...`. |
+| `oopsy-candidates.py "<로그 glob>" --zones 52F=r12s,...` | 피할 수 있는 적 기술(맞는 사람이 거의 없는 기술) 후보를 찾습니다. 새 레이드가 나올 때 웁시 실수 목록을 만드는 데 씁니다. `--names`에 영어 Action.csv를 주면 영어 이름도 붙습니다. |
 | `config-tests/run.mjs` | 설정 화면 회귀 시험 전부(전투 페이지, 툴팁, 기본값 버튼 등). `layout-sweep.mjs`는 여러 너비의 배치 점검 (따로 실행). |
 
 예:
