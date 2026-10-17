@@ -354,12 +354,14 @@ export default class TimerBar extends HTMLElement {
     // override the bg/fg attribute colors, which layout() passes in via --timerbar-*-attr.
     // draw() also sets --timerbar-progress (0-1, the filled fraction) on the root part.
     // timerbar-frame is an empty layer under the others (e.g. for borders a skin animates on
-    // their own).  The runner (hidden unless a skin shows timerbar-runner-track) moves with the
-    // progress through animations the compositor runs, like the fill: in place at 1, and at 0
-    // translated by its own width away from the side the fill is anchored to.  Its last item,
-    // timerbar-runner-e, has an opacity equal to the progress, and timerbar-runner-fixed moves
-    // the other way so it stays in place (shown where the runner is, if it clips it) (see
-    // syncRunner); timerbar-runner-fixed-inner, inside it, is free for a skin to animate.
+    // their own), and timerbar-fx-a to timerbar-fx-d, in that order, are more under it (e.g. for
+    // effects a skin fades or moves as a whole).  The runner (hidden unless a skin shows
+    // timerbar-runner-track) moves with the progress through animations the compositor runs,
+    // like the fill: in place at 1, and at 0 translated by its own width away from the side the
+    // fill is anchored to.  Its last item, timerbar-runner-e, has an opacity equal to the
+    // progress, and timerbar-runner-fixed moves the other way so it stays in place (shown where
+    // the runner is, if it clips it) (see syncRunner); timerbar-runner-fixed-inner, inside it,
+    // is free for a skin to animate.
     root.innerHTML = `
       <style>
         .timerbar-root {
@@ -386,10 +388,12 @@ export default class TimerBar extends HTMLElement {
         .timerbar-runner-track {
           display: none;
         }
-        .timerbar-frame {
+        .timerbar-frame,
+        .timerbar-fx {
           border-radius: inherit;
         }
         .timerbar-frame,
+        .timerbar-fx,
         .timerbar-runner-track,
         .timerbar-runner,
         .timerbar-runner-item {
@@ -457,6 +461,10 @@ export default class TimerBar extends HTMLElement {
         }
       </style>
       <div id="root" class="timerbar-root" part="timerbar-root">
+        <div class="timerbar-fx" part="timerbar-fx-a"></div>
+        <div class="timerbar-fx" part="timerbar-fx-b"></div>
+        <div class="timerbar-fx" part="timerbar-fx-c"></div>
+        <div class="timerbar-fx" part="timerbar-fx-d"></div>
         <div class="timerbar-frame" part="timerbar-frame"></div>
         <div id="bg" class="timerbar-bg" part="timerbar-bg"></div>
         <div id="fg" class="timerbar-fg" part="timerbar-fg"></div>
