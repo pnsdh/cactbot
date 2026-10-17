@@ -39,6 +39,7 @@ npm install          # 이 폴더 전용 패키지(puppeteer-core)
 | `timeline-edits-e2e.mjs --log <로그> --from <줄> --to <줄> --zone <ID> --edits <json>` | 실제 전투 재생에 타임라인 편집(문구·숨기기·강조색·직업별·추가 항목)을 넣고, 직업마다 보여야 할 것/안 보여야 할 것을 확인합니다. 예시: `examples/timeline-edits-1368.json`. |
 | `oopsy-replay.mjs <로그> [--sets <파일들>] [--grep] [--print] [--me]` | 로그를 웁시 실수 감지에 그대로 통과시켜 잡힌 실수를 셉니다. 빌드 없이 소스로 돌므로 저장소 루트에서 `node --loader=ts-node/esm dev/oopsy-replay.mjs ...`. |
 | `oopsy-candidates.py "<로그 glob>" --zones 52F=r12s,...` | 피할 수 있는 적 기술(맞는 사람이 거의 없는 기술) 후보를 찾습니다. 새 레이드가 나올 때 웁시 실수 목록을 만드는 데 씁니다. `--names`에 영어 Action.csv를 주면 영어 이름도 붙습니다. |
+| `patch-health.mjs <로그> [--baseline <패치 전 로그>]` | 게임 패치 뒤 첫 플레이 로그로 OverlayPlugin 자체 로그 줄(257~274)을 검진합니다: 줄 종류별로 나오는지, 필드 수와 값이 정상인지(예: 초읽기 결과 00, 위치·방향 범위), 함께 나와야 할 게임 줄과의 비율. opcode가 틀리면 줄이 끊기고, 패킷 구조가 바뀌면 값이 깨집니다. 저장소 루트에서 `node --loader=ts-node/esm dev/patch-health.mjs ...`. 이름 등 로그 내용은 출력하지 않습니다. |
 | `config-tests/run.mjs` | 설정 화면 회귀 시험 전부(전투 페이지, 툴팁, 기본값 버튼 등). `layout-sweep.mjs`는 여러 너비의 배치 점검 (따로 실행). |
 
 예:
