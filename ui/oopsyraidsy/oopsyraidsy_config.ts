@@ -395,7 +395,8 @@ const templateOptions: OptionsTemplate = {
           'cbkr': 'cbkr',
         },
       },
-      default: 'default',
+      // Fork: the fork's own skin.
+      default: 'cbkr',
     },
     {
       id: 'NumLiveListItemsInCombat',
@@ -469,15 +470,16 @@ const templateOptions: OptionsTemplate = {
           'Right Side': 'right',
           '❌ Disabled': 'disabled',
         },
+        // Fork: the same values in every language (oopsy knows only these).
         de: {
-          'Left Side': 'links',
-          'Right Side': 'rechts',
-          '❌ Disabled': 'deaktiviert',
+          'Linke Seite': 'left',
+          'Rechte Seite': 'right',
+          '❌ Deaktiviert': 'disabled',
         },
         fr: {
-          'Côté gauche': 'gauche',
-          'Côté droit': 'droite',
-          '❌ Disabled': 'désactivé',
+          'Côté gauche': 'left',
+          'Côté droit': 'right',
+          '❌ Désactivé': 'disabled',
         },
         ja: {
           '左側': 'left',

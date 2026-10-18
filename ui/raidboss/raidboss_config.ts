@@ -2598,7 +2598,8 @@ const templateOptions: OptionsTemplate = {
           'cbkr': 'cbkr',
         },
       },
-      default: 'default',
+      // Fork: the fork's own skin.
+      default: 'cbkr',
     },
     {
       id: 'TimelineEnabled',
