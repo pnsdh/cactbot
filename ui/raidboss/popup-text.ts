@@ -371,7 +371,7 @@ class TriggerOutputProxy {
           const ttsTemplate = target.ttsStrings[name];
           if (ttsTemplate !== undefined && ttsTemplate !== '') {
             const tts = target.getReplacement(ttsTemplate, params, name, id);
-            if (tts !== undefined && tts !== str) {
+            if (tts !== undefined && tts !== str && str.trim() !== '') {
               let map = ttsSubstitutions.get(target.trigger);
               if (!map)
                 ttsSubstitutions.set(target.trigger, map = new Map<string, string>());
@@ -600,6 +600,8 @@ export class PopupText {
   protected ttsSay: (text: string, severity?: 'alarm' | 'alert' | 'info') => void;
   // Fork: the OverlayPlugin's TTS fetches a zone's alerts ahead (see _prepareTts).
   protected ttsCanPrepare = false;
+  // The zone's timeline triggers (not in triggers/netTriggers), for _prepareTts.
+  protected ttsTimelineTriggers: LooseTrigger[] = [];
   protected partyTracker: PartyTracker;
   protected readonly kMaxRowsOfText = 2;
   // Fork: players kept per sound (see _playAudioFile).
@@ -1043,6 +1045,7 @@ export class PopupText {
     this.triggers = allTriggers.filter((x) => x.localRegex !== undefined);
     this.netTriggers = allTriggers.filter((x) => x.localNetRegex !== undefined);
     const timelineTriggers = allTriggers.filter(isRaidbossLooseTimelineTrigger);
+    this.ttsTimelineTriggers = timelineTriggers;
 
     this.Reset();
     this._prepareTts();
@@ -1065,7 +1068,8 @@ export class PopupText {
   // output strings with the user's edits and TTS texts, and fixed texts), sent for a network
   // voice to fetch ahead, so the first time plays at once too.
   _prepareTts(): void {
-    if (!this.ttsCanPrepare || this.options.IsRemoteRaidboss)
+    // Nothing is spoken without audio (see _onTriggerInternalHelperDefaults).
+    if (!this.ttsCanPrepare || this.options.IsRemoteRaidboss || !this.options.AudioAllowed)
       return;
     const texts = new Set<string>();
     const seen = new Set<unknown>();
@@ -1085,7 +1089,37 @@ export class PopupText {
       const shown = transform ? this.options.TransformText(t.trim()) ?? t.trim() : t.trim();
       texts.add(this.options.TransformTts(this._ttsCleanup(shown)));
     };
-    for (const trigger of [...this.triggers, ...this.netTriggers]) {
+    // What a response sets as its output strings (as the config page reads them: called with
+    // an output that only records them).
+    const responseStrings = (trigger: ProcessedTrigger): { [key: string]: unknown } => {
+      const response = trigger.response;
+      if (typeof response !== 'function')
+        return {};
+      let strings: { [key: string]: unknown } = {};
+      const recorder = new Proxy({}, {
+        set(_t, property, value): boolean {
+          if (property === 'responseOutputStrings' && typeof value === 'object' && value !== null)
+            strings = value as { [key: string]: unknown };
+          return true;
+        },
+        get() {
+          return () => '';
+        },
+      });
+      const noMatches: Matches = {};
+      try {
+        response(this.data, noMatches, recorder as Output);
+      } catch {
+        // A response that needs real matches: nothing to fetch ahead.
+      }
+      return strings;
+    };
+    const triggers: ProcessedTrigger[] = [
+      ...this.triggers,
+      ...this.netTriggers,
+      ...this.ttsTimelineTriggers as ProcessedTrigger[],
+    ];
+    for (const trigger of triggers) {
       if (seen.has(trigger))
         continue;
       seen.add(trigger);
@@ -1098,12 +1132,15 @@ export class PopupText {
         trigger.triggerSetAutoConfig?.SpokenAlertsEnabled ?? this.options.SpokenAlertsEnabled;
       if (!spoken)
         continue;
-      for (const [key, value] of Object.entries(trigger.outputStrings ?? {})) {
+      const strings = { ...responseStrings(trigger), ...trigger.outputStrings };
+      for (const [key, value] of Object.entries(strings)) {
         const tts = config?.TtsStrings?.[key];
+        // An edit left blank is the default again (as at runtime).
+        const edited = config?.OutputStrings?.[key];
         if (tts !== undefined && tts !== '')
           add(textOf(tts), false);
         else
-          add(textOf(config?.OutputStrings?.[key] ?? value), true);
+          add(textOf(edited !== undefined && edited !== '' ? edited : value), true);
       }
       for (const field of [trigger.tts, trigger.alarmText, trigger.alertText, trigger.infoText]) {
         if (typeof field !== 'function')
@@ -1653,11 +1690,18 @@ export class PopupText {
 
     // Fork: the user's TTS text for each output string the text was made from.
     const substitutions = ttsSubstitutions.get(triggerHelper.trigger);
-    if (substitutions && triggerHelper.ttsText !== undefined) {
-      let text = triggerHelper.ttsText;
-      for (const [shown, spoken] of substitutions)
-        text = text.split(shown).join(spoken);
-      triggerHelper.ttsText = text;
+    // One pass, the longest first: a text made of other outputs (e.g. "${inOut} + ${spread}")
+    // is replaced whole before its parts, and what was put in is not replaced again.
+    if (substitutions && substitutions.size > 0 && triggerHelper.ttsText !== undefined) {
+      const keys = [...substitutions.keys()].sort((a, b) => b.length - a.length);
+      const pattern = new RegExp(
+        keys.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'),
+        'g',
+      );
+      triggerHelper.ttsText = triggerHelper.ttsText.replace(
+        pattern,
+        (m) => substitutions.get(m) ?? m,
+      );
     }
   }
 

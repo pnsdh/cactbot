@@ -1172,7 +1172,10 @@ class RaidbossConfigurator {
           const ttsInput = document.createElement('input');
           ttsDiv.appendChild(ttsInput);
           ttsInput.type = 'text';
-          ttsInput.placeholder = template;
+          // Empty, TTS says what the screen does: the edited text, or the default.
+          const shownText = () => input.value !== '' ? input.value : template;
+          ttsInput.placeholder = shownText();
+          input.addEventListener('input', () => ttsInput.placeholder = shownText());
           ttsInput.value = this.base.getStringOption(
             'raidboss',
             [kOptionKeys.triggers, trigId, kOptionKeys.ttsStrings, key],

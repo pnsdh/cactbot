@@ -87,6 +87,12 @@ export class Resolver {
 export type LineRegExpCache = Map<LineEvent, Map<ProcessedTrigger, RegExpExecArray | false>>;
 
 export default class PopupTextAnalysis extends StubbedPopupText {
+  // Fork: an emulated fight fetches nothing ahead (it would replace the live overlay's list in
+  // the OverlayPlugin's TTS).
+  override _prepareTts(): void {
+    // Nothing.
+  }
+
   triggerResolvers: Resolver[] = [];
   currentResolver?: Resolver;
 

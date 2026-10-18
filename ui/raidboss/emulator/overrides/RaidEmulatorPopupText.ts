@@ -25,6 +25,12 @@ type ScheduledTrigger = {
 };
 
 export default class RaidEmulatorPopupText extends StubbedPopupText {
+  // Fork: an emulated fight fetches nothing ahead (it would replace the live overlay's list in
+  // the OverlayPlugin's TTS).
+  override _prepareTts(): void {
+    // Nothing.
+  }
+
   $popupTextContainerWrapper: HTMLElement;
   emulatedOffset: number;
   emulator?: RaidEmulator;
