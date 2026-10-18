@@ -9,6 +9,7 @@ import {
 } from '../../resources/player_override';
 import Regexes from '../../resources/regexes';
 import { translateRegex, translateRegexBuildParam } from '../../resources/translations';
+import { selectVariants } from '../../resources/trigger_set_variants';
 import UserConfig, { ConfigValue } from '../../resources/user_config';
 import Util from '../../resources/util';
 import ZoneId from '../../resources/zone_id';
@@ -773,9 +774,11 @@ export class PopupText {
     this.data.currentHP = e.detail.currentHP;
   }
 
-  ProcessDataFiles(files: RaidbossFileData): void {
+  ProcessDataFiles(allFiles: RaidbossFileData): void {
     this.triggerSets = [];
     this.triggerSetsById = {};
+    // Fork: the fork's own version of a fight or upstream's, as chosen.
+    const files = selectVariants(allFiles, (id) => this.options.TriggerSetVariant[id] ?? 'custom');
 
     for (const [filename, json] of Object.entries(files)) {
       if (!filename.endsWith('.js') && !filename.endsWith('.ts'))

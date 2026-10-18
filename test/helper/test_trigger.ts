@@ -98,6 +98,10 @@ const testTriggerFile = (file: string, info: TriggerSetInfo) => {
       assert.fail('has an undefined id somehow');
       return;
     }
+    // Fork: the fork's own version of a fight (ui/raidboss/data/fork/) shares upstream's id; one
+    // of the two is loaded (resources/trigger_set_variants.ts).
+    if (/[\\/]raidboss[\\/]data[\\/]fork[\\/]/.test(file))
+      return;
     const prevFile = info.triggerSetId[id];
     if (prevFile === undefined) {
       info.triggerSetId[id] = file;

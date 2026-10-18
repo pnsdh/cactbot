@@ -1,4 +1,5 @@
 import { Lang } from '../../resources/languages';
+import { TriggerSetVariants } from '../../resources/trigger_set_variants';
 import UserConfig, { ConfigValue } from '../../resources/user_config';
 import { BaseOptions, RaidbossData } from '../../types/data';
 import { Matches } from '../../types/net_matches';
@@ -63,6 +64,8 @@ type RaidbossNonConfigOptions = {
   PerTriggerOptions: PerTriggerOptions;
   PerZoneTimelineConfig: PerZoneTimelineConfig;
   TriggerSetConfig: TriggerSetConfig;
+  // Fork: per fight, the fork's own version or upstream's (resources/trigger_set_variants.ts).
+  TriggerSetVariant: TriggerSetVariants;
   Triggers: LooseTriggerSet[];
   PlayerNameOverride?: string;
   // Fork: the player's job as timelines load, for timeline entry edits by job (set by popup-text).
@@ -93,6 +96,8 @@ const defaultRaidbossNonConfigOptions: RaidbossNonConfigOptions = {
   PerTriggerOptions: {},
   PerZoneTimelineConfig: {},
   TriggerSetConfig: {},
+  // Fork: per fight, the fork's own triggers and timeline or upstream's (trigger_set_variants.ts).
+  TriggerSetVariant: {},
 
   Triggers: [],
 
