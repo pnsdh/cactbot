@@ -106,6 +106,7 @@
     <Compile Include="FFXIVProcessIntl.cs" />
     <Compile Include="JSEvents.cs" />
     <Compile Include="NativeMethods.cs" />
+    <Compile Include="SelfCheck.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

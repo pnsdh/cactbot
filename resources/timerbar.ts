@@ -7,6 +7,10 @@ import { UnreachableCode } from './not_reached';
 const kMinProgressPixels = 0.5;
 const kMinProgressStep = 0.0005;
 
+// Without progress updates, how long before its end a bar draws every frame again (a few frames at
+// any rate a timer may be late by).
+const kEndFramesMs = 25;
+
 // Bar widths, kept up to date by one observer shared by all bars (reading them every frame
 // would force layout).
 const barWidths = new WeakMap<Element, number>();
@@ -50,6 +54,12 @@ export default class TimerBar extends HTMLElement {
   private readonly _onFrame = (): void => {
     this._frameRequested = false;
     this.advance();
+  };
+  // Without progress updates, the loop waits for the next shown change instead (nextChangeMs).
+  private _wakeTimer?: number;
+  private readonly _onWake = (): void => {
+    this._wakeTimer = undefined;
+    window.requestAnimationFrame(this._onFrame);
   };
   // What draw() last wrote, so that frames which wouldn't change anything skip the DOM writes
   // (and the style recalc, layout and repaint they cause).
@@ -344,12 +354,14 @@ export default class TimerBar extends HTMLElement {
     // override the bg/fg attribute colors, which layout() passes in via --timerbar-*-attr.
     // draw() also sets --timerbar-progress (0-1, the filled fraction) on the root part.
     // timerbar-frame is an empty layer under the others (e.g. for borders a skin animates on
-    // their own).  The runner (hidden unless a skin shows timerbar-runner-track) moves with the
-    // progress through animations the compositor runs, like the fill: in place at 1, and at 0
-    // translated by its own width away from the side the fill is anchored to.  Its last item,
-    // timerbar-runner-e, has an opacity equal to the progress, and timerbar-runner-fixed moves
-    // the other way so it stays in place (shown where the runner is, if it clips it) (see
-    // syncRunner).
+    // their own), and timerbar-fx-a to timerbar-fx-d, in that order, are more under it (e.g. for
+    // effects a skin fades or moves as a whole).  The runner (hidden unless a skin shows
+    // timerbar-runner-track) moves with the progress through animations the compositor runs,
+    // like the fill: in place at 1, and at 0 translated by its own width away from the side the
+    // fill is anchored to.  Its last item, timerbar-runner-e, has an opacity equal to the
+    // progress, and timerbar-runner-fixed moves the other way so it stays in place (shown where
+    // the runner is, if it clips it) (see syncRunner); timerbar-runner-fixed-inner, inside it,
+    // is free for a skin to animate.
     root.innerHTML = `
       <style>
         .timerbar-root {
@@ -376,10 +388,12 @@ export default class TimerBar extends HTMLElement {
         .timerbar-runner-track {
           display: none;
         }
-        .timerbar-frame {
+        .timerbar-frame,
+        .timerbar-fx {
           border-radius: inherit;
         }
         .timerbar-frame,
+        .timerbar-fx,
         .timerbar-runner-track,
         .timerbar-runner,
         .timerbar-runner-item {
@@ -447,12 +461,18 @@ export default class TimerBar extends HTMLElement {
         }
       </style>
       <div id="root" class="timerbar-root" part="timerbar-root">
+        <div class="timerbar-fx" part="timerbar-fx-a"></div>
+        <div class="timerbar-fx" part="timerbar-fx-b"></div>
+        <div class="timerbar-fx" part="timerbar-fx-c"></div>
+        <div class="timerbar-fx" part="timerbar-fx-d"></div>
         <div class="timerbar-frame" part="timerbar-frame"></div>
         <div id="bg" class="timerbar-bg" part="timerbar-bg"></div>
         <div id="fg" class="timerbar-fg" part="timerbar-fg"></div>
         <div id="runnertrack" class="timerbar-runner-track" part="timerbar-runner-track">
           <div id="runner" class="timerbar-runner" part="timerbar-runner">
-            <div id="runnerfixed" class="timerbar-runner-item" part="timerbar-runner-fixed"></div>
+            <div id="runnerfixed" class="timerbar-runner-item" part="timerbar-runner-fixed">
+              <div class="timerbar-runner-item" part="timerbar-runner-fixed-inner"></div>
+            </div>
             <div class="timerbar-runner-item" part="timerbar-runner-a"></div>
             <div class="timerbar-runner-item" part="timerbar-runner-b"></div>
             <div class="timerbar-runner-item" part="timerbar-runner-c"></div>
@@ -494,6 +514,7 @@ export default class TimerBar extends HTMLElement {
     this._connected = false;
     getBarResizeObserver().unobserve(this.rootElement);
     this.cancelRunner();
+    this.cancelWake();
   }
 
   attributeChangedCallback(name: string, _oldValue: string | number, newValue: string): void {
@@ -525,18 +546,24 @@ export default class TimerBar extends HTMLElement {
     } else if (name === 'lefttext') {
       const update = newValue !== this._leftText && this._connected;
       this._leftText = newValue;
-      if (update)
+      if (update) {
         this.updateText();
+        this.rewake();
+      }
     } else if (name === 'centertext') {
       const update = newValue !== this._centerText && this._connected;
       this._centerText = newValue;
-      if (update)
+      if (update) {
         this.updateText();
+        this.rewake();
+      }
     } else if (name === 'righttext') {
       const update = newValue !== this._rightText && this._connected;
       this._rightText = newValue;
-      if (update)
+      if (update) {
         this.updateText();
+        this.rewake();
+      }
     } else if (name === 'hideafter') {
       this._hideAfter = Math.max(this.hideafter ?? 0, 0);
       if (this.value === 0) {
@@ -719,6 +746,48 @@ export default class TimerBar extends HTMLElement {
     right.style.cssText += s;
   }
 
+  // Without the per-frame progress writes, a bar only changes when a shown time does (0.1s steps,
+  // where its rounding changes) or when it ends: the time until then, or undefined to keep
+  // drawing every frame.
+  private nextChangeMs(elapsedSec: number): number | undefined {
+    const texts = [this._leftText, this._centerText, this._rightText];
+    if (this._progressUpdates || texts.includes('percent'))
+      return undefined;
+    const remainSec = this._duration - elapsedSec;
+    // Every frame of its last moments, so `ended` comes on the frame the bar reaches 0 (skins
+    // start effects on it) rather than a timer and a frame later.
+    const untilEndFramesMs = remainSec * 1000 - kEndFramesMs;
+    if (untilEndFramesMs <= 0)
+      return undefined;
+    let next = Infinity;
+    if (texts.includes('remain') || texts.includes('duration'))
+      next = Math.min(next, remainSec - (Math.ceil(remainSec * 10 - 0.5) - 0.5) / 10);
+    if (texts.includes('elapsed'))
+      next = Math.min(next, (Math.floor(elapsedSec * 10 + 0.5) + 0.5) / 10 - elapsedSec);
+    // Exactly on a step (e.g. 3.75s left), the formulas give the step after it: that one is now.
+    // (Infinity: no time shown, nothing changes until the end.)
+    if (next !== Infinity && next > 0.1 - 1e-6)
+      next = 0;
+    // Just past it, then on the next frame.
+    return Math.min(Math.max(next, 0) * 1000 + 1, untilEndFramesMs);
+  }
+
+  // A text that changes what is shown: waits for its own next change from now.
+  private rewake(): void {
+    if (this._wakeTimer === undefined)
+      return;
+    this.cancelWake();
+    this.advance();
+  }
+
+  private cancelWake(): void {
+    if (this._wakeTimer === undefined)
+      return;
+    window.clearTimeout(this._wakeTimer);
+    this._wakeTimer = undefined;
+    this._frameRequested = false;
+  }
+
   setvalue(remainSec: number): void {
     const elapsedSec = Math.max(0, this._duration - remainSec);
     this._start = Date.now() - elapsedSec * 1000;
@@ -755,10 +824,18 @@ export default class TimerBar extends HTMLElement {
         this._hideTimer = window.setTimeout(this.hide.bind(this), this._hideAfter * 1000);
       else if (this._hideAfter === 0)
         this.hide();
-    } else if (!this._frameRequested) {
-      // Timer not completed, request another animation frame
-      this._frameRequested = true;
-      window.requestAnimationFrame(this._onFrame);
+    } else {
+      // A new time may change when the next change is.
+      this.cancelWake();
+      if (!this._frameRequested) {
+        // Timer not completed, request another animation frame
+        this._frameRequested = true;
+        const wait = this.nextChangeMs(elapsedSec);
+        if (wait === undefined)
+          window.requestAnimationFrame(this._onFrame);
+        else
+          this._wakeTimer = window.setTimeout(this._onWake, wait);
+      }
     }
 
     this.draw();

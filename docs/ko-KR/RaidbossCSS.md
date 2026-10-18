@@ -103,7 +103,9 @@ cactbot이 막대 시간을 맞출 때 애니메이션(Web Animations)을 만들
 * 러너 안의 `timerbar-runner-a`~`timerbar-runner-e`는 러너와 함께 움직입니다. 기본 크기는 러너와 같습니다.
   `timerbar-runner-e`는 투명도가 진행도와 같습니다.
 * `timerbar-runner-fixed`는 러너와 반대로 움직여 제자리에 있습니다. 러너에 `overflow: hidden`을 주면 러너가 지나간 부분만 드러납니다.
+  그 안의 `timerbar-runner-fixed-inner`는 스킨이 따로 움직일 수 있는 빈 요소입니다(예: 흐르는 줄무늬를 `transform`으로).
 * `timerbar-frame`은 다른 요소보다 아래에 깔리는 빈 층입니다. 테두리처럼 따로 애니메이션할 장식에 씁니다.
+* `timerbar-fx-a`~`timerbar-fx-d`는 그보다 더 아래(이 순서로 위로 쌓임)에 깔리는 빈 층입니다. 효과를 한 번 그려 두고 투명도나 `transform`만 움직이면 막대 전체를 매 프레임 다시 그리지 않습니다.
 
 진행도에 맞춰 움직이는 표식은 러너의 오른쪽 끝에 두면 됩니다.
 
@@ -140,8 +142,9 @@ cactbot이 막대 시간을 맞출 때 애니메이션(Web Animations)을 만들
 | `timerbar-bg` | 배경 |
 | `timerbar-fg` | 채움 |
 | `timerbar-frame` | 맨 아래 빈 층 ([러너](#러너) 참고) |
+| `timerbar-fx-a`~`timerbar-fx-d` | `timerbar-frame` 아래의 빈 층 ([러너](#러너) 참고) |
 | `timerbar-runner-track`, `timerbar-runner` | 러너 영역과 러너 (기본은 숨김) |
-| `timerbar-runner-a`~`timerbar-runner-e`, `timerbar-runner-fixed` | 러너 안의 요소 |
+| `timerbar-runner-a`~`timerbar-runner-e`, `timerbar-runner-fixed`, `timerbar-runner-fixed-inner` | 러너 안의 요소 |
 | `text-container` | 글자 영역 (왼쪽·가운데·오른쪽 각각) |
 | `text` | 글자 (왼쪽·가운데·오른쪽 공통) |
 | `timerbar-lefttext` | 왼쪽 글자 (기술 이름) |

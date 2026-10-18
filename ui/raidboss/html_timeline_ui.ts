@@ -320,6 +320,9 @@ export class HTMLTimelineUI extends TimelineUI {
   }
 
   public override OnAddTimer(fightNow: number, e: Event, channeling: boolean): void {
+    // Fork: a hidden timeline (timeline=0) makes no bars, as each draws every frame.
+    if (!this.options.TimelineEnabled)
+      return;
     const parked = this.parkedBars.get(e.id);
     const reuse = parked !== undefined && parked.channeling === channeling &&
       this.activeBars[e.id] === undefined && parked.bar.parentElement !== null;

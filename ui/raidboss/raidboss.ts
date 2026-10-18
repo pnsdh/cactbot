@@ -3,6 +3,7 @@ import { addRemotePlayerSelectUI } from '../../resources/player_override';
 import UserConfig from '../../resources/user_config';
 
 import raidbossFileData from './data/raidboss_manifest.txt';
+import { startLatencyProbe } from './dev_latency_probe';
 import { HTMLTimelineUI } from './html_timeline_ui';
 import { PopupText, PopupTextGenerator } from './popup-text';
 import defaultOptions from './raidboss_options';
@@ -93,6 +94,7 @@ UserConfig.getUserConfigLocation('raidboss', defaultOptions, () => {
   const timelineController = new TimelineController(options, timelineUI, raidbossFileData);
   const timelineLoader = new TimelineLoader(timelineController);
   const popupText = new PopupText(options, timelineLoader, raidbossFileData);
+  popupText.PreloadSounds();
 
   // Connect the timelines to the popup text, if alerts are desired.
   if (options.AlertsEnabled)
@@ -105,4 +107,8 @@ UserConfig.getUserConfigLocation('raidboss', defaultOptions, () => {
   addOverlayListener('LogLine', (e) => {
     timelineController.OnNetLog(e);
   });
+
+  // Fork: for development only (see dev_latency_probe.ts).
+  if (params.get('devProbe') === 'latency')
+    startLatencyProbe(options.AlertsEnabled ? 'alerts' : 'timeline');
 });

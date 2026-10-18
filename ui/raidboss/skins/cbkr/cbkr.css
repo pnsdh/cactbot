@@ -357,10 +357,7 @@
    runs without restyling the bar every frame. */
 @supports selector(:has(*)) {
   .timer-bar.next timer-bar,
-  .timer-bar.next.soon timer-bar {
-    animation: cbkr-promote 650ms cubic-bezier(0.16, 1, 0.3, 1);
-  }
-
+  .timer-bar.next.soon timer-bar,
   .timer-bar.soon timer-bar {
     animation: none;
   }
@@ -376,10 +373,25 @@
   .timer-bar.channeling timer-bar,
   .timer-bar.channeling.soon timer-bar,
   .timer-bar.next.channeling.soon timer-bar {
-    animation: cbkr-cast-in 260ms ease-out;
+    animation: none;
   }
 
-  .timer-bar.channeling timer-bar::part(timerbar-runner-fixed) {
+  /* The stripes on a layer one stripe wider that moves by a stripe, rather than a moving
+     background, which is painted again every frame (#timeline: over the rule below). */
+  #timeline .timer-bar.channeling timer-bar::part(timerbar-runner-fixed) {
+    background: none;
+  }
+
+  .timer-bar.channeling timer-bar::part(timerbar-runner-fixed-inner) {
+    left: -11.31px;
+    width: calc(100% + 11.31px);
+    background:
+      repeating-linear-gradient(
+        -45deg,
+        rgb(var(--cbkr-cast) / 30%) 0 4px,
+        rgb(var(--cbkr-cast) / 13%) 4px 8px
+      );
+    background-size: 11.31px 100%;
     animation: cbkr-stripes-flow 1.6s linear infinite;
   }
 
@@ -588,6 +600,110 @@
   animation: cbkr-bar-exit 460ms forwards;
 }
 
+/* ===== Effects where ::part() animations run =====
+   The landing, promotion and cast fade-in above animate custom properties of the whole bar, which
+   restyles and repaints it every frame.  Here each effect is drawn once on a layer of its own
+   (timerbar-fx-a to -d, under the lane) that only fades or moves, which the compositor runs; the
+   ring keeps its drawing (scaling would thin it) but animates on its own part only, and so does the
+   diamond's growth. */
+@supports selector(:has(*)) {
+  .timer-bar timer-bar {
+    transition: font-size 320ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .timer-bar.next timer-bar {
+    transition: font-size 210ms cubic-bezier(0.4, 0, 0.2, 1) 250ms;
+  }
+
+  .timer-bar timer-bar::part(timerbar-runner-d),
+  .timer-bar timer-bar::part(timerbar-runner-e) {
+    /* stylelint-disable-next-line custom-property-no-missing-var-function */
+    transition: --cbkr-d 180ms ease-out;
+  }
+
+  .timer-bar timer-bar::part(timerbar-root),
+  #timeline .timer-bar timer-bar[ended]::part(timerbar-root) {
+    --cbkr-end-fx: none;
+
+    box-shadow: none;
+  }
+
+  .timer-bar timer-bar::part(timerbar-fx-a),
+  .timer-bar timer-bar::part(timerbar-fx-b),
+  .timer-bar timer-bar::part(timerbar-fx-c),
+  .timer-bar timer-bar::part(timerbar-fx-d) {
+    opacity: 0;
+  }
+
+  /* Landing: the time column's tint, */
+  .timer-bar timer-bar::part(timerbar-fx-a) {
+    left: auto;
+    right: 0;
+    width: var(--cbkr-time-w);
+    background: rgb(var(--cbkr-c));
+  }
+
+  /* the band of light from the now line, */
+  .timer-bar timer-bar::part(timerbar-fx-b) {
+    left: calc(100% - var(--cbkr-time-w) - 26px);
+    width: 30px;
+    background: linear-gradient(90deg, transparent, rgb(var(--cbkr-h)) 26px, transparent);
+  }
+
+  /* and the panel's flash. */
+  .timer-bar timer-bar::part(timerbar-fx-c) {
+    box-shadow:
+      inset 0 0 0.5px 2px rgb(var(--cbkr-h) / 95%),
+      inset 0 0 22px rgb(var(--cbkr-c) / 45%);
+  }
+
+  /* Promotion's pop. */
+  .timer-bar timer-bar::part(timerbar-fx-d) {
+    box-shadow:
+      inset 0 0 0.5px 2px rgb(var(--cbkr-h) / 95%),
+      inset 0 0 16px rgb(var(--cbkr-c) / 45%);
+  }
+
+  .timer-bar.next timer-bar::part(timerbar-fx-d) {
+    animation: cbkr-fx-pop 650ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* Not when promoted while blinking, nor for casts (see above), nor once landed. */
+  .timer-bar.next.soon timer-bar::part(timerbar-fx-d),
+  .timer-bar.channeling timer-bar::part(timerbar-fx-d),
+  #timeline .timer-bar timer-bar[ended]::part(timerbar-fx-d) {
+    animation: none;
+  }
+
+  .timer-bar.channeling timer-bar::part(timerbar-root) {
+    animation: cbkr-fx-cast-in 260ms ease-out;
+  }
+
+  #timeline .timer-bar timer-bar[ended] {
+    animation: none;
+  }
+
+  #timeline .timer-bar timer-bar[ended]::part(timerbar-fx-a) {
+    animation: cbkr-fx-tint 480ms cubic-bezier(0.3, 0.6, 0.3, 1) forwards;
+  }
+
+  #timeline .timer-bar timer-bar[ended]::part(timerbar-fx-b) {
+    animation: cbkr-fx-sweep 480ms cubic-bezier(0.3, 0.6, 0.3, 1) forwards;
+  }
+
+  #timeline .timer-bar timer-bar[ended]::part(timerbar-fx-c) {
+    animation: cbkr-fx-flash 700ms ease-out forwards;
+  }
+
+  #timeline .timer-bar timer-bar[ended]::part(timerbar-runner-b) {
+    animation: cbkr-fx-flare 650ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  }
+
+  #timeline .timer-bar timer-bar[ended]::part(timerbar-runner-c) {
+    animation: cbkr-fx-ring 650ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  }
+}
+
 /* ===== Timeline keyframes ===== */
 @keyframes cbkr-bar-in {
   0% {
@@ -660,8 +776,8 @@
 }
 
 @keyframes cbkr-stripes-flow {
-  0% { background-position: 0 0; }
-  100% { background-position: 11.31px 0; }
+  0% { transform: none; }
+  100% { transform: translateX(11.31px); }
 }
 
 @keyframes cbkr-stripes {
@@ -699,6 +815,56 @@
     --cbkr-sx: 110px;
     --cbkr-sa: 0;
     --cbkr-fa: 0;
+  }
+}
+
+@keyframes cbkr-fx-pop {
+  0%,
+  100% { opacity: 0; }
+  30% { opacity: 1; }
+}
+
+@keyframes cbkr-fx-cast-in {
+  0% { opacity: 0.3; }
+  100% { opacity: 1; }
+}
+
+@keyframes cbkr-fx-tint {
+  0% { opacity: 0.4; }
+  100% { opacity: 0; }
+}
+
+@keyframes cbkr-fx-sweep {
+  0% {
+    opacity: 0.95;
+    transform: none;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateX(110px);
+  }
+}
+
+@keyframes cbkr-fx-flash {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes cbkr-fx-flare {
+  0% { transform: scale(calc(44 / 26)); }
+  100% { transform: scale(calc(24 / 26)); }
+}
+
+@keyframes cbkr-fx-ring {
+  0% {
+    --cbkr-ring: 6px;
+    --cbkr-ring-a: 0.95;
+  }
+
+  100% {
+    --cbkr-ring: 46px;
+    --cbkr-ring-a: 0;
   }
 }
 

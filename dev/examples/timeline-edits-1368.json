@@ -1,0 +1,16 @@
+{
+  "entries": {
+    "2013.1|Banishga IV (raidwide)": { "text": "[리프] 전체 공격", "highlight": "red" },
+    "2021.9|--middle--": { "hide": true },
+    "2035.1|Divine Arrow (castbar)": { "highlight": "blue" }
+  },
+  "jobEntries": { "WAR": { "2035.1|Divine Arrow (castbar)": { "text": "[원초] 화살" } } },
+  "add": [
+    { "time": "2016", "text": "[전사] 메모", "duration": "", "job": "WAR" },
+    { "time": "2019", "text": "공통 메모", "duration": "" }
+  ],
+  "expect": {
+    "WAR": ["+[전사] 메모", "+공통 메모", "+[원초] 화살"],
+    "WHM": ["-[전사] 메모", "+공통 메모", "-[원초] 화살"]
+  }
+}

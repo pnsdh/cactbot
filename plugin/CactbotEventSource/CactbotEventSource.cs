@@ -36,6 +36,8 @@ namespace Cactbot {
     private System.Timers.Timer fast_update_timer_;
     // Held while the |fast_update_timer_| is running.
     private FFXIVProcess ffxiv_;
+    // Fork, for development: see SelfCheck (op-selfcheck.enable).
+    private SelfCheck self_check_;
 
     private string language_ = null;
     private string pc_locale_ = null;
@@ -279,6 +281,8 @@ namespace Cactbot {
       // in case the ffxiv plugin has already sent this event and it never changes again.
       plugin_helper.RegisterProcessChangedHandler(ffxiv_.OnProcessChanged);
       ffxiv_.OnProcessChanged(plugin_helper.GetCurrentProcess());
+      if (SelfCheck.Enabled)
+        self_check_ = new SelfCheck(ffxiv_, plugin_helper);
 
       // Incoming events.
       Advanced_Combat_Tracker.ActGlobals.oFormActMain.OnLogLineRead += OnLogLineRead;
@@ -307,6 +311,7 @@ namespace Cactbot {
 
     public override void Stop() {
       fast_update_timer_.Stop();
+      self_check_?.Dispose();
       Advanced_Combat_Tracker.ActGlobals.oFormActMain.OnLogLineRead -= OnLogLineRead;
     }
 
