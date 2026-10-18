@@ -68,12 +68,57 @@ const kEntryEditsNote = {
   ko: '새 디자인 설정 화면에서 항목별·직업별로 고친 내용 ${n}개도 적용되고 있습니다. 보거나 고치려면 \'설정 화면 스타일\'을 \'새 디자인\'으로 바꿔 주세요.',
 };
 
+// Fork: the label of an output string's TTS text.
+const kTtsStringLabel = {
+  en: 'TTS',
+  de: 'TTS',
+  fr: 'TTS',
+  ja: 'TTS',
+  cn: 'TTS',
+  ko: 'TTS 문구',
+  tc: 'TTS',
+};
+
+// Fork: the button that shows a trigger's TTS texts.
+const kTtsToggle = {
+  show: {
+    en: 'Separate TTS text…',
+    de: 'Eigener TTS-Text…',
+    fr: 'Texte TTS séparé…',
+    ja: 'TTSの文を別に…',
+    cn: '单独设置TTS文本…',
+    ko: 'TTS 문구 따로 쓰기…',
+    tc: '單獨設定TTS文字…',
+  },
+  note: {
+    en: 'What TTS says instead of each text above (same ${params}); empty: the same as the screen.',
+    de: 'Was TTS statt jedes Textes oben sagt (gleiche ${params}); leer: wie auf dem Bildschirm.',
+    fr:
+      'Ce que dit le TTS à la place de chaque texte ci-dessus (mêmes ${params}) ; vide : comme à l’écran.',
+    ja: '上の各文の代わりにTTSが読む文（同じ${params}）。空なら画面と同じ。',
+    cn: 'TTS代替上面每个文本读出的内容（相同的${params}）；留空则与屏幕相同。',
+    ko: '위 각 문구 대신 TTS가 읽을 말 (같은 ${params} 사용). 비우면 화면 문구와 같습니다.',
+    tc: 'TTS代替上面每個文字讀出的內容（相同的${params}）；留空則與螢幕相同。',
+  },
+  hide: {
+    en: 'Hide TTS texts',
+    de: 'TTS-Texte ausblenden',
+    fr: 'Masquer les textes TTS',
+    ja: 'TTSの文を隠す',
+    cn: '隐藏TTS文本',
+    ko: 'TTS 문구 숨기기',
+    tc: '隱藏TTS文字',
+  },
+};
+
 const kOptionKeys = {
   output: 'Output',
   duration: 'Duration',
   beforeSeconds: 'BeforeSeconds',
   delayAdjust: 'DelayAdjust',
   outputStrings: 'OutputStrings',
+  // Fork: TTS's own text for an output string (see TriggerOutputProxy).
+  ttsStrings: 'TtsStrings',
   // folder for all trigger options
   triggers: 'triggers',
   // folder for all trigger set options
@@ -1076,6 +1121,8 @@ class RaidbossConfigurator {
 
         // Add output strings manually
         const outputStrings = trig.outputStrings || {};
+        // Fork: each one's TTS text, shown once asked for (or once one is set).
+        const ttsRows: HTMLElement[] = [];
 
         for (const [key, outputString] of Object.entries(outputStrings)) {
           const optionKey = kOptionKeys.outputStrings;
@@ -1110,6 +1157,67 @@ class RaidbossConfigurator {
           input.oninput = setFunc;
 
           triggerDetails.appendChild(div);
+
+          // Fork: what TTS says for it, if not the same as the screen (same ${params}).
+          const ttsLabel = document.createElement('div');
+          ttsLabel.innerText = `${key} · ${this.base.translate(kTtsStringLabel)}`;
+          ttsLabel.classList.add('trigger-outputstring-label', 'trigger-ttsstring-label');
+          triggerDetails.appendChild(ttsLabel);
+          const ttsDiv = document.createElement('div');
+          ttsDiv.classList.add(
+            'option-input-container',
+            'trigger-outputstring',
+            'trigger-ttsstring',
+          );
+          const ttsInput = document.createElement('input');
+          ttsDiv.appendChild(ttsInput);
+          ttsInput.type = 'text';
+          ttsInput.placeholder = template;
+          ttsInput.value = this.base.getStringOption(
+            'raidboss',
+            [kOptionKeys.triggers, trigId, kOptionKeys.ttsStrings, key],
+            '',
+          );
+          const setTts = () =>
+            this.base.setOption(
+              'raidboss',
+              [kOptionKeys.triggers, trigId, kOptionKeys.ttsStrings, key],
+              ttsInput.value,
+            );
+          ttsInput.onchange = setTts;
+          ttsInput.oninput = setTts;
+          triggerDetails.appendChild(ttsDiv);
+          ttsRows.push(ttsLabel, ttsDiv);
+        }
+
+        if (ttsRows.length > 0) {
+          const anySet = Object.keys(outputStrings).some((key) =>
+            this.base.getStringOption(
+              'raidboss',
+              [kOptionKeys.triggers, trigId, kOptionKeys.ttsStrings, key],
+              '',
+            ) !== ''
+          );
+          // A row of its own after the output strings: the button, and what it is for.
+          const toggleLabel = document.createElement('div');
+          toggleLabel.classList.add('trigger-outputstring-label');
+          const toggle = document.createElement('button');
+          toggle.type = 'button';
+          toggle.classList.add('trigger-tts-toggle');
+          toggleLabel.appendChild(toggle);
+          const toggleDiv = document.createElement('div');
+          toggleDiv.classList.add('trigger-tts-toggle-note');
+          toggleDiv.innerText = this.base.translate(kTtsToggle.note);
+          const show = (shown: boolean) => {
+            for (const row of ttsRows)
+              row.style.display = shown ? '' : 'none';
+            toggle.innerText = this.base.translate(shown ? kTtsToggle.hide : kTtsToggle.show);
+            toggle.dataset.shown = shown ? '1' : '';
+          };
+          toggle.onclick = () => show(toggle.dataset.shown !== '1');
+          show(anySet);
+          triggerDetails.appendChild(toggleLabel);
+          triggerDetails.appendChild(toggleDiv);
         }
 
         const label = document.createElement('div');
@@ -1930,7 +2038,18 @@ const processPerTriggerAutoConfig = (options: RaidbossOptions, savedConfig: Save
     )
       autoConfig[kOptionKeys.outputStrings] = outputStrings;
 
-    if (typeof output === 'string' || duration || outputStrings !== undefined)
+    // Fork: TTS's own texts, the same shape.
+    const ttsStrings = entry[kOptionKeys.ttsStrings];
+    if (
+      typeof ttsStrings === 'object' && !Array.isArray(ttsStrings) &&
+      Object.values(ttsStrings).every((v) => typeof v === 'string')
+    )
+      autoConfig[kOptionKeys.ttsStrings] = ttsStrings as { [key: string]: string };
+
+    if (
+      typeof output === 'string' || duration || outputStrings !== undefined ||
+      autoConfig[kOptionKeys.ttsStrings] !== undefined
+    )
       perTriggerAutoConfig[id] = autoConfig;
   }
 };

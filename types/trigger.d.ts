@@ -108,6 +108,8 @@ export type TriggerAutoConfig = {
   BeforeSeconds?: number;
   DelayAdjust?: number;
   OutputStrings?: OutputStrings;
+  // Fork: what TTS says instead of an output string (same params), by output string key.
+  TtsStrings?: OutputStrings;
   TextAlertsEnabled?: boolean;
   SoundAlertsEnabled?: boolean;
   SpokenAlertsEnabled?: boolean;

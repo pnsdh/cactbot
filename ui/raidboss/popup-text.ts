@@ -276,9 +276,15 @@ const isObject = (x: unknown): x is { [key: string]: unknown } => {
 // User trigger may pass anything as parameters
 type TriggerParams = { [key: string]: unknown };
 
+// Fork: what an output string said on screen and what TTS says instead (the user's TTS text
+// for that output string, same params), for the trigger instance being evaluated (they are
+// evaluated one at a time, see the note in TriggerOutputProxy).
+const ttsSubstitutions = new WeakMap<ProcessedTrigger, Map<string, string>>();
+
 class TriggerOutputProxy {
   public outputStrings: OutputStrings;
   public overrideStrings: OutputStrings = {};
+  public ttsStrings: OutputStrings = {};
   public responseOutputStrings: { [outputName: string]: unknown } = {};
   public unknownValue = '???';
 
@@ -293,6 +299,8 @@ class TriggerOutputProxy {
       const config = perTriggerAutoConfig[trigger.id];
       if (config && config.OutputStrings)
         this.overrideStrings = config.OutputStrings;
+      if (config && config.TtsStrings)
+        this.ttsStrings = config.TtsStrings;
     }
 
     return new Proxy(this, {
@@ -359,6 +367,16 @@ class TriggerOutputProxy {
           if (str === undefined) {
             console.error(`Trigger ${target.trigger.id ?? ''} has missing outputString ${name}.`);
             return target.unknownValue;
+          }
+          const ttsTemplate = target.ttsStrings[name];
+          if (ttsTemplate !== undefined && ttsTemplate !== '') {
+            const tts = target.getReplacement(ttsTemplate, params, name, id);
+            if (tts !== undefined && tts !== str) {
+              let map = ttsSubstitutions.get(target.trigger);
+              if (!map)
+                ttsSubstitutions.set(target.trigger, map = new Map<string, string>());
+              map.set(str, tts);
+            }
           }
           return str;
         };
@@ -1175,6 +1193,8 @@ export class PopupText {
     const triggerPostDelay = () => {
       const promise = this._onTriggerInternalPromise(triggerHelper);
       const triggerPostPromise = () => {
+        // Fork: TTS texts of this instance's output strings only.
+        ttsSubstitutions.get(triggerHelper.trigger)?.clear();
         this._onTriggerInternalSound(triggerHelper);
         this._onTriggerInternalSoundVolume(triggerHelper);
         this._onTriggerInternalResponse(triggerHelper);
@@ -1528,6 +1548,15 @@ export class PopupText {
       } else {
         triggerHelper.ttsText = triggerHelper.defaultTTSText;
       }
+    }
+
+    // Fork: the user's TTS text for each output string the text was made from.
+    const substitutions = ttsSubstitutions.get(triggerHelper.trigger);
+    if (substitutions && triggerHelper.ttsText !== undefined) {
+      let text = triggerHelper.ttsText;
+      for (const [shown, spoken] of substitutions)
+        text = text.split(shown).join(spoken);
+      triggerHelper.ttsText = text;
     }
   }
 

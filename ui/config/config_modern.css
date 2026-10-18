@@ -892,6 +892,26 @@ html:not(.config-classic) {
   content: "";
 }
 
+/* Fork: shows a trigger's TTS texts (one per output string). */
+:root:not(.config-classic) .trigger-tts-toggle {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--cfg-muted);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+:root:not(.config-classic) .trigger-tts-toggle:hover {
+  color: var(--cfg-text);
+}
+
+:root:not(.config-classic) .trigger-tts-toggle-note {
+  color: var(--cfg-muted);
+  font-size: 0.9em;
+}
+
 :root:not(.config-classic) .trigger-details > .trigger-outputstring > input[type="text"] {
   width: 100%;
   max-width: 560px;
