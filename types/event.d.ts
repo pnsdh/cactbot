@@ -504,6 +504,28 @@ type CactbotRequestStateHandler = (msg: {
   call: 'cactbotRequestState';
 }) => void;
 
+// OverlayPlugin's.  Fork: severity and lang are read by the plugin's own TTS (the pnsdh fork),
+// ignored by others.
+type SayHandler = (msg: {
+  call: 'say';
+  text?: string;
+  severity?: 'info' | 'alert' | 'alarm';
+  source?: string;
+  lang?: string;
+  // Fork: this text's volume (0-1).
+  volume?: number;
+  // Fork: asks what the plugin's TTS takes (others answer nothing), or its volume of all speech
+  // (set with volume, 0-100).
+  query?: 'capabilities' | 'volume';
+}) => { engine?: string; prepare?: boolean; volume?: number; enabled?: boolean } | null | undefined;
+
+// Fork (pnsdh OverlayPlugin): a zone's alerts, fetched ahead by a network voice.
+type TtsPrepareHandler = (msg: {
+  call: 'ttsPrepare';
+  texts: string[];
+  lang?: string;
+}) => void;
+
 type CactbotSayHandler = (msg: {
   call: 'cactbotSay';
   text: string;
@@ -529,6 +551,8 @@ export type OverlayHandlerAll = {
   'subscribe': SubscribeHandler;
   'getCombatants': GetCombatantsHandler;
   'openWebsiteWithWS': OpenWebsiteWithWSHandler;
+  'say': SayHandler;
+  'ttsPrepare': TtsPrepareHandler;
   'cactbotReloadOverlays': CactbotReloadOverlaysHandler;
   'cactbotLoadUser': CactbotLoadUserHandler;
   'cactbotRequestPlayerUpdate': CactbotRequestPlayerUpdateHandler;

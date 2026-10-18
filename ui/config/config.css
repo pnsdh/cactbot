@@ -443,3 +443,13 @@ input[type="checkbox"] {
   width: 15px;
   height: 15px;
 }
+
+/* Fork: shows a trigger's TTS texts (one per output string). */
+.trigger-tts-toggle {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}

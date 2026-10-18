@@ -1,3 +1,4 @@
+import { callOverlayHandler } from '../../resources/overlay_plugin_api';
 import { ConfigEntry, ConfigValue } from '../../resources/user_config';
 import { LocaleText } from '../../types/trigger';
 
@@ -46,6 +47,17 @@ const kTopics: { [group: string]: Topic[] } = {
         'InfoSoundVolume',
         'LongSoundVolume',
         'PullSoundVolume',
+      ],
+    },
+    {
+      title: { en: 'TTS voice', ko: 'TTS 음성' },
+      ids: [
+        'TtsVolume',
+        'AlarmTtsVolume',
+        'AlertTtsVolume',
+        'InfoTtsVolume',
+        'TtsPlayerLabel',
+        'TtsPreparePlayers',
       ],
     },
     {
@@ -188,6 +200,10 @@ const kNumbers: { [id: string]: NumberKind } = {
   InfoSoundVolume: kPercent,
   LongSoundVolume: kPercent,
   PullSoundVolume: kPercent,
+  TtsVolume: kPercent,
+  AlarmTtsVolume: kPercent,
+  AlertTtsVolume: kPercent,
+  InfoTtsVolume: kPercent,
   AlarmRumbleDuration: kMsAsSeconds,
   AlarmRumbleWeak: kPercent,
   AlarmRumbleStrong: kPercent,
@@ -568,7 +584,76 @@ const addReset = (
   };
   inputDiv.addEventListener('input', refresh);
   inputDiv.addEventListener('change', refresh);
+  inputDiv.addEventListener('config-shown', refresh);
   refresh();
+};
+
+// Fork: the TTS master volume is the pnsdh OverlayPlugin's own setting: shown from it (asked
+// again while the page is shown, as it can change in the plugin's settings), and set in it as it
+// changes here (what cactbot saves for it is not used).  Other OverlayPlugins answer nothing: it
+// can't be changed then.
+const linkTtsVolume = (cells: HTMLElement[] | undefined): void => {
+  const inputDiv = cells?.[1];
+  const input = inputDiv?.querySelector<HTMLInputElement>(
+    'input[type="text"]:not(.config-num-shown)',
+  );
+  if (inputDiv === undefined || input === null || input === undefined)
+    return;
+  let linked = false;
+  let timer: number | undefined;
+  // Changed here lately, or being changed (typed, dragged): not overwritten from the plugin.
+  let changedAt = 0;
+  let dragging = false;
+  inputDiv.addEventListener('pointerdown', () => dragging = true);
+  window.addEventListener('pointerup', () => dragging = false);
+  input.addEventListener('input', () => {
+    if (!linked)
+      return;
+    changedAt = Date.now();
+    window.clearTimeout(timer);
+    timer = window.setTimeout(() => {
+      const value = parseFloat(input.value);
+      void callOverlayHandler({
+        call: 'say',
+        query: 'volume',
+        volume: Math.round(Math.max(0, Math.min(1, isFinite(value) ? value : 1)) * 100),
+      });
+    }, 150);
+  });
+  const busy = () =>
+    dragging || Date.now() - changedAt < 1000 || inputDiv.contains(document.activeElement);
+  const refresh = async (first: boolean) => {
+    if (!first && (!linked || busy()))
+      return;
+    const answer = await callOverlayHandler({ call: 'say', query: 'volume' });
+    if (typeof answer?.volume !== 'number') {
+      if (first) {
+        for (
+          const control of inputDiv.querySelectorAll<HTMLInputElement | HTMLButtonElement>(
+            'input, button',
+          )
+        )
+          control.disabled = true;
+      }
+      return;
+    }
+    const value = (answer.volume / 100).toString();
+    linked = true;
+    if (busy() || parseFloat(input.value) === answer.volume / 100)
+      return;
+    input.value = value;
+    input.dispatchEvent(new Event('config-shown', { bubbles: true }));
+  };
+  void refresh(true);
+  window.addEventListener('focus', () => void refresh(false));
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible')
+      void refresh(false);
+  });
+  window.setInterval(() => {
+    if (document.visibilityState === 'visible')
+      void refresh(false);
+  }, 2000);
 };
 
 // Moves an option's description (and the notes in its name's parentheses) into a tooltip on an
@@ -695,6 +780,8 @@ export const arrangeSection = (
     if (type !== 'html' && type !== 'directory')
       addReset(id, left, inputDiv, translate);
   }
+  if (group === 'raidboss')
+    linkTtsVolume(rows.get('TtsVolume'));
 
   const topics = kTopics[group] ?? [];
   const cards: HTMLElement[] = [];

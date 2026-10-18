@@ -16,6 +16,7 @@ import { RaidbossData } from '../../types/data';
 import { EventResponses, LogEvent } from '../../types/event';
 import { Job, Role } from '../../types/job';
 import { Matches } from '../../types/net_matches';
+import { PartyMemberParamObjectKeys } from '../../types/party';
 import {
   DataInitializeFunc,
   GeneralNetRegexTrigger,
@@ -276,16 +277,38 @@ const isObject = (x: unknown): x is { [key: string]: unknown } => {
 // User trigger may pass anything as parameters
 type TriggerParams = { [key: string]: unknown };
 
+// Fork: what an output string said on screen and what TTS says instead (the user's TTS text
+// for that output string, same params), for the trigger instance being evaluated (they are
+// evaluated one at a time, see the note in TriggerOutputProxy).
+const ttsSubstitutions = new WeakMap<ProcessedTrigger, Map<string, string>>();
+
+// Fork: params that name a player, for making ahead alerts naming one (see _prepareTts).
+const kTtsPlayerParams = ['player', 'target', 'name', 'tank', 'healer', 'partner'];
+
+// Fork: a party member as triggers pass it (data.party.member), alone or in a list.
+const isPartyParam = (v: unknown): v is { [key: string]: unknown } =>
+  isObject(v) && typeof v['nick'] === 'string' && typeof v['name'] === 'string';
+const hasPartyParam = (params?: TriggerParams): boolean =>
+  params !== undefined &&
+  Object.values(params).some((v) =>
+    isPartyParam(v) || (Array.isArray(v) && v.some((p) => isPartyParam(p)))
+  );
+
 class TriggerOutputProxy {
   public outputStrings: OutputStrings;
   public overrideStrings: OutputStrings = {};
+  public ttsStrings: OutputStrings = {};
   public responseOutputStrings: { [outputName: string]: unknown } = {};
   public unknownValue = '???';
+
+  // Fork: rendering what TTS says, with players as ttsPlayerLabel says (see evaluateOutputParam).
+  public speaking = false;
 
   private constructor(
     public trigger: ProcessedTrigger,
     public displayLang: Lang,
     public perTriggerAutoConfig?: PerTriggerAutoConfig,
+    public ttsPlayerLabel?: PartyMemberParamObjectKeys,
   ) {
     this.outputStrings = trigger.outputStrings ?? {};
 
@@ -293,6 +316,8 @@ class TriggerOutputProxy {
       const config = perTriggerAutoConfig[trigger.id];
       if (config && config.OutputStrings)
         this.overrideStrings = config.OutputStrings;
+      if (config && config.TtsStrings)
+        this.ttsStrings = config.TtsStrings;
     }
 
     return new Proxy(this, {
@@ -348,17 +373,43 @@ class TriggerOutputProxy {
           // Ideally, response provides everything and trigger provides nothing,
           // or there's no response and trigger provides everything.  Having
           // this well-defined smooths out the collision edge cases.
-          let str = target.getReplacement(target.overrideStrings[name], params, name, id);
+          let source: { [lang: string]: unknown } | string | undefined =
+            target.overrideStrings[name];
+          let str = target.getReplacement(source, params, name, id);
           if (str === undefined) {
             const responseString = target.responseOutputStrings[name];
-            if (isObject(responseString))
+            if (isObject(responseString)) {
+              source = responseString;
               str = target.getReplacement(responseString, params, name, id);
+            }
           }
-          if (str === undefined)
-            str = target.getReplacement(target.outputStrings[name], params, name, id);
+          if (str === undefined) {
+            source = target.outputStrings[name];
+            str = target.getReplacement(source, params, name, id);
+          }
           if (str === undefined) {
             console.error(`Trigger ${target.trigger.id ?? ''} has missing outputString ${name}.`);
             return target.unknownValue;
+          }
+          // Fork: what TTS says instead: the user's TTS text, or the same with players read
+          // as ttsPlayerLabel says.
+          const ttsTemplate = target.ttsStrings[name];
+          const ownTts = ttsTemplate !== undefined && ttsTemplate !== '';
+          const relabel = target.ttsPlayerLabel !== undefined && hasPartyParam(params);
+          if (ownTts || relabel) {
+            target.speaking = relabel;
+            let tts: string | undefined;
+            try {
+              tts = target.getReplacement(ownTts ? ttsTemplate : source, params, name, id);
+            } finally {
+              target.speaking = false;
+            }
+            if (tts !== undefined && tts !== str && str.trim() !== '') {
+              let map = ttsSubstitutions.get(target.trigger);
+              if (!map)
+                ttsSubstitutions.set(target.trigger, map = new Map<string, string>());
+              map.set(str, tts);
+            }
           }
           return str;
         };
@@ -402,6 +453,15 @@ class TriggerOutputProxy {
     // Appease TypeScript, this shouldn't happen.
     if (!isObject(val))
       return this.unknownValue;
+
+    // Fork: a player, as TTS reads it.
+    if (
+      this.speaking && prop === undefined && this.ttsPlayerLabel !== undefined && isPartyParam(val)
+    ) {
+      const label = val[this.ttsPlayerLabel];
+      if (typeof label === 'string' && label !== '')
+        return label;
+    }
 
     if (prop !== undefined) {
       const retVal = val[prop];
@@ -494,11 +554,17 @@ class TriggerOutputProxy {
     trigger: ProcessedTrigger,
     displayLang: Lang,
     perTriggerAutoConfig?: PerTriggerAutoConfig,
+    ttsPlayerLabel?: PartyMemberParamObjectKeys,
   ): Output {
     // `Output` is the common type used for the trigger data interface to support arbitrary
     // string keys and always returns a string. However, TypeScript doesn't have good support
     // for the Proxy representing this structure so we need to cast Proxy => unknown => Output
-    return new TriggerOutputProxy(trigger, displayLang, perTriggerAutoConfig) as unknown as Output;
+    return new TriggerOutputProxy(
+      trigger,
+      displayLang,
+      perTriggerAutoConfig,
+      ttsPlayerLabel,
+    ) as unknown as Output;
   }
 }
 
@@ -526,6 +592,9 @@ export interface TriggerHelper {
   soundVol?: number;
   triggerSoundVol?: number;
   defaultTTSText?: string;
+  // Fork: the kind of the first text shown (alarm, then alert, then info), for how the TTS
+  // treats it (see ttsSay).
+  ttsSeverity?: 'alarm' | 'alert' | 'info';
   textAlertsEnabled: boolean;
   soundAlertsEnabled: boolean;
   spokenAlertsEnabled: boolean;
@@ -576,7 +645,13 @@ export class PopupText {
   protected parserLang: Lang;
   protected displayLang: Lang;
   protected ttsEngine?: BrowserTTSEngine;
-  protected ttsSay: (text: string) => void;
+  protected ttsSay: (text: string, severity?: 'alarm' | 'alert' | 'info') => void;
+  // Fork: the OverlayPlugin's TTS fetches a zone's alerts ahead (see _prepareTts).
+  protected ttsCanPrepare = false;
+  protected ttsAsking = false;
+  protected ttsPartyTimer?: number;
+  // The zone's timeline triggers (not in triggers/netTriggers), for _prepareTts.
+  protected ttsTimelineTriggers: LooseTrigger[] = [];
   protected partyTracker: PartyTracker;
   protected readonly kMaxRowsOfText = 2;
   // Fork: players kept per sound (see _playAudioFile).
@@ -619,12 +694,29 @@ export class PopupText {
         this.ttsEngine?.play(this.options.TransformTts(text));
       };
     } else {
-      this.ttsSay = (text) => {
+      // Fork: OverlayPlugin's own say, with how important the alert is and its language, which
+      // the pnsdh OverlayPlugin's TTS uses (a more important alert cuts in, volume by kind).
+      // Other OverlayPlugins read only the text, with ACT's TTS, as cactbotSay did.
+      this.ttsSay = (text, severity) => {
+        // Fork: its volume by kind (an alert without text counts as info).
+        const volume = severity === 'alarm'
+          ? this.options.AlarmTtsVolume
+          : severity === 'alert'
+          ? this.options.AlertTtsVolume
+          : this.options.InfoTtsVolume;
         void callOverlayHandler({
-          call: 'cactbotSay',
+          call: 'say',
           text: this.options.TransformTts(text),
+          severity: severity,
+          source: 'cactbot',
+          lang: this.ttsLang(),
+          volume: Math.max(0, Math.min(1, Number(volume))),
         });
       };
+      // Fork: whether it can fetch a zone's alerts ahead (other OverlayPlugins answer nothing;
+      // asked again on each zone until it can, as the plugin's TTS may be turned on later).
+      if (this.options.AlertsEnabled)
+        this._askTtsCapabilities();
     }
 
     this.data = this.getDataObject();
@@ -652,6 +744,11 @@ export class PopupText {
   HookOverlays(): void {
     addOverlayListener('PartyChanged', (e) => {
       this.partyTracker.onPartyChanged(e);
+      // Fork: alerts naming the new members made ahead (once the party settles).
+      if (this.options.TtsPreparePlayers && this.ttsCanPrepare) {
+        window.clearTimeout(this.ttsPartyTimer);
+        this.ttsPartyTimer = window.setTimeout(() => this._prepareTts(), 3000);
+      }
     });
     addPlayerChangedOverrideListener((e: PlayerChangedDetail) => {
       this.OnPlayerChange(e);
@@ -1006,8 +1103,10 @@ export class PopupText {
     this.triggers = allTriggers.filter((x) => x.localRegex !== undefined);
     this.netTriggers = allTriggers.filter((x) => x.localNetRegex !== undefined);
     const timelineTriggers = allTriggers.filter(isRaidbossLooseTimelineTrigger);
+    this.ttsTimelineTriggers = timelineTriggers;
 
     this.Reset();
+    this._prepareTts();
 
     this.timelineLoader.SetTimelines(
       timelineFiles,
@@ -1017,6 +1116,193 @@ export class PopupText {
       timelineStyles,
       this.zoneId,
     );
+  }
+
+  ttsLang(): string {
+    return this.displayLang === 'cn' || this.displayLang === 'tc' ? 'zh' : this.displayLang;
+  }
+
+  // Fork: the zone's alerts that would be spoken, as they would be (texts without params: their
+  // output strings with the user's edits and TTS texts, and fixed texts), sent for a network
+  // voice to fetch ahead, so the first time plays at once too.
+  _askTtsCapabilities(): void {
+    if (this.ttsAsking)
+      return;
+    this.ttsAsking = true;
+    void callOverlayHandler({ call: 'say', query: 'capabilities' }).then((r) => {
+      this.ttsAsking = false;
+      this.ttsCanPrepare = r?.prepare === true;
+      if (this.ttsCanPrepare)
+        this._prepareTts();
+    }).catch(() => {
+      this.ttsAsking = false;
+    });
+  }
+
+  _prepareTts(): void {
+    // Nothing is spoken without audio (see _onTriggerInternalHelperDefaults).
+    if (this.options.IsRemoteRaidboss || !this.options.AudioAllowed || !this.options.AlertsEnabled)
+      return;
+    if (!this.ttsCanPrepare) {
+      this._askTtsCapabilities();
+      return;
+    }
+    const texts = new Set<string>();
+    const seen = new Set<unknown>();
+    const textOf = (v: unknown): string | undefined => {
+      if (typeof v === 'string')
+        return v;
+      if (typeof v === 'object' && v !== null) {
+        const obj = v as { [lang: string]: unknown };
+        const t = obj[this.displayLang] ?? obj['en'];
+        return typeof t === 'string' ? t : undefined;
+      }
+      return undefined;
+    };
+    const add = (t: string | undefined, transform: boolean) => {
+      if (t === undefined || t.includes('${') || t.trim() === '')
+        return;
+      const shown = transform ? this.options.TransformText(t.trim()) ?? t.trim() : t.trim();
+      texts.add(this.options.TransformTts(this._ttsCleanup(shown)));
+    };
+    // An alert naming one player (its only param), for each party member as TTS reads them.
+    // Kept for the end: a long list is cut there by the plugin.
+    const withPlayers: [string, boolean][] = [];
+    const members = this.options.TtsPreparePlayers
+      ? this.partyTracker.partyNames.map((n) => this.partyTracker.member(n))
+      : [];
+    const label = this.ttsPlayerLabel();
+    const paramPattern = /\${\s*([^}\s]+)\s*}/g;
+    const addPlayers = () => {
+      for (const [t, transform] of withPlayers) {
+        const bases = new Set([...t.matchAll(paramPattern)].map((m) => m[1]?.split('.')[0]));
+        const base = [...bases][0];
+        if (bases.size !== 1 || base === undefined || !kTtsPlayerParams.includes(base))
+          continue;
+        for (const member of members) {
+          const fields = member as unknown as { [key: string]: unknown };
+          add(
+            t.replace(paramPattern, (_m, key: string) => {
+              const prop = key.split('.')[1] ?? label;
+              const value = prop !== undefined ? fields[prop] : undefined;
+              return typeof value === 'string' && value !== '' ? value : member.toString();
+            }),
+            transform,
+          );
+        }
+      }
+    };
+    const addOrKeep = (t: string | undefined, transform: boolean) => {
+      if (t !== undefined && t.includes('${')) {
+        if (members.length > 0)
+          withPlayers.push([t, transform]);
+        return;
+      }
+      add(t, transform);
+    };
+    // What a response sets as its output strings (as the config page reads them: called with
+    // an output that only records them).
+    // Responses run on data of their own: what they change (counters, lists) must not touch the
+    // fight's (a zone that keeps its data out of combat would carry it into the fight).
+    const scratch = this.getDataObject();
+    const responseStrings = (trigger: ProcessedTrigger): { [key: string]: unknown } => {
+      const response = trigger.response;
+      if (typeof response !== 'function')
+        return {};
+      let strings: { [key: string]: unknown } = {};
+      const recorder = new Proxy({}, {
+        set(_t, property, value): boolean {
+          if (property === 'responseOutputStrings' && typeof value === 'object' && value !== null)
+            strings = value as { [key: string]: unknown };
+          return true;
+        },
+        get() {
+          return () => '';
+        },
+      });
+      const noMatches: Matches = {};
+      try {
+        response(scratch, noMatches, recorder as Output);
+      } catch {
+        // A response that needs real matches: nothing to fetch ahead.
+      }
+      return strings;
+    };
+    const triggers: ProcessedTrigger[] = [
+      ...this.triggers,
+      ...this.netTriggers,
+      ...this.ttsTimelineTriggers as ProcessedTrigger[],
+    ];
+    for (const trigger of triggers) {
+      if (seen.has(trigger))
+        continue;
+      seen.add(trigger);
+      const id = trigger.id;
+      const options = id !== undefined ? this.options.PerTriggerOptions[id] : undefined;
+      const config = id !== undefined ? this.options.PerTriggerAutoConfig[id] : undefined;
+      if (id !== undefined && this.options.DisabledTriggers[id])
+        continue;
+      const spoken = options?.SpeechAlert ?? config?.SpokenAlertsEnabled ??
+        trigger.triggerSetAutoConfig?.SpokenAlertsEnabled ?? this.options.SpokenAlertsEnabled;
+      if (!spoken)
+        continue;
+      const strings = { ...responseStrings(trigger), ...trigger.outputStrings };
+      for (const [key, value] of Object.entries(strings)) {
+        const tts = config?.TtsStrings?.[key];
+        // An edit left blank is the default again (as at runtime).
+        const edited = config?.OutputStrings?.[key];
+        if (tts !== undefined && tts !== '')
+          addOrKeep(textOf(tts), false);
+        else
+          addOrKeep(textOf(edited !== undefined && edited !== '' ? edited : value), true);
+      }
+      for (const field of [trigger.tts, trigger.alarmText, trigger.alertText, trigger.infoText]) {
+        if (typeof field !== 'function')
+          add(textOf(field), field !== trigger.tts);
+      }
+    }
+    addPlayers();
+    void callOverlayHandler({ call: 'ttsPrepare', texts: [...texts], lang: this.ttsLang() })
+      .catch(() => undefined);
+  }
+
+  // Fork: how TTS reads players (none: as on screen).
+  ttsPlayerLabel(): PartyMemberParamObjectKeys | undefined {
+    const label = this.options.TtsPlayerLabel;
+    return label === 'screen' ? undefined : label;
+  }
+
+  // Before TTS reads an alert: what reads badly aloud taken out (also for _prepareTts, so a text
+  // fetched ahead is the same text said later).
+  _ttsCleanup(text: string): string {
+    // Heuristics for auto tts.
+    // * Remove a bunch of chars.
+    text = text.replace(/[#!]/g, '');
+    // * slashes between mechanics
+    text = text.replace('/', ' ');
+    // * tildes at the end for emphasis
+    text = text.replace(/~+$/, '');
+    // * arrows helping visually simple to understand e.g. ↖ Front left / Back right ↘
+    text = text.replace(/[↖-↙]/g, '');
+    // * Korean TTS reads wrong with '1번째'
+    text = text.replace('1번째', '첫번째');
+    // * arrows at the front or the end are directions, e.g. "east =>"
+    text = text.replace(/[-=]+>\s*$/g, '');
+    text = text.replace(/^\s*<[-=]+/g, '');
+    // * arrows in the middle are a sequence, e.g. "in => out => spread"
+    const arrowReplacement = {
+      en: ' then ',
+      de: ' dann ',
+      fr: ' puis ',
+      ja: 'や',
+      cn: '然后',
+      ko: ' 그리고 ',
+      tc: '然後',
+    };
+    text = text.replace(/\s*(<[-=]|[=-]>)\s*/g, arrowReplacement[this.displayLang]);
+    // * Countdown substitution marker, if present
+    text = text.replaceAll('{{CD}}', '');
+    return text;
   }
 
   ProcessTrigger(trigger: ProcessedTrigger | ProcessedTimelineTrigger): void {
@@ -1034,6 +1320,7 @@ export class PopupText {
       trigger,
       this.displayLang,
       this.options.PerTriggerAutoConfig,
+      this.ttsPlayerLabel(),
     );
   }
 
@@ -1166,6 +1453,8 @@ export class PopupText {
     const triggerPostDelay = () => {
       const promise = this._onTriggerInternalPromise(triggerHelper);
       const triggerPostPromise = () => {
+        // Fork: TTS texts of this instance's output strings only.
+        ttsSubstitutions.get(triggerHelper.trigger)?.clear();
         this._onTriggerInternalSound(triggerHelper);
         this._onTriggerInternalSoundVolume(triggerHelper);
         this._onTriggerInternalResponse(triggerHelper);
@@ -1520,6 +1809,22 @@ export class PopupText {
         triggerHelper.ttsText = triggerHelper.defaultTTSText;
       }
     }
+
+    // Fork: the user's TTS text for each output string the text was made from.
+    const substitutions = ttsSubstitutions.get(triggerHelper.trigger);
+    // One pass, the longest first: a text made of other outputs (e.g. "${inOut} + ${spread}")
+    // is replaced whole before its parts, and what was put in is not replaced again.  Only where
+    // it stands as a word of its own: "1" not inside "10", "북" not inside "북동" (a particle
+    // written onto it, "북으로", is then left as it is).
+    if (substitutions && substitutions.size > 0 && triggerHelper.ttsText !== undefined) {
+      const keys = [...substitutions.keys()].sort((a, b) => b.length - a.length);
+      const escaped = keys.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+      const pattern = new RegExp(`(?<![\\p{L}\\p{N}])(?:${escaped})(?![\\p{L}\\p{N}])`, 'gu');
+      triggerHelper.ttsText = triggerHelper.ttsText.replace(
+        pattern,
+        (m) => substitutions.get(m) ?? m,
+      );
+    }
   }
 
   _onTriggerInternalPlayAudio(triggerHelper: TriggerHelper): void {
@@ -1549,40 +1854,10 @@ export class PopupText {
     // on (speech=true, text=true, sound=true) but this will
     // not cause tts to play over top of sounds or noises.
     if (triggerHelper.ttsText !== undefined && triggerHelper.spokenAlertsEnabled) {
-      // Heuristics for auto tts.
       // * In case this is an integer.
-      triggerHelper.ttsText = triggerHelper.ttsText.toString();
-      // * Remove a bunch of chars.
-      triggerHelper.ttsText = triggerHelper.ttsText.replace(/[#!]/g, '');
-      // * slashes between mechanics
-      triggerHelper.ttsText = triggerHelper.ttsText.replace('/', ' ');
-      // * tildes at the end for emphasis
-      triggerHelper.ttsText = triggerHelper.ttsText.replace(/~+$/, '');
-      // * arrows helping visually simple to understand e.g. ↖ Front left / Back right ↘
-      triggerHelper.ttsText = triggerHelper.ttsText.replace(/[↖-↙]/g, '');
-      // * Korean TTS reads wrong with '1번째'
-      triggerHelper.ttsText = triggerHelper.ttsText.replace('1번째', '첫번째');
-      // * arrows at the front or the end are directions, e.g. "east =>"
-      triggerHelper.ttsText = triggerHelper.ttsText.replace(/[-=]+>\s*$/g, '');
-      triggerHelper.ttsText = triggerHelper.ttsText.replace(/^\s*<[-=]+/g, '');
-      // * arrows in the middle are a sequence, e.g. "in => out => spread"
-      const arrowReplacement = {
-        en: ' then ',
-        de: ' dann ',
-        fr: ' puis ',
-        ja: 'や',
-        cn: '然后',
-        ko: ' 그리고 ',
-        tc: '然後',
-      };
-      triggerHelper.ttsText = triggerHelper.ttsText.replace(
-        /\s*(<[-=]|[=-]>)\s*/g,
-        arrowReplacement[this.displayLang],
-      );
-      // * Countdown substitution marker, if present
-      triggerHelper.ttsText = triggerHelper.ttsText.replaceAll('{{CD}}', '');
+      triggerHelper.ttsText = this._ttsCleanup(triggerHelper.ttsText.toString());
 
-      this.ttsSay(triggerHelper.ttsText);
+      this.ttsSay(triggerHelper.ttsText, triggerHelper.ttsSeverity);
     } else if (triggerHelper.soundUrl !== undefined && triggerHelper.soundAlertsEnabled) {
       this._playAudioFile(triggerHelper, triggerHelper.soundUrl, triggerHelper.soundVol);
     }
@@ -1687,6 +1962,7 @@ export class PopupText {
 
     text = this.options.TransformText(text) ?? text;
     triggerHelper.defaultTTSText = triggerHelper.defaultTTSText ?? text;
+    triggerHelper.ttsSeverity = triggerHelper.ttsSeverity ?? textType;
     if (text && typeof text === 'string' && triggerHelper.textAlertsEnabled) {
       // per-trigger option > trigger field > option duration by text type
       let duration = triggerHelper.duration?.fromConfig ?? triggerHelper.duration?.fromTrigger;
