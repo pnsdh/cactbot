@@ -504,6 +504,16 @@ type CactbotRequestStateHandler = (msg: {
   call: 'cactbotRequestState';
 }) => void;
 
+// OverlayPlugin's.  Fork: severity and lang are read by the plugin's own TTS (the pnsdh fork),
+// ignored by others.
+type SayHandler = (msg: {
+  call: 'say';
+  text: string;
+  severity?: 'info' | 'alert' | 'alarm';
+  source?: string;
+  lang?: string;
+}) => void;
+
 type CactbotSayHandler = (msg: {
   call: 'cactbotSay';
   text: string;
@@ -529,6 +539,7 @@ export type OverlayHandlerAll = {
   'subscribe': SubscribeHandler;
   'getCombatants': GetCombatantsHandler;
   'openWebsiteWithWS': OpenWebsiteWithWSHandler;
+  'say': SayHandler;
   'cactbotReloadOverlays': CactbotReloadOverlaysHandler;
   'cactbotLoadUser': CactbotLoadUserHandler;
   'cactbotRequestPlayerUpdate': CactbotRequestPlayerUpdateHandler;

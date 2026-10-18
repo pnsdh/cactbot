@@ -67,13 +67,13 @@ export default class RaidEmulatorPopupText extends StubbedPopupText {
 
     const parentTtsSay = this.ttsSay;
 
-    this.ttsSay = (ttsText: string): void => {
+    this.ttsSay = (ttsText: string, severity?: 'alarm' | 'alert' | 'info'): void => {
       if (this.seeking)
         return;
 
       const div = this._makeTextElement(undefined, ttsText, 'tts-text');
       this.addDisplayText(div, this.emulatedOffset + this.audioDebugTextDuration);
-      parentTtsSay(ttsText);
+      parentTtsSay(ttsText, severity);
     };
   }
 

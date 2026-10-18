@@ -526,6 +526,9 @@ export interface TriggerHelper {
   soundVol?: number;
   triggerSoundVol?: number;
   defaultTTSText?: string;
+  // Fork: the kind of the first text shown (alarm, then alert, then info), for how the TTS
+  // treats it (see ttsSay).
+  ttsSeverity?: 'alarm' | 'alert' | 'info';
   textAlertsEnabled: boolean;
   soundAlertsEnabled: boolean;
   spokenAlertsEnabled: boolean;
@@ -576,7 +579,7 @@ export class PopupText {
   protected parserLang: Lang;
   protected displayLang: Lang;
   protected ttsEngine?: BrowserTTSEngine;
-  protected ttsSay: (text: string) => void;
+  protected ttsSay: (text: string, severity?: 'alarm' | 'alert' | 'info') => void;
   protected partyTracker: PartyTracker;
   protected readonly kMaxRowsOfText = 2;
   // Fork: players kept per sound (see _playAudioFile).
@@ -619,10 +622,16 @@ export class PopupText {
         this.ttsEngine?.play(this.options.TransformTts(text));
       };
     } else {
-      this.ttsSay = (text) => {
+      // Fork: OverlayPlugin's own say, with how important the alert is and its language, which
+      // the pnsdh OverlayPlugin's TTS uses (a more important alert cuts in, volume by kind).
+      // Other OverlayPlugins read only the text, with ACT's TTS, as cactbotSay did.
+      this.ttsSay = (text, severity) => {
         void callOverlayHandler({
-          call: 'cactbotSay',
+          call: 'say',
           text: this.options.TransformTts(text),
+          severity: severity,
+          source: 'cactbot',
+          lang: this.displayLang === 'cn' || this.displayLang === 'tc' ? 'zh' : this.displayLang,
         });
       };
     }
@@ -1582,7 +1591,7 @@ export class PopupText {
       // * Countdown substitution marker, if present
       triggerHelper.ttsText = triggerHelper.ttsText.replaceAll('{{CD}}', '');
 
-      this.ttsSay(triggerHelper.ttsText);
+      this.ttsSay(triggerHelper.ttsText, triggerHelper.ttsSeverity);
     } else if (triggerHelper.soundUrl !== undefined && triggerHelper.soundAlertsEnabled) {
       this._playAudioFile(triggerHelper, triggerHelper.soundUrl, triggerHelper.soundVol);
     }
@@ -1687,6 +1696,7 @@ export class PopupText {
 
     text = this.options.TransformText(text) ?? text;
     triggerHelper.defaultTTSText = triggerHelper.defaultTTSText ?? text;
+    triggerHelper.ttsSeverity = triggerHelper.ttsSeverity ?? textType;
     if (text && typeof text === 'string' && triggerHelper.textAlertsEnabled) {
       // per-trigger option > trigger field > option duration by text type
       let duration = triggerHelper.duration?.fromConfig ?? triggerHelper.duration?.fromTrigger;
