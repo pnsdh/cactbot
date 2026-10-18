@@ -940,6 +940,35 @@ html:not(.config-classic) {
   border-radius: 8px;
 }
 
+/* Fork: in the TTS card while alerts aren't output to TTS (see config_rows.ts noteTtsOutput). */
+:root:not(.config-classic) .config-tts-note {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  margin: 0 0 8px;
+  padding: 10px 14px;
+  color: var(--cfg-alert);
+  background-color: var(--cfg-warn-bg);
+  border: 1px solid var(--cfg-alert);
+  border-radius: 8px;
+  font-size: 12.5px;
+}
+
+:root:not(.config-classic) .config-tts-note > button {
+  padding: 4px 10px;
+  color: var(--cfg-text);
+  background: var(--cfg-surface-2);
+  border: 1px solid var(--cfg-line-strong);
+  border-radius: 6px;
+  font: inherit;
+  cursor: pointer;
+}
+
+:root:not(.config-classic) .config-tts-note > button:hover {
+  background: var(--cfg-hover);
+}
+
 :root:not(.config-classic) .alarm-text {
   color: var(--cfg-alarm);
 }

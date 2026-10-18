@@ -111,6 +111,29 @@ const check = (name, ok, info) => results.push(`${ok ? 'OK  ' : 'FAIL'} ${name} 
   await wait(3000);
   const followed = await shown(page);
   check('follows the plugin', followed.value === '55', JSON.stringify(followed));
+  // Alerts output as text and sound (the default): said in the TTS card, with a button to switch.
+  const note = () =>
+    page.evaluate(() => {
+      const n = document.querySelector('.config-tts-note');
+      const select = document.querySelector(
+        '.option-input-container[data-option-id="DefaultAlertOutput"] select',
+      );
+      return { shown: n !== null && n.offsetParent !== null, output: select?.value };
+    });
+  const before = await note();
+  await page.evaluate(() => document.querySelector('.config-tts-note button').click());
+  await wait(400);
+  const after = await note();
+  const promptAfter = await page.evaluate(() =>
+    !document.getElementById('butter-margin').classList.contains('hidden')
+  );
+  check(
+    'TTS output note and button',
+    before.shown && before.output === 'textAndSound' && !after.shown &&
+      after.output === 'ttsAndText' &&
+      promptAfter,
+    `${JSON.stringify(before)} -> ${JSON.stringify(after)}, reload prompt ${promptAfter}`,
+  );
   check('no page errors', errors.length === 0, errors.join('; '));
   await page.close();
 }

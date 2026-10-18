@@ -656,6 +656,45 @@ const linkTtsVolume = (cells: HTMLElement[] | undefined): void => {
   }, 2000);
 };
 
+// Fork: TTS reads cactbot's alerts only when the default output has TTS: said at the top of the
+// TTS card while it has none, with a button to switch (the plugin's TTS tab says so too).
+const kTtsOutputNote: LocaleText = {
+  en: 'Alerts are not read by TTS now: the default alert output has no TTS.',
+  ko: '지금은 알림을 TTS로 읽지 않습니다. 기본 알람 출력 방식에 TTS가 없습니다.',
+};
+const kTtsOutputButton: LocaleText = {
+  en: 'Switch to text and TTS',
+  ko: '텍스트와 TTS로 바꾸기',
+};
+
+const noteTtsOutput = (rows: Map<string, HTMLElement[]>, translate: Translate): void => {
+  const select = rows.get('DefaultAlertOutput')?.[1]?.querySelector('select');
+  const card = rows.get('TtsVolume')?.[0]?.closest('.config-card');
+  if (select === null || select === undefined || card === null || card === undefined)
+    return;
+  const note = document.createElement('div');
+  note.classList.add('config-tts-note');
+  const text = document.createElement('span');
+  text.textContent = translate(kTtsOutputNote);
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.textContent = translate(kTtsOutputButton);
+  button.onclick = () => {
+    select.value = 'ttsAndText';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  };
+  note.append(text, button);
+  // The card shows its children in reverse: before the title is under it on screen.
+  card.insertBefore(note, card.querySelector('.config-card-title'));
+  const update = () =>
+    note.classList.toggle(
+      'config-hidden',
+      select.value === 'ttsAndText' || select.value === 'ttsOnly',
+    );
+  select.addEventListener('change', update);
+  update();
+};
+
 // Moves an option's description (and the notes in its name's parentheses) into a tooltip on an
 // icon after its name.  The texts stay in the row, hidden, for search.
 export const addOptionTooltip = (
@@ -804,6 +843,9 @@ export const arrangeSection = (
 
   for (const card of cards)
     groupDiv.before(card);
+
+  if (group === 'raidboss')
+    noteTtsOutput(rows, translate);
 
   // What's left (raidboss and oopsy trigger lists, added by buildExtraUI) is a card of its own.
   const treeCard = makeCard(translate(kTriggersTitle), groupDiv);
