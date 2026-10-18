@@ -81,11 +81,15 @@ export const mockOverlayPlugin = (page, data = {}) =>
           };
         } else if (m.call === 'cactbotLoadData') {
           r = { data: data };
+        } else if (m.call === 'say' && m.query === 'capabilities') {
+          // As the pnsdh OverlayPlugin's TTS answers, if a test set it.
+          r = window.__ttsCapabilities ?? null;
         } else if (m.call === 'getCombatants') {
           r = { combatants: [] };
         }
+        // Nothing to answer comes as null, as OverlayPlugin sends it (not the text "null").
         if (cb)
-          setTimeout(() => cb(JSON.stringify(r)), 0);
+          setTimeout(() => cb(r === null ? null : JSON.stringify(r)), 0);
       },
     };
   }, data);

@@ -56,5 +56,30 @@ for (const [name, data] of cases) {
     console.log(`  FAIL: expected "${expect}" (info) and "4" (alarm)`);
   }
 }
+// A plugin that fetches ahead gets the zone's alerts as they will be said, once loaded.
+{
+  const browser = await launch();
+  const { page } = await openPage(browser, 'raidboss', {
+    query: 'alerts=1&timeline=0',
+    data: {
+      raidboss: { ...ttsOnly, triggers: { 'Test Laugh': { TtsStrings: { text: '크하하' } } } },
+    },
+    beforeLoad: (p) => p.evaluateOnNewDocument(() => window.__ttsCapabilities = { prepare: true }),
+  });
+  await startFight(page, 134, 'Middle La Noscea');
+  await wait(500);
+  const prepared = await page.evaluate(() =>
+    window.__overlayCalls.filter((c) => c.call === 'ttsPrepare').map((c) => c.texts)
+  );
+  await browser.close();
+  const last = prepared.at(-1) ?? [];
+  console.log(`== fetched ahead (${prepared.length} lists, last ${last.length} texts)`);
+  console.log(`  ${last.slice(0, 8).join(' | ')}`);
+  if (!last.includes('크하하') || last.some((t) => t.includes('${'))) {
+    failed++;
+    console.log('  FAIL: expected the TTS text "크하하" and no texts with params');
+  }
+}
+
 console.log(failed === 0 ? 'ok' : `${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);
