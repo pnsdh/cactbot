@@ -3,6 +3,7 @@ import { Lang } from '../../resources/languages';
 import { UnreachableCode } from '../../resources/not_reached';
 import { callOverlayHandler } from '../../resources/overlay_plugin_api';
 import Regexes from '../../resources/regexes';
+import { withoutForkDir } from '../../resources/trigger_set_variants';
 import UserConfig, {
   ConfigEntry,
   ConfigEntryToDivMap,
@@ -1115,11 +1116,13 @@ export class CactbotConfigurator {
         continue;
 
       triggerSet.filename = filename;
+      // Fork: the fork's own version of a fight (data/fork/) is shown where upstream's would be.
+      const path = withoutForkDir(filename);
 
       let prefixKey = '00-misc';
       let prefix: LocaleText = kPrefixToCategory['00-misc'];
       for (const [key, value] of Object.entries(kPrefixToCategory)) {
-        if (!filename.startsWith(key))
+        if (!path.startsWith(key))
           continue;
         prefixKey = key;
         prefix = value;
@@ -1134,7 +1137,7 @@ export class CactbotConfigurator {
         break;
       }
 
-      let title = fileNameToTitle(filename);
+      let title = fileNameToTitle(path);
       let zoneId: number | undefined = undefined;
 
       // Make assumptions about trigger structure here to try to get the zoneId out.

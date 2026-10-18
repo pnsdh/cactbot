@@ -37,11 +37,18 @@ const asKeyOf = <T>(key: unknown, obj: T): keyof T | undefined => {
 // See details in that function for more information.
 NetRegexes.setFlagTranslationsNeeded(true);
 
+// Fork: the fork's own versions of fights (ui/raidboss/data/fork/) are written in Korean and
+// translated from it: nothing in them is to be translated into Korean (their English is checked
+// like any other language by the tests).
+const isKoreanSource = (file: string): boolean => /[\\/]raidboss[\\/]data[\\/]fork[\\/]/.test(file);
+
 export const findMissing = async (
   triggersFile: string,
   locale: Lang,
   errorFunc: ErrorFuncType,
 ): Promise<void> => {
+  if (locale === 'ko' && isKoreanSource(triggersFile))
+    return;
   // Hackily assume that any file with a txt file of the same name is a trigger/timeline.
   const timelineFile = triggersFile.replace(/\.[jt]s$/, '.txt');
   if (!fs.existsSync(timelineFile))

@@ -5,6 +5,13 @@ import PartyTracker, { jobLocalizedFull } from '../../resources/party';
 import Regexes from '../../resources/regexes';
 import { triggerOutputFunctions } from '../../resources/responses';
 import { translateRegex, translateRegexBuildParam } from '../../resources/translations';
+import {
+  selectVariants,
+  timelineZoneKey,
+  TriggerSetVariant,
+  upstreamZones,
+  variantSetIds,
+} from '../../resources/trigger_set_variants';
 import UserConfig, {
   ConfigEntry,
   ConfigEntryToDivMap,
@@ -126,6 +133,36 @@ const kOptionKeys = {
   triggerSets: 'triggerSets',
   // folder for options in trigger set config ui
   triggerSetConfig: 'TriggerSetConfig',
+  // Fork: per fight, the fork's own version or upstream's (trigger_set_variants.ts).
+  triggerSetVariant: 'TriggerSetVariant',
+} as const;
+
+// Fork: fights with both the fork's own triggers and timeline and upstream's.
+const kVariantSetIds = variantSetIds(raidbossFileData);
+
+// Fork: the choice between them, in a fight's options.
+const kVariantEntry = {
+  name: {
+    en: 'Triggers and timeline',
+    ko: '트리거·타임라인',
+  },
+  comment: {
+    en:
+      'The fork\'s own (cbkr) or upstream cactbot\'s. The config page reloads to show the chosen version\'s triggers.',
+    ko: '포크가 따로 만든 것(cbkr) 또는 본가 캑봇 것입니다. 바꾸면 설정 화면을 다시 불러와 고른 버전의 트리거를 보여 줍니다.',
+  },
+  type: 'select',
+  options: {
+    en: {
+      'Fork\'s own (cbkr)': 'custom',
+      'Upstream cactbot': 'upstream',
+    },
+    ko: {
+      '포크 커스텀 (cbkr)': 'custom',
+      '본가 캑봇': 'upstream',
+    },
+  },
+  default: 'custom',
 } as const;
 
 type TriggerSoundOption = {
@@ -765,6 +802,29 @@ class RaidbossConfigurator {
         triggerSetConfig.classList.add('overlay-options');
         triggerContainer.appendChild(triggerSetConfig);
 
+        // Fork: the fork's own version of this fight or upstream's.
+        if (kVariantSetIds.has(info.triggerSet.id)) {
+          const variantEntry = { ...kVariantEntry, id: info.triggerSet.id } as const;
+          const variant = this.base.buildConfigEntry(
+            userOptions,
+            triggerSetConfig,
+            variantEntry,
+            'raidboss',
+            [kOptionKeys.triggerSetVariant],
+          );
+          if (variant) {
+            addFightOptionReset(
+              variant.elements,
+              variantEntry,
+              (text) => this.base.translate(text),
+            );
+            // Its triggers (and timeline) are the other version's: the page is made again.
+            variant.elements[1]?.addEventListener('change', () => {
+              void this.base.flushPendingSave().then(() => window.location.reload());
+            });
+          }
+        }
+
         const triggerSetAlertOutput = {
           ...defaultTriggerSetAlertOutput,
           id: kOptionKeys.output,
@@ -784,13 +844,23 @@ class RaidbossConfigurator {
             info.triggerSet.id,
           ],
         );
-        // Fork: back to the general alert output.
-        if (outputEntry)
+        // Fork: back to following the general alert output: what was saved for the fight goes
+        // (saving the general value would keep it when the general one changes later).
+        if (outputEntry) {
           addFightOptionReset(
             outputEntry.elements,
             triggerSetAlertOutput,
             (text) => this.base.translate(text),
           );
+          const setId = info.triggerSet.id;
+          outputEntry.elements[1]?.querySelector('.config-reset')?.addEventListener('click', () => {
+            this.base.setJsonOption(
+              'raidboss',
+              [kOptionKeys.triggerSets, setId, kOptionKeys.output],
+              undefined as unknown as SavedConfigEntry,
+            );
+          });
+        }
 
         // Track the values of and html elements associated with each config entry,
         // to be used for updating visibility/enablement of config entries.
@@ -878,9 +948,11 @@ class RaidbossConfigurator {
           default: typeof opt.default === 'function' ? undefined : opt.default.toString(),
         });
       }
+      if (kVariantSetIds.has(setId))
+        settings.push({ path: [kOptionKeys.triggerSetVariant, setId], default: 'custom' });
     }
     if (info.triggerSet.timeline !== undefined && typeof info.zoneId === 'number')
-      settings.push({ path: ['timeline', info.zoneId.toString()] });
+      settings.push({ path: ['timeline', this.timelineKey(info.zoneId, setId)] });
     // An overridden set shows a warning instead of its triggers.
     if (info.triggerSet.overriddenByFile !== undefined) {
       registerTriggerFile('raidboss', triggerContainer, info.title, info.type, [], settings);
@@ -1265,12 +1337,30 @@ class RaidbossConfigurator {
   }
 
   // Build the top level timeline editing expandable container.
+  // Fork: which version of a fight is chosen (trigger_set_variants.ts).
+  chosenVariant(setId?: string): TriggerSetVariant {
+    if (setId === undefined || !kVariantSetIds.has(setId))
+      return 'custom';
+    const value = this.base.getStringOption(
+      'raidboss',
+      [kOptionKeys.triggerSetVariant, setId],
+      'custom',
+    );
+    return value === 'upstream' ? 'upstream' : 'custom';
+  }
+
+  // Fork: where a fight's timeline edits are saved (upstream's version's apart from the fork's).
+  timelineKey(zoneId: number, setId?: string): string {
+    return timelineZoneKey(zoneId, this.chosenVariant(setId) === 'upstream');
+  }
+
   buildTimelineUIContainer(
     zoneId: number,
     set: ConfigLooseTriggerSet,
     parent: HTMLElement,
     options: RaidbossOptions,
   ): void {
+    const zoneKey = this.timelineKey(zoneId, set.id);
     const container = document.createElement('div');
     container.classList.add('timeline-edit-container', 'collapsed');
     parent.appendChild(container);
@@ -1299,7 +1389,7 @@ class RaidbossConfigurator {
       },
       edits: () =>
         countTimelineEdits(
-          this.base.getJsonOption('raidboss', ['timeline', zoneId.toString()], {}),
+          this.base.getJsonOption('raidboss', ['timeline', zoneKey], {}),
         ),
     });
 
@@ -1312,7 +1402,7 @@ class RaidbossConfigurator {
         const { text, timeline } = parse();
         // Fork: the new config page also edits single entries (timeline_editor.ts).
         if (!isClassic()) {
-          const zonePath = ['timeline', zoneId.toString()];
+          const zonePath = ['timeline', zoneKey];
           buildTimelineEditor(container, {
             timeline: timeline,
             text: text,
@@ -1324,15 +1414,15 @@ class RaidbossConfigurator {
             setColor: (id, value) =>
               this.base.setJsonOption('raidboss', ['timelineColors', id], value),
             jobName: (job) => this.base.translate(jobLocalizedFull[job as Job] ?? { en: job }),
-            buildByName: (pane) => this.buildTimelineTextUI(zoneId, timeline, pane),
+            buildByName: (pane) => this.buildTimelineTextUI(zoneKey, timeline, pane),
           });
         } else {
           this.buildTimelineListingUI(timeline, text, container);
-          this.buildTimelineAddUI(zoneId, container);
-          this.buildTimelineTextUI(zoneId, timeline, container);
+          this.buildTimelineAddUI(zoneKey, container);
+          this.buildTimelineTextUI(zoneKey, timeline, container);
           // Fork: edits made in the new style's editor apply here too, but only it shows them.
           const n = countEntryEdits(
-            this.base.getJsonOption('raidboss', ['timeline', zoneId.toString()], {}),
+            this.base.getJsonOption('raidboss', ['timeline', zoneKey], {}),
           );
           if (n > 0) {
             const note = document.createElement('div');
@@ -1400,11 +1490,12 @@ class RaidbossConfigurator {
     timelineContents.innerText = translated.join('\n');
   }
 
+  // Fork: zoneKey, where the zone's edits are saved (see timelineKey).
   buildTimelineAddUI(
-    zoneId: number,
+    zoneKey: string,
     parent: HTMLElement,
   ): void {
-    const addId = ['timeline', zoneId.toString(), 'add'];
+    const addId = ['timeline', zoneKey, 'add'];
 
     const header = document.createElement('div');
     header.classList.add('timeline-add-header');
@@ -1517,7 +1608,7 @@ class RaidbossConfigurator {
   }
 
   buildTimelineTextUI(
-    zoneId: number,
+    zoneKey: string,
     timeline: TimelineParser,
     parent: HTMLElement,
   ): void {
@@ -1556,7 +1647,7 @@ class RaidbossConfigurator {
 
       // Enable/disable here behaves identically to `hideall "key"`, where this text will
       // not be shown, but timeline triggers related to it will still fire.
-      const enableId = ['timeline', zoneId.toString(), 'enable', key];
+      const enableId = ['timeline', zoneKey, 'enable', key];
       const defaultValue = true;
       checkInput.checked = this.base.getBooleanOption('raidboss', enableId, defaultValue);
       checkInput.onchange = () => this.base.setOption('raidboss', enableId, checkInput.checked);
@@ -1573,7 +1664,7 @@ class RaidbossConfigurator {
 
       // Any changes are tied to the original timeline text (key), but the config ui will
       // display the current language's text with replacements (event) as the placeholder above.
-      const textId = ['timeline', zoneId.toString(), 'globalReplace', key];
+      const textId = ['timeline', zoneKey, 'globalReplace', key];
       textInput.value = this.base.getStringOption('raidboss', textId, '');
       const setFunc = () => this.base.setOption('raidboss', textId, textInput.value);
       textInput.onchange = setFunc;
@@ -1813,7 +1904,9 @@ class RaidbossConfigurator {
     // `map` is a sorted map of shortened zone key => { various fields, triggerSet }
     const triggerFiles: { [filename: string]: ConfigLooseTriggerSet } = {};
     const timelineFiles: { [filename: string]: string } = {};
-    for (const [filename, triggerSetOrString] of Object.entries(files)) {
+    // Fork: the fork's own version of a fight or upstream's, as chosen.
+    const chosen = selectVariants(files, (id) => this.chosenVariant(id));
+    for (const [filename, triggerSetOrString] of Object.entries(chosen)) {
       if (typeof triggerSetOrString === 'string')
         timelineFiles[filename] = triggerSetOrString;
       else
@@ -2098,6 +2191,20 @@ const processPerTriggerSetAutoConfig = (
   }
 };
 
+// Fork: raidboss > TriggerSetVariant > <set id> > 'custom' | 'upstream'.
+const processTriggerSetVariant = (options: RaidbossOptions, savedConfig: SavedConfigEntry) => {
+  const variants = options.TriggerSetVariant ??= {};
+  if (typeof savedConfig !== 'object' || Array.isArray(savedConfig))
+    return;
+  const saved = savedConfig[kOptionKeys.triggerSetVariant];
+  if (typeof saved !== 'object' || Array.isArray(saved))
+    return;
+  for (const [setId, value] of Object.entries(saved)) {
+    if (value === 'custom' || value === 'upstream')
+      variants[setId] = value;
+  }
+};
+
 const processPerZoneTimelineConfig = (options: RaidbossOptions, savedConfig: SavedConfigEntry) => {
   const optionName = 'PerZoneTimelineConfig';
   // SavedConfig uses this key structure:
@@ -2114,9 +2221,15 @@ const processPerZoneTimelineConfig = (options: RaidbossOptions, savedConfig: Sav
   // Fork: the user's highlight colors.
   const palette = readPalette(savedConfig['timelineColors']);
 
+  // Fork: a fight played with upstream's version instead of the fork's keeps its own edits, as
+  // '<zone id>@upstream' (the fork's stay at '<zone id>').
+  const upstream = upstreamZones(raidbossFileData, options.TriggerSetVariant ?? {});
   for (const [zoneKey, zoneEntry] of Object.entries(timeline)) {
-    const zoneId = parseInt(zoneKey);
+    const [idPart = '', variant] = zoneKey.split('@');
+    const zoneId = parseInt(idPart);
     if (!zoneId)
+      continue;
+    if ((variant ?? '') !== (upstream.has(zoneId) ? 'upstream' : ''))
       continue;
     const timelineConfig = perZoneTimelineConfig[zoneId] ??= {};
 
@@ -2316,6 +2429,8 @@ const templateOptions: OptionsTemplate = {
 
     processPerTriggerAutoConfig(options, savedConfig);
     processPerTriggerSetAutoConfig(options, savedConfig);
+    // Fork: before the timeline edits, which go by it.
+    processTriggerSetVariant(options, savedConfig);
     processPerZoneTimelineConfig(options, savedConfig);
     processTriggerSetConfig(options, savedConfig);
   },

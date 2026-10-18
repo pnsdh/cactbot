@@ -98,6 +98,20 @@ const testTriggerFile = (file: string, info: TriggerSetInfo) => {
       assert.fail('has an undefined id somehow');
       return;
     }
+    // Fork: the fork's own version of a fight (ui/raidboss/data/fork/) shares upstream's id; one
+    // of the two is loaded (resources/trigger_set_variants.ts).  Upstream's file must still be at
+    // the same path with the same id, or both would load (e.g. after upstream renamed it).
+    const forkDir = /([\\/]raidboss[\\/]data[\\/])fork[\\/]/;
+    if (forkDir.test(file)) {
+      const partner = file.replace(forkDir, '$1');
+      if (!fs.existsSync(partner)) {
+        assert.fail(`fork version without upstream's file at ${partner}`);
+        return;
+      }
+      if (!fs.readFileSync(partner, 'utf8').includes(`id: '${id}'`))
+        assert.fail(`upstream's ${partner} no longer has the set id ${id}`);
+      return;
+    }
     const prevFile = info.triggerSetId[id];
     if (prevFile === undefined) {
       info.triggerSetId[id] = file;

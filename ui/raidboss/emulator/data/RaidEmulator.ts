@@ -35,7 +35,9 @@ export default class RaidEmulator extends EventBus {
   ): void {
     // If language was autodetected from the encounter, set the current ParserLanguage
     // appropriately
-    if (enc.language !== 'en') {
+    // Fork: English too when found in the log (the fork's default language is Korean, so an
+    // English client's log would otherwise be read as Korean).
+    if (enc.language !== 'en' || enc.languageDetected) {
       this.options.ParserLanguage = enc.language;
       this.popupText?.setParserLanguage(enc.language);
     }

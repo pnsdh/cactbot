@@ -166,7 +166,7 @@ for (const type of kSometimes) {
   report(
     n > 0 ? 'OK  ' : 'info',
     `${type} ${name(type)}: ${n} lines${base ? ` (baseline ${before})` : ''}${
-      n === 0 ? ' — only in some content' : ''
+      n === 0 ? ' (only in some content)' : ''
     }`,
   );
 }
