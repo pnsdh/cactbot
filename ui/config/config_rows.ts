@@ -1,3 +1,4 @@
+import { callOverlayHandler } from '../../resources/overlay_plugin_api';
 import { ConfigEntry, ConfigValue } from '../../resources/user_config';
 import { LocaleText } from '../../types/trigger';
 
@@ -47,6 +48,10 @@ const kTopics: { [group: string]: Topic[] } = {
         'LongSoundVolume',
         'PullSoundVolume',
       ],
+    },
+    {
+      title: { en: 'TTS voice', ko: 'TTS 음성' },
+      ids: ['TtsVolume', 'AlarmTtsVolume', 'AlertTtsVolume', 'InfoTtsVolume'],
     },
     {
       title: { en: 'Gamepad rumble', ko: '게임패드 진동' },
@@ -188,6 +193,10 @@ const kNumbers: { [id: string]: NumberKind } = {
   InfoSoundVolume: kPercent,
   LongSoundVolume: kPercent,
   PullSoundVolume: kPercent,
+  TtsVolume: kPercent,
+  AlarmTtsVolume: kPercent,
+  AlertTtsVolume: kPercent,
+  InfoTtsVolume: kPercent,
   AlarmRumbleDuration: kMsAsSeconds,
   AlarmRumbleWeak: kPercent,
   AlarmRumbleStrong: kPercent,
@@ -568,7 +577,49 @@ const addReset = (
   };
   inputDiv.addEventListener('input', refresh);
   inputDiv.addEventListener('change', refresh);
+  inputDiv.addEventListener('config-shown', refresh);
   refresh();
+};
+
+// Fork: the TTS master volume is the pnsdh OverlayPlugin's own setting: shown from it, and set in
+// it as it changes here (what cactbot saves for it is not used).  Other OverlayPlugins answer
+// nothing: it can't be changed then.
+const linkTtsVolume = (cells: HTMLElement[] | undefined): void => {
+  const inputDiv = cells?.[1];
+  const input = inputDiv?.querySelector<HTMLInputElement>(
+    'input[type="text"]:not(.config-num-shown)',
+  );
+  if (inputDiv === undefined || input === null || input === undefined)
+    return;
+  let linked = false;
+  let timer: number | undefined;
+  input.addEventListener('input', () => {
+    if (!linked)
+      return;
+    window.clearTimeout(timer);
+    timer = window.setTimeout(() => {
+      const value = parseFloat(input.value);
+      void callOverlayHandler({
+        call: 'say',
+        query: 'volume',
+        volume: Math.round(Math.max(0, Math.min(1, isFinite(value) ? value : 1)) * 100),
+      });
+    }, 150);
+  });
+  void callOverlayHandler({ call: 'say', query: 'volume' }).then((answer) => {
+    if (typeof answer?.volume !== 'number') {
+      for (
+        const control of inputDiv.querySelectorAll<HTMLInputElement | HTMLButtonElement>(
+          'input, button',
+        )
+      )
+        control.disabled = true;
+      return;
+    }
+    input.value = (answer.volume / 100).toString();
+    input.dispatchEvent(new Event('config-shown', { bubbles: true }));
+    linked = true;
+  });
 };
 
 // Moves an option's description (and the notes in its name's parentheses) into a tooltip on an
@@ -695,6 +746,8 @@ export const arrangeSection = (
     if (type !== 'html' && type !== 'directory')
       addReset(id, left, inputDiv, translate);
   }
+  if (group === 'raidboss')
+    linkTtsVolume(rows.get('TtsVolume'));
 
   const topics = kTopics[group] ?? [];
   const cards: HTMLElement[] = [];

@@ -1,5 +1,5 @@
-// What raidboss asks OverlayPlugin to say, end to end: the alert's kind (severity) and language
-// go with the text, and a TTS text set for an output string in the config replaces what the
+// What raidboss asks OverlayPlugin to say, end to end: the alert's kind (severity), language and
+// volume (set by kind in the config) go with the text, and a TTS text set for an output string in the config replaces what the
 // screen shows (with the same params).  Uses the built page (dist/) and the test triggers
 // (Middle La Noscea, /echo lines in Korean, as the parser language is).
 //
@@ -36,6 +36,7 @@ const cases = [
       triggers: { 'Test Lang': { TtsStrings: { text: '지금 언어는 ${lang}입니다' } } },
     },
   }],
+  ['volumes by kind', { raidboss: { ...ttsOnly, AlarmTtsVolume: 0.3, InfoTtsVolume: 0.6 } }],
 ];
 
 let failed = 0;
@@ -43,17 +44,23 @@ for (const [name, data] of cases) {
   const { said, errors } = await run(data);
   console.log(`== ${name}`);
   for (const s of said)
-    console.log(`  ${s.call} severity=${s.severity} lang=${s.lang} source=${s.source}: ${s.text}`);
+    console.log(
+      `  ${s.call} severity=${s.severity} lang=${s.lang} volume=${s.volume} source=${s.source}: ${s.text}`,
+    );
   for (const e of errors)
     console.log(`  page error: ${e}`);
   const lang = said.find((s) => /언어|language/i.test(s.text));
-  const expect = name === 'default text' ? '언어: ko' : '지금 언어는 ko입니다';
+  const expect = name === 'TTS text for Test Lang' ? '지금 언어는 ko입니다' : '언어: ko';
+  const [infoVolume, alarmVolume] = name === 'volumes by kind' ? [0.6, 0.3] : [1, 1];
+  const four = said.find((s) => s.text === '4');
   if (
-    lang?.text !== expect || lang?.severity !== 'info' ||
-    said.find((s) => s.text === '4')?.severity !== 'alarm'
+    lang?.text !== expect || lang?.severity !== 'info' || lang?.volume !== infoVolume ||
+    four?.severity !== 'alarm' || four?.volume !== alarmVolume
   ) {
     failed++;
-    console.log(`  FAIL: expected "${expect}" (info) and "4" (alarm)`);
+    console.log(
+      `  FAIL: expected "${expect}" (info, ${infoVolume}) and "4" (alarm, ${alarmVolume})`,
+    );
   }
 }
 // A plugin that fetches ahead gets the zone's alerts as they will be said, once loaded.

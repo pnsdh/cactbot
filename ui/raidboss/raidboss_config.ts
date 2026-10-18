@@ -2843,9 +2843,9 @@ const templateOptions: OptionsTemplate = {
       },
       comment: {
         en:
-          'Multiplies the volumes below: at 100% each sound plays at its own volume. Sounds only: text to speech is as loud as set in ACT (its sound options, or a TTS plugin).',
+          'Multiplies the volumes below: at 100% each sound plays at its own volume. Sounds only: text to speech is set under TTS voice (with the pnsdh OverlayPlugin\'s own TTS; otherwise in ACT\'s sound options or a TTS plugin).',
         ko:
-          '아래 소리 크기들에 곱해지는 배율입니다. 100%면 각 소리가 정해진 크기 그대로 납니다. 효과음에만 적용되고, TTS 음성 크기는 ACT의 사운드 설정(또는 TTS 플러그인)에서 정합니다.',
+          '아래 소리 크기들에 곱해지는 배율입니다. 100%면 각 소리가 정해진 크기 그대로 납니다. 효과음에만 적용되고, TTS 음성 크기는 아래 TTS 음성에서 정합니다 (pnsdh OverlayPlugin의 자체 TTS일 때. 그 밖에는 ACT의 사운드 설정이나 TTS 플러그인).',
       },
       type: 'float',
       default: 1,
@@ -2916,6 +2916,54 @@ const templateOptions: OptionsTemplate = {
         cn: '开怪提示音量 (0-1)',
         ko: '풀링 소리 크기 (0-1)',
         tc: '開怪提示音量 (0-1)',
+      },
+      type: 'float',
+      default: 1,
+    },
+    {
+      // Fork: the pnsdh OverlayPlugin's own setting, linked on the config page (config_rows.ts).
+      id: 'TtsVolume',
+      name: {
+        en: 'TTS master volume',
+        ko: '전체 TTS 크기',
+      },
+      comment: {
+        en:
+          'The same as the volume of all speech in OverlayPlugin\'s TTS settings: changed on either side, both follow, with no overlay reload. Only with an OverlayPlugin that has its own TTS (pnsdh).',
+        ko:
+          'OverlayPlugin TTS 설정의 전체 볼륨과 같은 값입니다. 어느 쪽에서 바꿔도 함께 바뀌고, 오버레이를 다시 불러올 필요가 없습니다. 자체 TTS가 있는 OverlayPlugin(pnsdh)에서만 바꿀 수 있습니다.',
+      },
+      type: 'float',
+      default: 1,
+    },
+    {
+      id: 'AlarmTtsVolume',
+      name: {
+        en: 'Alarm TTS volume',
+        ko: '경고 TTS 크기',
+      },
+      comment: {
+        en:
+          'When OverlayPlugin\'s own TTS reads cactbot\'s alerts (pnsdh). With ACT\'s TTS, ACT\'s sound options apply.',
+        ko: 'OverlayPlugin(pnsdh)의 자체 TTS로 읽을 때 적용됩니다. ACT의 TTS로 읽으면 ACT의 사운드 설정을 따릅니다.',
+      },
+      type: 'float',
+      default: 1,
+    },
+    {
+      id: 'AlertTtsVolume',
+      name: {
+        en: 'Alert TTS volume',
+        ko: '주의 TTS 크기',
+      },
+      type: 'float',
+      default: 1,
+    },
+    {
+      id: 'InfoTtsVolume',
+      name: {
+        en: 'Info TTS volume',
+        ko: '안내 TTS 크기',
       },
       type: 'float',
       default: 1,

@@ -649,12 +649,19 @@ export class PopupText {
       // the pnsdh OverlayPlugin's TTS uses (a more important alert cuts in, volume by kind).
       // Other OverlayPlugins read only the text, with ACT's TTS, as cactbotSay did.
       this.ttsSay = (text, severity) => {
+        // Fork: its volume by kind (an alert without text counts as info).
+        const volume = severity === 'alarm'
+          ? this.options.AlarmTtsVolume
+          : severity === 'alert'
+          ? this.options.AlertTtsVolume
+          : this.options.InfoTtsVolume;
         void callOverlayHandler({
           call: 'say',
           text: this.options.TransformTts(text),
           severity: severity,
           source: 'cactbot',
           lang: this.ttsLang(),
+          volume: Math.max(0, Math.min(1, Number(volume))),
         });
       };
       // Fork: whether it can fetch a zone's alerts ahead (other OverlayPlugins answer nothing;

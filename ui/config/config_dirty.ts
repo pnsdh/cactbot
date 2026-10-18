@@ -47,6 +47,8 @@ const isDefault = (group: string, path: string[], value: SavedConfigEntry): bool
 
 // Options of this page alone: the overlays don't need a reload for them.
 const kPageOptions = ['ConfigStyle', 'ConfigTheme', 'ConfigZoom'];
+// ...and options that are another program's own setting (the pnsdh OverlayPlugin's TTS volume).
+const kLinkedOptions: { [group: string]: string[] } = { raidboss: ['TtsVolume'] };
 
 // The config without anything that means the default, with keys in order.
 const normalize = (
@@ -57,6 +59,8 @@ const normalize = (
   if (value === undefined || value === null)
     return undefined;
   if (group === 'general' && path.length === 1 && kPageOptions.includes(path[0] ?? ''))
+    return undefined;
+  if (path.length === 1 && kLinkedOptions[group]?.includes(path[0] ?? ''))
     return undefined;
   if (Array.isArray(value)) {
     const items = value.map((v) => normalize(group, path, v)).filter((v) => v !== undefined);

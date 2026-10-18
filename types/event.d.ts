@@ -512,9 +512,12 @@ type SayHandler = (msg: {
   severity?: 'info' | 'alert' | 'alarm';
   source?: string;
   lang?: string;
-  // Fork: asks what the plugin's TTS takes (others answer nothing).
-  query?: 'capabilities';
-}) => { engine?: string; prepare?: boolean } | null | undefined;
+  // Fork: this text's volume (0-1).
+  volume?: number;
+  // Fork: asks what the plugin's TTS takes (others answer nothing), or its volume of all speech
+  // (set with volume, 0-100).
+  query?: 'capabilities' | 'volume';
+}) => { engine?: string; prepare?: boolean; volume?: number; enabled?: boolean } | null | undefined;
 
 // Fork (pnsdh OverlayPlugin): a zone's alerts, fetched ahead by a network voice.
 type TtsPrepareHandler = (msg: {
