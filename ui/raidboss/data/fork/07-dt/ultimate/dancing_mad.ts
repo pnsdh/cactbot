@@ -6001,7 +6001,7 @@ const triggerSet: TriggerSet<Data> = {
   // 타임라인 원본은 한국어(source·표시 능력명 모두 한국어). 타 언어 클라이언트 지원:
   //   replaceSync = source(NPC명)을 각 언어로 치환 → 로그 sync 정상 작동.
   //   replaceText = 표시 능력명·주석을 각 언어로(BNpcName/Action/RSV 데이터 기반).
-  //   cn은 중국어 데이터 없어 replaceSync만. de·fr·cn은 일부 커스텀 라벨 미번역이라 missingTranslations (ja는 완역).
+  //   cn은 중국어 데이터 없어 replaceSync만. en 외 로케일은 일부 커스텀 라벨(--컷씬 종료-- 등) 미번역이라 missingTranslations.
   //   부분문자열(엑스데스⊂네오 엑스데스, 선더가⊂찌릿찌릿 선더가 등)은 lookaround로 치환 충돌 방지.
   timelineReplace: [
     {
@@ -6416,6 +6416,7 @@ const triggerSet: TriggerSet<Data> = {
     },
     {
       locale: 'ja',
+      missingTranslations: true,
       replaceSync: {
         '케프카': 'ケフカ',
         '(?<!네오 )엑스데스': 'エクスデス',
