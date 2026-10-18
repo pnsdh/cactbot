@@ -7,17 +7,15 @@
 * 절 요성난무(P1~P5) 트리거·타임라인을 한국 서버 공략에 맞춰 따로 작성했습니다. 전투마다 본가 트리거로 바꿔 쓸 수도 있습니다.
 * 알람·타임라인과 웁시레이지용 `cbkr` 스킨을 제공합니다(기본 스킨).
 * 설정 화면을 새로 디자인했고, 타임라인 항목마다 문구·숨기기·강조색을 바꿀 수 있습니다.
-* [OverlayPlugin 한국어 포크](https://github.com/pnsdh/OverlayPlugin)의 TTS와 연동됩니다: 알림 중요도별 크기, 출력 문구마다 TTS가 읽을 말 따로 쓰기, 플레이어를 직업으로 읽기, 지역 알림 미리 만들기.
+* TTS가 플레이어를 직업으로 읽고, 출력 문구마다 TTS가 읽을 말을 따로 쓸 수 있습니다.
 
-**[OverlayPlugin 한국어 포크](https://github.com/pnsdh/OverlayPlugin)를 함께 쓰는 것을 권장합니다.** 타임라인이 더 부드럽게 움직이고, 알림을 플러그인 자체 TTS로 들을 수 있습니다. 본가 OverlayPlugin에서도 동작하지만 TTS 연동 기능은 쓸 수 없습니다.
+**[OverlayPlugin 한국어 포크](https://github.com/pnsdh/OverlayPlugin)를 함께 쓰는 것을 권장합니다.** 타임라인이 더 부드럽게 움직이고, TTS가 중요한 알림을 먼저 읽으며 경고·주의·안내별로 크기를 정할 수 있습니다. 본가 OverlayPlugin에서도 이 두 가지 말고는 모두 동작합니다.
 
 문의·버그 제보는 [디스코드](https://discord.gg/R75tq68bA9)로 해 주세요.
 
 ## 설치
 
 ACT, FFXIV ACT Plugin, OverlayPlugin이 필요합니다. 없다면 해루봇이나 [본가 한국어 안내](docs/ko-KR/README.md#설치하기)로 먼저 설치합니다(cactbot은 설치하지 않아도 됩니다).
-
-> OverlayPlugin은 [한국어 포크](https://github.com/pnsdh/OverlayPlugin)로 바꾸는 것을 권장합니다. 설치 방법은 그쪽 안내를 따릅니다.
 
 ### 기존 cactbot을 쓰던 경우
 
@@ -53,21 +51,10 @@ ACT, FFXIV ACT Plugin, OverlayPlugin이 필요합니다. 없다면 해루봇이�
     | 실수 기록 | `Cactbot OopsyRaidsy` |
 
 1. 위치와 크기를 맞춘 뒤 `General` 탭에서 잠금(`Lock Overlay`)과 클릭 통과(`Enable Clickthrough`)를 체크합니다.
-1. 스킨은 기본으로 `cbkr`입니다. cactbot 원래 모양을 원하면 `Cactbot Config`에서 `레이드보스 스킨`, `웁시레이지 스킨`을 `기본`으로 바꿉니다.
+
+스킨은 `cbkr`이 기본입니다. cactbot 원래 모양을 원하면 `Cactbot Config`에서 `레이드보스 스킨`, `웁시레이지 스킨`을 `기본`으로 바꿉니다.
 
 기존 cactbot 오버레이는 본가 파일을 가리키므로 지우고 새로 만듭니다. 위치를 참고하려면 표시(`Show Overlay`)만 꺼 두었다가 나중에 지웁니다.
-
-### TTS로 알림 듣기
-
-[OverlayPlugin 한국어 포크](https://github.com/pnsdh/OverlayPlugin)가 필요합니다.
-
-1. OverlayPlugin의 `TTS` 탭에서 **알림을 이 플러그인의 TTS로 읽기**를 켜고 엔진을 고릅니다(무료: Windows, Supertonic).
-1. `Cactbot Config` → `레이드보스` → `기본 알람 출력 방식`을 `텍스트와 TTS`로 바꿉니다.
-1. 같은 화면의 `TTS 음성` 칸에서 경고·주의·안내별 크기와 플레이어를 읽는 방식(기본: 직업)을 정합니다.
-
-### 요성난무를 본가 트리거로 쓰기
-
-`Cactbot Config` → `레이드보스`의 트리거 목록에서 절 요성난무를 열고, 맨 위 `트리거·타임라인`을 `본가 캑봇`으로 바꿉니다. 전투마다 따로 고를 수 있고, 타임라인 편집도 버전별로 따로 저장됩니다.
 
 ### 지켜야 할 것
 
@@ -88,6 +75,20 @@ ACT, FFXIV ACT Plugin, OverlayPlugin이 필요합니다. 없다면 해루봇이�
   ACT 폴더 밖에 두면 해루봇이 실행될 때마다 경고하고, 복원 시 경로를 `FileResources\user`로 되돌립니다.
 
 </details>
+
+## 쓰기
+
+### TTS로 알림 듣기
+
+1. `Cactbot Config` → `레이드보스` → `기본 알람 출력 방식`을 `텍스트와 TTS`로 바꿉니다.
+1. 같은 화면의 `TTS 음성` 칸에서 플레이어를 읽는 방식(기본: 직업)을 정합니다.
+
+읽는 것은 ACT의 TTS(또는 TTSYukkuri 같은 TTS 플러그인)입니다.
+[OverlayPlugin 한국어 포크](https://github.com/pnsdh/OverlayPlugin)를 쓰면 OverlayPlugin의 `TTS` 탭에서 플러그인 자체 TTS를 켤 수 있고(무료: Windows, Supertonic), `TTS 음성` 칸에서 경고·주의·안내별 크기도 정할 수 있습니다.
+
+### 요성난무를 본가 트리거로 쓰기
+
+`Cactbot Config` → `레이드보스`의 트리거 목록에서 절 요성난무를 열고, 맨 위 `트리거·타임라인`을 `본가 캑봇`으로 바꿉니다. 전투마다 따로 고를 수 있고, 타임라인 편집도 버전별로 따로 저장됩니다.
 
 ## 자주 묻는 것
 
