@@ -103,6 +103,14 @@ const check = (name, ok, info) => results.push(`${ok ? 'OK  ' : 'FAIL'} ${name} 
     !document.getElementById('butter-margin').classList.contains('hidden')
   );
   check('no reload prompt', !prompt, `prompt=${prompt}`);
+  // Changed in the plugin's settings: shown here within a few seconds.
+  await page.evaluate(() => {
+    document.activeElement?.blur();
+    window.__ttsVolume = 55;
+  });
+  await wait(3000);
+  const followed = await shown(page);
+  check('follows the plugin', followed.value === '55', JSON.stringify(followed));
   check('no page errors', errors.length === 0, errors.join('; '));
   await page.close();
 }

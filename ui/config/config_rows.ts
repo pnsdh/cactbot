@@ -581,9 +581,10 @@ const addReset = (
   refresh();
 };
 
-// Fork: the TTS master volume is the pnsdh OverlayPlugin's own setting: shown from it, and set in
-// it as it changes here (what cactbot saves for it is not used).  Other OverlayPlugins answer
-// nothing: it can't be changed then.
+// Fork: the TTS master volume is the pnsdh OverlayPlugin's own setting: shown from it (asked
+// again while the page is shown, as it can change in the plugin's settings), and set in it as it
+// changes here (what cactbot saves for it is not used).  Other OverlayPlugins answer nothing: it
+// can't be changed then.
 const linkTtsVolume = (cells: HTMLElement[] | undefined): void => {
   const inputDiv = cells?.[1];
   const input = inputDiv?.querySelector<HTMLInputElement>(
@@ -593,9 +594,15 @@ const linkTtsVolume = (cells: HTMLElement[] | undefined): void => {
     return;
   let linked = false;
   let timer: number | undefined;
+  // Changed here lately, or being changed (typed, dragged): not overwritten from the plugin.
+  let changedAt = 0;
+  let dragging = false;
+  inputDiv.addEventListener('pointerdown', () => dragging = true);
+  window.addEventListener('pointerup', () => dragging = false);
   input.addEventListener('input', () => {
     if (!linked)
       return;
+    changedAt = Date.now();
     window.clearTimeout(timer);
     timer = window.setTimeout(() => {
       const value = parseFloat(input.value);
@@ -606,20 +613,40 @@ const linkTtsVolume = (cells: HTMLElement[] | undefined): void => {
       });
     }, 150);
   });
-  void callOverlayHandler({ call: 'say', query: 'volume' }).then((answer) => {
+  const busy = () =>
+    dragging || Date.now() - changedAt < 1000 || inputDiv.contains(document.activeElement);
+  const refresh = async (first: boolean) => {
+    if (!first && (!linked || busy()))
+      return;
+    const answer = await callOverlayHandler({ call: 'say', query: 'volume' });
     if (typeof answer?.volume !== 'number') {
-      for (
-        const control of inputDiv.querySelectorAll<HTMLInputElement | HTMLButtonElement>(
-          'input, button',
+      if (first) {
+        for (
+          const control of inputDiv.querySelectorAll<HTMLInputElement | HTMLButtonElement>(
+            'input, button',
+          )
         )
-      )
-        control.disabled = true;
+          control.disabled = true;
+      }
       return;
     }
-    input.value = (answer.volume / 100).toString();
-    input.dispatchEvent(new Event('config-shown', { bubbles: true }));
+    const value = (answer.volume / 100).toString();
     linked = true;
+    if (busy() || parseFloat(input.value) === answer.volume / 100)
+      return;
+    input.value = value;
+    input.dispatchEvent(new Event('config-shown', { bubbles: true }));
+  };
+  void refresh(true);
+  window.addEventListener('focus', () => void refresh(false));
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible')
+      void refresh(false);
   });
+  window.setInterval(() => {
+    if (document.visibilityState === 'visible')
+      void refresh(false);
+  }, 2000);
 };
 
 // Moves an option's description (and the notes in its name's parentheses) into a tooltip on an
