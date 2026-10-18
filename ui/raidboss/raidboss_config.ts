@@ -34,6 +34,7 @@ import {
   ConfigProcessedFile,
   ConfigProcessedFileMap,
 } from '../config/config';
+import { addFightOptionReset } from '../config/config_rows';
 import { isClassic } from '../config/config_tabs';
 import {
   buildTriggerBrowser,
@@ -773,7 +774,7 @@ class RaidbossConfigurator {
             defaultAlertOutput.default.toString(),
           ),
         } as const;
-        this.base.buildConfigEntry(
+        const outputEntry = this.base.buildConfigEntry(
           userOptions,
           triggerSetConfig,
           triggerSetAlertOutput,
@@ -783,6 +784,13 @@ class RaidbossConfigurator {
             info.triggerSet.id,
           ],
         );
+        // Fork: back to the general alert output.
+        if (outputEntry)
+          addFightOptionReset(
+            outputEntry.elements,
+            triggerSetAlertOutput,
+            (text) => this.base.translate(text),
+          );
 
         // Track the values of and html elements associated with each config entry,
         // to be used for updating visibility/enablement of config entries.
@@ -808,6 +816,8 @@ class RaidbossConfigurator {
 
           if (!ret)
             continue;
+          // Fork: back to its default, as other options.
+          addFightOptionReset(ret.elements, opt, (text) => this.base.translate(text));
           elements.set(opt, ret.elements);
           values[opt.id] = ret.value;
         }
@@ -2598,7 +2608,8 @@ const templateOptions: OptionsTemplate = {
           'cbkr': 'cbkr',
         },
       },
-      default: 'default',
+      // Fork: the fork's own skin.
+      default: 'cbkr',
     },
     {
       id: 'TimelineEnabled',

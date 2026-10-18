@@ -592,7 +592,11 @@ const addReset = (
 // again while the page is shown, as it can change in the plugin's settings), and set in it as it
 // changes here (what cactbot saves for it is not used).  Other OverlayPlugins answer nothing: it
 // can't be changed then.
-const linkTtsVolume = (cells: HTMLElement[] | undefined): void => {
+// onEnabled: whether the plugin reads alerts now (its TTS on), each time it answers.
+const linkTtsVolume = (
+  cells: HTMLElement[] | undefined,
+  onEnabled?: (enabled: boolean) => void,
+): void => {
   const inputDiv = cells?.[1];
   const input = inputDiv?.querySelector<HTMLInputElement>(
     'input[type="text"]:not(.config-num-shown)',
@@ -637,6 +641,7 @@ const linkTtsVolume = (cells: HTMLElement[] | undefined): void => {
       }
       return;
     }
+    onEnabled?.(answer.enabled === true);
     const value = (answer.volume / 100).toString();
     linked = true;
     if (busy() || parseFloat(input.value) === answer.volume / 100)
@@ -654,6 +659,71 @@ const linkTtsVolume = (cells: HTMLElement[] | undefined): void => {
     if (document.visibilityState === 'visible')
       void refresh(false);
   }, 2000);
+};
+
+// Fork: TTS reads cactbot's alerts only when the default output has TTS: said at the top of the
+// TTS card while it has none and the pnsdh OverlayPlugin's TTS is on (not to those who don't use
+// TTS), with a button to switch (the plugin's TTS tab says so too).
+const kTtsOutputNote: LocaleText = {
+  en: 'Alerts are not read by TTS now: the default alert output has no TTS.',
+  ko: '지금은 알림을 TTS로 읽지 않습니다. 기본 알람 출력 방식에 TTS가 없습니다.',
+};
+const kTtsOutputButton: LocaleText = {
+  en: 'Switch to text and TTS',
+  ko: '텍스트와 TTS로 바꾸기',
+};
+
+const noteTtsOutput = (
+  rows: Map<string, HTMLElement[]>,
+  translate: Translate,
+): ((pluginTts: boolean) => void) | undefined => {
+  const select = rows.get('DefaultAlertOutput')?.[1]?.querySelector('select');
+  const card = rows.get('TtsVolume')?.[0]?.closest('.config-card');
+  if (select === null || select === undefined || card === null || card === undefined)
+    return undefined;
+  let pluginTts = false;
+  const note = document.createElement('div');
+  note.classList.add('config-tts-note');
+  const text = document.createElement('span');
+  text.textContent = translate(kTtsOutputNote);
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.textContent = translate(kTtsOutputButton);
+  button.onclick = () => {
+    select.value = 'ttsAndText';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  };
+  note.append(text, button);
+  // The card shows its children in reverse: before the title is under it on screen.
+  card.insertBefore(note, card.querySelector('.config-card-title'));
+  const update = () =>
+    note.classList.toggle(
+      'config-hidden',
+      !pluginTts || select.value === 'ttsAndText' || select.value === 'ttsOnly',
+    );
+  select.addEventListener('change', update);
+  update();
+  return (on: boolean) => {
+    pluginTts = on;
+    update();
+  };
+};
+
+// Fork: a fight's own option (a raidboss trigger set's config): the reset button other options
+// have.  An option whose default is worked out (a function) has none.
+export const addFightOptionReset = (
+  elements: HTMLElement[],
+  opt: ConfigEntry,
+  translate: Translate,
+): void => {
+  const [left, inputDiv] = elements;
+  if (left === undefined || inputDiv === undefined || typeof opt.default === 'function')
+    return;
+  if (opt.type === 'html' || opt.type === 'directory')
+    return;
+  left.dataset.optionType = opt.type;
+  left.dataset.optionDefault = opt.default.toString();
+  addReset(opt.id, left, inputDiv, translate);
 };
 
 // Moves an option's description (and the notes in its name's parentheses) into a tooltip on an
@@ -780,8 +850,6 @@ export const arrangeSection = (
     if (type !== 'html' && type !== 'directory')
       addReset(id, left, inputDiv, translate);
   }
-  if (group === 'raidboss')
-    linkTtsVolume(rows.get('TtsVolume'));
 
   const topics = kTopics[group] ?? [];
   const cards: HTMLElement[] = [];
@@ -804,6 +872,9 @@ export const arrangeSection = (
 
   for (const card of cards)
     groupDiv.before(card);
+
+  if (group === 'raidboss')
+    linkTtsVolume(rows.get('TtsVolume'), noteTtsOutput(rows, translate));
 
   // What's left (raidboss and oopsy trigger lists, added by buildExtraUI) is a card of its own.
   const treeCard = makeCard(translate(kTriggersTitle), groupDiv);

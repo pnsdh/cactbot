@@ -78,6 +78,12 @@ for (const [name, data] of cases) {
   const prepared = await page.evaluate(() =>
     window.__overlayCalls.filter((c) => c.call === 'ttsPrepare').map((c) => c.texts)
   );
+  // The plugin is told how alerts are output (its TTS tab warns when none is read aloud).
+  const outputs = await page.evaluate(() =>
+    window.__overlayCalls.filter((c) => c.call === 'say' && c.query === 'capabilities').map((c) =>
+      c.output
+    )
+  );
   await browser.close();
   const last = prepared.at(-1) ?? [];
   console.log(`== fetched ahead (${prepared.length} lists, last ${last.length} texts)`);
@@ -85,6 +91,11 @@ for (const [name, data] of cases) {
   if (!last.includes('크하하') || last.some((t) => t.includes('${'))) {
     failed++;
     console.log('  FAIL: expected the TTS text "크하하" and no texts with params');
+  }
+  console.log(`  output told to the plugin: ${outputs.join(', ')}`);
+  if (outputs.length === 0 || outputs.some((o) => o !== 'ttsOnly')) {
+    failed++;
+    console.log('  FAIL: expected the capabilities query to carry the output (ttsOnly)');
   }
 }
 

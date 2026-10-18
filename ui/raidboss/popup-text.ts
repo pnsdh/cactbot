@@ -1129,7 +1129,15 @@ export class PopupText {
     if (this.ttsAsking)
       return;
     this.ttsAsking = true;
-    void callOverlayHandler({ call: 'say', query: 'capabilities' }).then((r) => {
+    // With how alerts are output by default (kept only as the switches it sets): the plugin's
+    // TTS tab says when none is read aloud.
+    const o = this.options;
+    const output = o.SpokenAlertsEnabled
+      ? (o.TextAlertsEnabled ? 'ttsAndText' : 'ttsOnly')
+      : o.TextAlertsEnabled
+      ? (o.SoundAlertsEnabled ? 'textAndSound' : 'textOnly')
+      : 'disabled';
+    void callOverlayHandler({ call: 'say', query: 'capabilities', output: output }).then((r) => {
       this.ttsAsking = false;
       this.ttsCanPrepare = r?.prepare === true;
       if (this.ttsCanPrepare)

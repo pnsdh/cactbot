@@ -514,6 +514,8 @@ type SayHandler = (msg: {
   lang?: string;
   // Fork: this text's volume (0-1).
   volume?: number;
+  // Fork: with the capabilities query, cactbot's default alert output (e.g. textAndSound).
+  output?: string;
   // Fork: asks what the plugin's TTS takes (others answer nothing), or its volume of all speech
   // (set with volume, 0-100).
   query?: 'capabilities' | 'volume';
