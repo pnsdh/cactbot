@@ -63,9 +63,11 @@ export const upstreamZones = (
   variants: TriggerSetVariants,
 ): Set<number> => {
   const zones = new Set<number>();
+  // Only fights that still have both versions (both load otherwise, each with its own edits).
+  const paired = variantSetIds(files);
   for (const [filename, data] of Object.entries(files)) {
     const id = setIdOf(data);
-    if (!isForkFile(filename) || id === undefined || variants[id] !== 'upstream')
+    if (!isForkFile(filename) || id === undefined || !paired.has(id) || variants[id] !== 'upstream')
       continue;
     if (typeof data !== 'object')
       continue;

@@ -844,13 +844,23 @@ class RaidbossConfigurator {
             info.triggerSet.id,
           ],
         );
-        // Fork: back to the general alert output.
-        if (outputEntry)
+        // Fork: back to following the general alert output: what was saved for the fight goes
+        // (saving the general value would keep it when the general one changes later).
+        if (outputEntry) {
           addFightOptionReset(
             outputEntry.elements,
             triggerSetAlertOutput,
             (text) => this.base.translate(text),
           );
+          const setId = info.triggerSet.id;
+          outputEntry.elements[1]?.querySelector('.config-reset')?.addEventListener('click', () => {
+            this.base.setJsonOption(
+              'raidboss',
+              [kOptionKeys.triggerSets, setId, kOptionKeys.output],
+              undefined as unknown as SavedConfigEntry,
+            );
+          });
+        }
 
         // Track the values of and html elements associated with each config entry,
         // to be used for updating visibility/enablement of config entries.

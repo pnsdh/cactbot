@@ -60,14 +60,17 @@ await page.waitForFunction(() => document.querySelectorAll('.config-trigger-brow
 });
 await wait(500);
 
-// The fight's options: the star method select (only it has "absolute"), the set's output before it.
+// The fight's options: the star method select (only it has "absolute"), and the set's output.
 const state = () =>
   page.evaluate(() => {
     const star = [...document.querySelectorAll('select')].find((s) =>
       [...s.options].some((o) => o.value === 'absolute')
     );
     const options = star?.closest('.overlay-options');
-    const output = options?.querySelector('select');
+    // The set's alert output (the fight's version select comes first in its card).
+    const output = [...(options?.querySelectorAll('select') ?? [])].find((s) =>
+      [...s.options].some((o) => o.value === 'ttsOnly')
+    );
     const reset = (s) => {
       const button = s?.closest('.option-input-container')?.querySelector('.config-reset');
       return button === null || button === undefined
