@@ -44,6 +44,8 @@ export default class Encounter {
   tzOffsetMillis = 0;
   playbackOffset = 0;
   language: Lang = 'en';
+  // Fork: the language was found in the log (not just the default 'en').
+  languageDetected = false;
   initialTimestamp = Number.MAX_SAFE_INTEGER;
 
   constructor(
@@ -96,8 +98,10 @@ export default class Encounter {
         }
       }
       const matchedLang = res?.language;
-      if (isLang(matchedLang))
+      if (isLang(matchedLang)) {
         this.language = matchedLang;
+        this.languageDetected = true;
+      }
     }
 
     this.combatantTracker = new CombatantTracker(this.logLines, this.language);
