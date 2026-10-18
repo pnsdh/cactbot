@@ -61,6 +61,8 @@ export const mockOverlayPlugin = (page, data = {}) =>
       ready: true,
       callHandler: (msgStr, cb) => {
         const m = JSON.parse(msgStr);
+        // Every call, for tests that check what the page asked of OverlayPlugin (e.g. say).
+        (window.__overlayCalls ??= []).push(m);
         let r = {};
         if (m.call === 'cactbotLoadUser') {
           r = {
