@@ -51,7 +51,14 @@ const kTopics: { [group: string]: Topic[] } = {
     },
     {
       title: { en: 'TTS voice', ko: 'TTS 음성' },
-      ids: ['TtsVolume', 'AlarmTtsVolume', 'AlertTtsVolume', 'InfoTtsVolume'],
+      ids: [
+        'TtsVolume',
+        'AlarmTtsVolume',
+        'AlertTtsVolume',
+        'InfoTtsVolume',
+        'TtsPlayerLabel',
+        'TtsPreparePlayers',
+      ],
     },
     {
       title: { en: 'Gamepad rumble', ko: '게임패드 진동' },

@@ -132,6 +132,10 @@ const defaultRaidbossConfigOptions = {
   AlarmTtsVolume: 1,
   AlertTtsVolume: 1,
   InfoTtsVolume: 1,
+  // Fork: how TTS reads a player (the screen keeps DefaultPlayerLabel; 'screen': the same), and
+  // whether alerts naming one player are made ahead for each party member.
+  TtsPlayerLabel: 'job' as 'screen' | PartyMemberParamObjectKeys,
+  TtsPreparePlayers: false,
   RumbleEnabled: false,
   InfoRumbleDuration: 400,
   InfoRumbleWeak: 0.5,

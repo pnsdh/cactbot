@@ -2969,6 +2969,49 @@ const templateOptions: OptionsTemplate = {
       default: 1,
     },
     {
+      // Fork: see TriggerOutputProxy (ttsPlayerLabel).
+      id: 'TtsPlayerLabel',
+      name: {
+        en: 'Players in TTS',
+        ko: 'TTS에서 플레이어 읽기',
+      },
+      comment: {
+        en:
+          'How TTS reads a player named in an alert; the screen keeps Default Player Label. Jobs read more clearly than many names and can be made ahead, but two players of one job sound the same.',
+        ko:
+          '알림 속 플레이어를 TTS가 어떻게 읽을지 정합니다. 화면은 "플레이어를 언급하는 기본 방법" 그대로입니다. 직업은 낯선 닉네임보다 또렷하게 읽히고 미리 만들기도 쉽지만, 같은 직업이 둘이면 구분되지 않습니다.',
+      },
+      type: 'select',
+      options: {
+        en: {
+          'Job (WAR)': 'job',
+          'Full Job (Warrior)': 'jobFull',
+          'As on screen': 'screen',
+        },
+        ko: {
+          '직업 약칭 (전사, 백마)': 'job',
+          '직업 이름 (전사, 백마도사)': 'jobFull',
+          '화면과 같게': 'screen',
+        },
+      },
+      default: 'job',
+    },
+    {
+      id: 'TtsPreparePlayers',
+      name: {
+        en: 'Make ahead alerts naming a player too',
+        ko: '플레이어가 들어간 알림도 미리 만들기',
+      },
+      comment: {
+        en:
+          'When OverlayPlugin\'s own TTS (pnsdh) makes a zone\'s alerts ahead: an alert naming one player is made for each party member, again when the party changes. Often tens to hundreds more texts a zone: with a paid service, that much more usage.',
+        ko:
+          'OverlayPlugin(pnsdh) 자체 TTS가 지역 알림을 미리 만들 때, 플레이어 한 명이 들어가는 알림을 파티원마다 한 문장씩 같이 만듭니다. 파티가 바뀌면 다시 만듭니다. 지역마다 문장이 수십에서 수백 개 늘어나서, 유료 서비스는 그만큼 사용량이 늘어납니다.',
+      },
+      type: 'checkbox',
+      default: false,
+    },
+    {
       id: 'RumbleEnabled',
       name: {
         en: 'Enable gamepad rumble for triggers',

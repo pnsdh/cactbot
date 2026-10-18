@@ -4,7 +4,7 @@
 // (Middle La Noscea, /echo lines in Korean, as the parser language is).
 //
 // node tts-e2e.mjs
-import { launch, openPage, sendLines, startFight, wait } from './lib/overlay.mjs';
+import { launch, openPage, send, sendLines, startFight, wait } from './lib/overlay.mjs';
 
 const echo = (text) => `00|2026-10-18T00:00:00.0000000+09:00|0038||${text}|0000000000000000`;
 
@@ -85,6 +85,67 @@ for (const [name, data] of cases) {
   if (!last.includes('크하하') || last.some((t) => t.includes('${'))) {
     failed++;
     console.log('  FAIL: expected the TTS text "크하하" and no texts with params');
+  }
+}
+
+// Players: TTS reads them as set (jobs by default) while the screen keeps its label, and with
+// TtsPreparePlayers an alert naming one player is made ahead for each party member.
+const party = {
+  type: 'PartyChanged',
+  party: [
+    { id: '10000001', name: 'Tester', worldId: 0, job: 21, level: 100, inParty: true },
+    { id: '10000002', name: 'Healer Friend', worldId: 0, job: 24, level: 100, inParty: true },
+  ],
+};
+for (
+  const [name, raidboss, expect] of [
+    ['players read as jobs (default)', {}, 'player = 전사'],
+    ['players read as on screen', { TtsPlayerLabel: 'screen' }, 'player = Tester'],
+  ]
+) {
+  const browser = await launch();
+  const { page } = await openPage(browser, 'raidboss', {
+    query: 'alerts=1&timeline=0',
+    data: { raidboss: { ...ttsOnly, ...raidboss } },
+  });
+  await startFight(page, 134, 'Middle La Noscea');
+  await send(page, party);
+  await page.evaluate(() => window.__overlayCalls.length = 0);
+  await sendLines(page, [echo('cactbot outputStrings 테스트')]);
+  await wait(500);
+  const said = await page.evaluate(() =>
+    window.__overlayCalls.filter((c) => c.call === 'say').map((c) => c.text)
+  );
+  await browser.close();
+  console.log(`== ${name}`);
+  console.log(`  ${said.join(' | ')}`);
+  if (!said.some((t) => t.startsWith(expect))) {
+    failed++;
+    console.log(`  FAIL: expected "${expect}..."`);
+  }
+}
+{
+  const browser = await launch();
+  const { page } = await openPage(browser, 'raidboss', {
+    query: 'alerts=1&timeline=0',
+    data: { raidboss: { ...ttsOnly, TtsPreparePlayers: true } },
+    beforeLoad: (p) => p.evaluateOnNewDocument(() => window.__ttsCapabilities = { prepare: true }),
+  });
+  await startFight(page, 134, 'Middle La Noscea');
+  await send(page, party);
+  // Made ahead again once the party settles.
+  await wait(3800);
+  const prepared = await page.evaluate(() =>
+    window.__overlayCalls.filter((c) => c.call === 'ttsPrepare').map((c) => c.texts)
+  );
+  await browser.close();
+  const last = prepared.at(-1) ?? [];
+  const withPlayers = last.filter((t) => /전사|백마/.test(t));
+  console.log(`== players made ahead (${prepared.length} lists, last ${last.length} texts)`);
+  console.log(`  ${withPlayers.join(' | ')}`);
+  if (!last.includes('전사 초읽기를 취소했습니다') || !last.includes('백마 초읽기를 취소했습니다')) {
+    failed++;
+    console.log('  FAIL: expected "전사 초읽기를 취소했습니다" and "백마 초읽기를 취소했습니다"');
   }
 }
 

@@ -16,6 +16,7 @@ import { RaidbossData } from '../../types/data';
 import { EventResponses, LogEvent } from '../../types/event';
 import { Job, Role } from '../../types/job';
 import { Matches } from '../../types/net_matches';
+import { PartyMemberParamObjectKeys } from '../../types/party';
 import {
   DataInitializeFunc,
   GeneralNetRegexTrigger,
@@ -281,6 +282,18 @@ type TriggerParams = { [key: string]: unknown };
 // evaluated one at a time, see the note in TriggerOutputProxy).
 const ttsSubstitutions = new WeakMap<ProcessedTrigger, Map<string, string>>();
 
+// Fork: params that name a player, for making ahead alerts naming one (see _prepareTts).
+const kTtsPlayerParams = ['player', 'target', 'name', 'tank', 'healer', 'partner'];
+
+// Fork: a party member as triggers pass it (data.party.member), alone or in a list.
+const isPartyParam = (v: unknown): v is { [key: string]: unknown } =>
+  isObject(v) && typeof v['nick'] === 'string' && typeof v['name'] === 'string';
+const hasPartyParam = (params?: TriggerParams): boolean =>
+  params !== undefined &&
+  Object.values(params).some((v) =>
+    isPartyParam(v) || (Array.isArray(v) && v.some((p) => isPartyParam(p)))
+  );
+
 class TriggerOutputProxy {
   public outputStrings: OutputStrings;
   public overrideStrings: OutputStrings = {};
@@ -288,10 +301,14 @@ class TriggerOutputProxy {
   public responseOutputStrings: { [outputName: string]: unknown } = {};
   public unknownValue = '???';
 
+  // Fork: rendering what TTS says, with players as ttsPlayerLabel says (see evaluateOutputParam).
+  public speaking = false;
+
   private constructor(
     public trigger: ProcessedTrigger,
     public displayLang: Lang,
     public perTriggerAutoConfig?: PerTriggerAutoConfig,
+    public ttsPlayerLabel?: PartyMemberParamObjectKeys,
   ) {
     this.outputStrings = trigger.outputStrings ?? {};
 
@@ -356,21 +373,37 @@ class TriggerOutputProxy {
           // Ideally, response provides everything and trigger provides nothing,
           // or there's no response and trigger provides everything.  Having
           // this well-defined smooths out the collision edge cases.
-          let str = target.getReplacement(target.overrideStrings[name], params, name, id);
+          let source: { [lang: string]: unknown } | string | undefined =
+            target.overrideStrings[name];
+          let str = target.getReplacement(source, params, name, id);
           if (str === undefined) {
             const responseString = target.responseOutputStrings[name];
-            if (isObject(responseString))
+            if (isObject(responseString)) {
+              source = responseString;
               str = target.getReplacement(responseString, params, name, id);
+            }
           }
-          if (str === undefined)
-            str = target.getReplacement(target.outputStrings[name], params, name, id);
+          if (str === undefined) {
+            source = target.outputStrings[name];
+            str = target.getReplacement(source, params, name, id);
+          }
           if (str === undefined) {
             console.error(`Trigger ${target.trigger.id ?? ''} has missing outputString ${name}.`);
             return target.unknownValue;
           }
+          // Fork: what TTS says instead: the user's TTS text, or the same with players read
+          // as ttsPlayerLabel says.
           const ttsTemplate = target.ttsStrings[name];
-          if (ttsTemplate !== undefined && ttsTemplate !== '') {
-            const tts = target.getReplacement(ttsTemplate, params, name, id);
+          const ownTts = ttsTemplate !== undefined && ttsTemplate !== '';
+          const relabel = target.ttsPlayerLabel !== undefined && hasPartyParam(params);
+          if (ownTts || relabel) {
+            target.speaking = relabel;
+            let tts: string | undefined;
+            try {
+              tts = target.getReplacement(ownTts ? ttsTemplate : source, params, name, id);
+            } finally {
+              target.speaking = false;
+            }
             if (tts !== undefined && tts !== str && str.trim() !== '') {
               let map = ttsSubstitutions.get(target.trigger);
               if (!map)
@@ -420,6 +453,15 @@ class TriggerOutputProxy {
     // Appease TypeScript, this shouldn't happen.
     if (!isObject(val))
       return this.unknownValue;
+
+    // Fork: a player, as TTS reads it.
+    if (
+      this.speaking && prop === undefined && this.ttsPlayerLabel !== undefined && isPartyParam(val)
+    ) {
+      const label = val[this.ttsPlayerLabel];
+      if (typeof label === 'string' && label !== '')
+        return label;
+    }
 
     if (prop !== undefined) {
       const retVal = val[prop];
@@ -512,11 +554,17 @@ class TriggerOutputProxy {
     trigger: ProcessedTrigger,
     displayLang: Lang,
     perTriggerAutoConfig?: PerTriggerAutoConfig,
+    ttsPlayerLabel?: PartyMemberParamObjectKeys,
   ): Output {
     // `Output` is the common type used for the trigger data interface to support arbitrary
     // string keys and always returns a string. However, TypeScript doesn't have good support
     // for the Proxy representing this structure so we need to cast Proxy => unknown => Output
-    return new TriggerOutputProxy(trigger, displayLang, perTriggerAutoConfig) as unknown as Output;
+    return new TriggerOutputProxy(
+      trigger,
+      displayLang,
+      perTriggerAutoConfig,
+      ttsPlayerLabel,
+    ) as unknown as Output;
   }
 }
 
@@ -601,6 +649,7 @@ export class PopupText {
   // Fork: the OverlayPlugin's TTS fetches a zone's alerts ahead (see _prepareTts).
   protected ttsCanPrepare = false;
   protected ttsAsking = false;
+  protected ttsPartyTimer?: number;
   // The zone's timeline triggers (not in triggers/netTriggers), for _prepareTts.
   protected ttsTimelineTriggers: LooseTrigger[] = [];
   protected partyTracker: PartyTracker;
@@ -695,6 +744,11 @@ export class PopupText {
   HookOverlays(): void {
     addOverlayListener('PartyChanged', (e) => {
       this.partyTracker.onPartyChanged(e);
+      // Fork: alerts naming the new members made ahead (once the party settles).
+      if (this.options.TtsPreparePlayers && this.ttsCanPrepare) {
+        window.clearTimeout(this.ttsPartyTimer);
+        this.ttsPartyTimer = window.setTimeout(() => this._prepareTts(), 3000);
+      }
     });
     addPlayerChangedOverrideListener((e: PlayerChangedDetail) => {
       this.OnPlayerChange(e);
@@ -1111,6 +1165,41 @@ export class PopupText {
       const shown = transform ? this.options.TransformText(t.trim()) ?? t.trim() : t.trim();
       texts.add(this.options.TransformTts(this._ttsCleanup(shown)));
     };
+    // An alert naming one player (its only param), for each party member as TTS reads them.
+    // Kept for the end: a long list is cut there by the plugin.
+    const withPlayers: [string, boolean][] = [];
+    const members = this.options.TtsPreparePlayers
+      ? this.partyTracker.partyNames.map((n) => this.partyTracker.member(n))
+      : [];
+    const label = this.ttsPlayerLabel();
+    const paramPattern = /\${\s*([^}\s]+)\s*}/g;
+    const addPlayers = () => {
+      for (const [t, transform] of withPlayers) {
+        const bases = new Set([...t.matchAll(paramPattern)].map((m) => m[1]?.split('.')[0]));
+        const base = [...bases][0];
+        if (bases.size !== 1 || base === undefined || !kTtsPlayerParams.includes(base))
+          continue;
+        for (const member of members) {
+          const fields = member as unknown as { [key: string]: unknown };
+          add(
+            t.replace(paramPattern, (_m, key: string) => {
+              const prop = key.split('.')[1] ?? label;
+              const value = prop !== undefined ? fields[prop] : undefined;
+              return typeof value === 'string' && value !== '' ? value : member.toString();
+            }),
+            transform,
+          );
+        }
+      }
+    };
+    const addOrKeep = (t: string | undefined, transform: boolean) => {
+      if (t !== undefined && t.includes('${')) {
+        if (members.length > 0)
+          withPlayers.push([t, transform]);
+        return;
+      }
+      add(t, transform);
+    };
     // What a response sets as its output strings (as the config page reads them: called with
     // an output that only records them).
     // Responses run on data of their own: what they change (counters, lists) must not touch the
@@ -1163,17 +1252,24 @@ export class PopupText {
         // An edit left blank is the default again (as at runtime).
         const edited = config?.OutputStrings?.[key];
         if (tts !== undefined && tts !== '')
-          add(textOf(tts), false);
+          addOrKeep(textOf(tts), false);
         else
-          add(textOf(edited !== undefined && edited !== '' ? edited : value), true);
+          addOrKeep(textOf(edited !== undefined && edited !== '' ? edited : value), true);
       }
       for (const field of [trigger.tts, trigger.alarmText, trigger.alertText, trigger.infoText]) {
         if (typeof field !== 'function')
           add(textOf(field), field !== trigger.tts);
       }
     }
+    addPlayers();
     void callOverlayHandler({ call: 'ttsPrepare', texts: [...texts], lang: this.ttsLang() })
       .catch(() => undefined);
+  }
+
+  // Fork: how TTS reads players (none: as on screen).
+  ttsPlayerLabel(): PartyMemberParamObjectKeys | undefined {
+    const label = this.options.TtsPlayerLabel;
+    return label === 'screen' ? undefined : label;
   }
 
   // Before TTS reads an alert: what reads badly aloud taken out (also for _prepareTts, so a text
@@ -1224,6 +1320,7 @@ export class PopupText {
       trigger,
       this.displayLang,
       this.options.PerTriggerAutoConfig,
+      this.ttsPlayerLabel(),
     );
   }
 
