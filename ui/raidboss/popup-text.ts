@@ -600,6 +600,7 @@ export class PopupText {
   protected ttsSay: (text: string, severity?: 'alarm' | 'alert' | 'info') => void;
   // Fork: the OverlayPlugin's TTS fetches a zone's alerts ahead (see _prepareTts).
   protected ttsCanPrepare = false;
+  protected ttsAsking = false;
   // The zone's timeline triggers (not in triggers/netTriggers), for _prepareTts.
   protected ttsTimelineTriggers: LooseTrigger[] = [];
   protected partyTracker: PartyTracker;
@@ -656,14 +657,10 @@ export class PopupText {
           lang: this.ttsLang(),
         });
       };
-      // Fork: whether it can fetch a zone's alerts ahead (asked once; other OverlayPlugins answer
-      // nothing).
-      if (this.options.AlertsEnabled) {
-        void callOverlayHandler({ call: 'say', query: 'capabilities' }).then((r) => {
-          this.ttsCanPrepare = r?.prepare === true;
-          this._prepareTts();
-        }).catch(() => undefined);
-      }
+      // Fork: whether it can fetch a zone's alerts ahead (other OverlayPlugins answer nothing;
+      // asked again on each zone until it can, as the plugin's TTS may be turned on later).
+      if (this.options.AlertsEnabled)
+        this._askTtsCapabilities();
     }
 
     this.data = this.getDataObject();
@@ -1067,10 +1064,28 @@ export class PopupText {
   // Fork: the zone's alerts that would be spoken, as they would be (texts without params: their
   // output strings with the user's edits and TTS texts, and fixed texts), sent for a network
   // voice to fetch ahead, so the first time plays at once too.
+  _askTtsCapabilities(): void {
+    if (this.ttsAsking)
+      return;
+    this.ttsAsking = true;
+    void callOverlayHandler({ call: 'say', query: 'capabilities' }).then((r) => {
+      this.ttsAsking = false;
+      this.ttsCanPrepare = r?.prepare === true;
+      if (this.ttsCanPrepare)
+        this._prepareTts();
+    }).catch(() => {
+      this.ttsAsking = false;
+    });
+  }
+
   _prepareTts(): void {
     // Nothing is spoken without audio (see _onTriggerInternalHelperDefaults).
-    if (!this.ttsCanPrepare || this.options.IsRemoteRaidboss || !this.options.AudioAllowed)
+    if (this.options.IsRemoteRaidboss || !this.options.AudioAllowed || !this.options.AlertsEnabled)
       return;
+    if (!this.ttsCanPrepare) {
+      this._askTtsCapabilities();
+      return;
+    }
     const texts = new Set<string>();
     const seen = new Set<unknown>();
     const textOf = (v: unknown): string | undefined => {
@@ -1091,6 +1106,9 @@ export class PopupText {
     };
     // What a response sets as its output strings (as the config page reads them: called with
     // an output that only records them).
+    // Responses run on data of their own: what they change (counters, lists) must not touch the
+    // fight's (a zone that keeps its data out of combat would carry it into the fight).
+    const scratch = this.getDataObject();
     const responseStrings = (trigger: ProcessedTrigger): { [key: string]: unknown } => {
       const response = trigger.response;
       if (typeof response !== 'function')
@@ -1108,7 +1126,7 @@ export class PopupText {
       });
       const noMatches: Matches = {};
       try {
-        response(this.data, noMatches, recorder as Output);
+        response(scratch, noMatches, recorder as Output);
       } catch {
         // A response that needs real matches: nothing to fetch ahead.
       }
@@ -1691,13 +1709,13 @@ export class PopupText {
     // Fork: the user's TTS text for each output string the text was made from.
     const substitutions = ttsSubstitutions.get(triggerHelper.trigger);
     // One pass, the longest first: a text made of other outputs (e.g. "${inOut} + ${spread}")
-    // is replaced whole before its parts, and what was put in is not replaced again.
+    // is replaced whole before its parts, and what was put in is not replaced again.  Only where
+    // it stands as a word of its own: "1" not inside "10", "북" not inside "북동" (a particle
+    // written onto it, "북으로", is then left as it is).
     if (substitutions && substitutions.size > 0 && triggerHelper.ttsText !== undefined) {
       const keys = [...substitutions.keys()].sort((a, b) => b.length - a.length);
-      const pattern = new RegExp(
-        keys.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'),
-        'g',
-      );
+      const escaped = keys.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+      const pattern = new RegExp(`(?<![\\p{L}\\p{N}])(?:${escaped})(?![\\p{L}\\p{N}])`, 'gu');
       triggerHelper.ttsText = triggerHelper.ttsText.replace(
         pattern,
         (m) => substitutions.get(m) ?? m,
