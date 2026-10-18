@@ -764,6 +764,10 @@ export default class TimerBar extends HTMLElement {
       next = Math.min(next, remainSec - (Math.ceil(remainSec * 10 - 0.5) - 0.5) / 10);
     if (texts.includes('elapsed'))
       next = Math.min(next, (Math.floor(elapsedSec * 10 + 0.5) + 0.5) / 10 - elapsedSec);
+    // Exactly on a step (e.g. 3.75s left), the formulas give the step after it: that one is now.
+    // (Infinity: no time shown, nothing changes until the end.)
+    if (next !== Infinity && next > 0.1 - 1e-6)
+      next = 0;
     // Just past it, then on the next frame.
     return Math.min(Math.max(next, 0) * 1000 + 1, untilEndFramesMs);
   }
