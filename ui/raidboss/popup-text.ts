@@ -598,6 +598,8 @@ export class PopupText {
   protected displayLang: Lang;
   protected ttsEngine?: BrowserTTSEngine;
   protected ttsSay: (text: string, severity?: 'alarm' | 'alert' | 'info') => void;
+  // Fork: the OverlayPlugin's TTS fetches a zone's alerts ahead (see _prepareTts).
+  protected ttsCanPrepare = false;
   protected partyTracker: PartyTracker;
   protected readonly kMaxRowsOfText = 2;
   // Fork: players kept per sound (see _playAudioFile).
@@ -649,9 +651,17 @@ export class PopupText {
           text: this.options.TransformTts(text),
           severity: severity,
           source: 'cactbot',
-          lang: this.displayLang === 'cn' || this.displayLang === 'tc' ? 'zh' : this.displayLang,
+          lang: this.ttsLang(),
         });
       };
+      // Fork: whether it can fetch a zone's alerts ahead (asked once; other OverlayPlugins answer
+      // nothing).
+      if (this.options.AlertsEnabled) {
+        void callOverlayHandler({ call: 'say', query: 'capabilities' }).then((r) => {
+          this.ttsCanPrepare = r?.prepare === true;
+          this._prepareTts();
+        }).catch(() => undefined);
+      }
     }
 
     this.data = this.getDataObject();
@@ -1035,6 +1045,7 @@ export class PopupText {
     const timelineTriggers = allTriggers.filter(isRaidbossLooseTimelineTrigger);
 
     this.Reset();
+    this._prepareTts();
 
     this.timelineLoader.SetTimelines(
       timelineFiles,
@@ -1044,6 +1055,96 @@ export class PopupText {
       timelineStyles,
       this.zoneId,
     );
+  }
+
+  ttsLang(): string {
+    return this.displayLang === 'cn' || this.displayLang === 'tc' ? 'zh' : this.displayLang;
+  }
+
+  // Fork: the zone's alerts that would be spoken, as they would be (texts without params: their
+  // output strings with the user's edits and TTS texts, and fixed texts), sent for a network
+  // voice to fetch ahead, so the first time plays at once too.
+  _prepareTts(): void {
+    if (!this.ttsCanPrepare || this.options.IsRemoteRaidboss)
+      return;
+    const texts = new Set<string>();
+    const seen = new Set<unknown>();
+    const textOf = (v: unknown): string | undefined => {
+      if (typeof v === 'string')
+        return v;
+      if (typeof v === 'object' && v !== null) {
+        const obj = v as { [lang: string]: unknown };
+        const t = obj[this.displayLang] ?? obj['en'];
+        return typeof t === 'string' ? t : undefined;
+      }
+      return undefined;
+    };
+    const add = (t: string | undefined, transform: boolean) => {
+      if (t === undefined || t.includes('${') || t.trim() === '')
+        return;
+      const shown = transform ? this.options.TransformText(t.trim()) ?? t.trim() : t.trim();
+      texts.add(this.options.TransformTts(this._ttsCleanup(shown)));
+    };
+    for (const trigger of [...this.triggers, ...this.netTriggers]) {
+      if (seen.has(trigger))
+        continue;
+      seen.add(trigger);
+      const id = trigger.id;
+      const options = id !== undefined ? this.options.PerTriggerOptions[id] : undefined;
+      const config = id !== undefined ? this.options.PerTriggerAutoConfig[id] : undefined;
+      if (id !== undefined && this.options.DisabledTriggers[id])
+        continue;
+      const spoken = options?.SpeechAlert ?? config?.SpokenAlertsEnabled ??
+        trigger.triggerSetAutoConfig?.SpokenAlertsEnabled ?? this.options.SpokenAlertsEnabled;
+      if (!spoken)
+        continue;
+      for (const [key, value] of Object.entries(trigger.outputStrings ?? {})) {
+        const tts = config?.TtsStrings?.[key];
+        if (tts !== undefined && tts !== '')
+          add(textOf(tts), false);
+        else
+          add(textOf(config?.OutputStrings?.[key] ?? value), true);
+      }
+      for (const field of [trigger.tts, trigger.alarmText, trigger.alertText, trigger.infoText]) {
+        if (typeof field !== 'function')
+          add(textOf(field), field !== trigger.tts);
+      }
+    }
+    void callOverlayHandler({ call: 'ttsPrepare', texts: [...texts], lang: this.ttsLang() })
+      .catch(() => undefined);
+  }
+
+  // Before TTS reads an alert: what reads badly aloud taken out (also for _prepareTts, so a text
+  // fetched ahead is the same text said later).
+  _ttsCleanup(text: string): string {
+    // Heuristics for auto tts.
+    // * Remove a bunch of chars.
+    text = text.replace(/[#!]/g, '');
+    // * slashes between mechanics
+    text = text.replace('/', ' ');
+    // * tildes at the end for emphasis
+    text = text.replace(/~+$/, '');
+    // * arrows helping visually simple to understand e.g. ↖ Front left / Back right ↘
+    text = text.replace(/[↖-↙]/g, '');
+    // * Korean TTS reads wrong with '1번째'
+    text = text.replace('1번째', '첫번째');
+    // * arrows at the front or the end are directions, e.g. "east =>"
+    text = text.replace(/[-=]+>\s*$/g, '');
+    text = text.replace(/^\s*<[-=]+/g, '');
+    // * arrows in the middle are a sequence, e.g. "in => out => spread"
+    const arrowReplacement = {
+      en: ' then ',
+      de: ' dann ',
+      fr: ' puis ',
+      ja: 'や',
+      cn: '然后',
+      ko: ' 그리고 ',
+      tc: '然後',
+    };
+    text = text.replace(/\s*(<[-=]|[=-]>)\s*/g, arrowReplacement[this.displayLang]);
+    // * Countdown substitution marker, if present
+    text = text.replaceAll('{{CD}}', '');
+    return text;
   }
 
   ProcessTrigger(trigger: ProcessedTrigger | ProcessedTimelineTrigger): void {
@@ -1587,38 +1688,8 @@ export class PopupText {
     // on (speech=true, text=true, sound=true) but this will
     // not cause tts to play over top of sounds or noises.
     if (triggerHelper.ttsText !== undefined && triggerHelper.spokenAlertsEnabled) {
-      // Heuristics for auto tts.
       // * In case this is an integer.
-      triggerHelper.ttsText = triggerHelper.ttsText.toString();
-      // * Remove a bunch of chars.
-      triggerHelper.ttsText = triggerHelper.ttsText.replace(/[#!]/g, '');
-      // * slashes between mechanics
-      triggerHelper.ttsText = triggerHelper.ttsText.replace('/', ' ');
-      // * tildes at the end for emphasis
-      triggerHelper.ttsText = triggerHelper.ttsText.replace(/~+$/, '');
-      // * arrows helping visually simple to understand e.g. ↖ Front left / Back right ↘
-      triggerHelper.ttsText = triggerHelper.ttsText.replace(/[↖-↙]/g, '');
-      // * Korean TTS reads wrong with '1번째'
-      triggerHelper.ttsText = triggerHelper.ttsText.replace('1번째', '첫번째');
-      // * arrows at the front or the end are directions, e.g. "east =>"
-      triggerHelper.ttsText = triggerHelper.ttsText.replace(/[-=]+>\s*$/g, '');
-      triggerHelper.ttsText = triggerHelper.ttsText.replace(/^\s*<[-=]+/g, '');
-      // * arrows in the middle are a sequence, e.g. "in => out => spread"
-      const arrowReplacement = {
-        en: ' then ',
-        de: ' dann ',
-        fr: ' puis ',
-        ja: 'や',
-        cn: '然后',
-        ko: ' 그리고 ',
-        tc: '然後',
-      };
-      triggerHelper.ttsText = triggerHelper.ttsText.replace(
-        /\s*(<[-=]|[=-]>)\s*/g,
-        arrowReplacement[this.displayLang],
-      );
-      // * Countdown substitution marker, if present
-      triggerHelper.ttsText = triggerHelper.ttsText.replaceAll('{{CD}}', '');
+      triggerHelper.ttsText = this._ttsCleanup(triggerHelper.ttsText.toString());
 
       this.ttsSay(triggerHelper.ttsText, triggerHelper.ttsSeverity);
     } else if (triggerHelper.soundUrl !== undefined && triggerHelper.soundAlertsEnabled) {
