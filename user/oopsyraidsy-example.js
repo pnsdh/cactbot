@@ -26,34 +26,30 @@ Options.PlayerNicks = {
   'Pipira Pira': '&#x1F41F;',
 };
 
-// A set of ability ids (in hex) to other ability names.  This is primarily
-// used for abillity names that ACT doesn't know yet (e.g. Unknown_26B4).
-//
-// For example: Rename wings of salvation to White Swirly because that's what
-// everybody in your raid group calls it.
-Options.AbilityIdNameMap['26CA'] = 'White Swirly';
-
-// An array of user-defined triggers, in the format defined in the readme:
+// An array of user-defined triggers, in the format defined in the oopsy guide:
 // https://github.com/OverlayPlugin/cactbot/blob/main/docs/OopsyraidsyGuide.md
+// Add to it with `push`: setting `Options.Triggers = [...]` would drop the ones other user files
+// have added.
 //
 // Here's an example trigger to show a line in the mistake log when
 // you crit adlo yourself in Summerford Farms.
-Options.Triggers = [
-  {
-    zoneId: ZoneId.MiddleLaNoscea,
-    triggers: [
-      {
-        id: 'Test Self Crit Adlo',
-        healRegex: 'B9', // Adloquium ability id
-        condition: function(e, data, matches) {
-          return e.targetName === data.me && matches.flags === '10004';
-        },
-        mistake: function(e, data) {
-          const text = `${e.abilityName}: ${e.damageStr}`;
-          return { type: 'good', blame: e.targetName, text: text };
-        },
+Options.Triggers.push({
+  zoneId: ZoneId.MiddleLaNoscea,
+  triggers: [
+    {
+      id: 'Test Self Crit Adlo',
+      type: 'Ability',
+      // Adloquium ability id
+      netRegex: NetRegexes.ability({ id: 'B9' }),
+      // The low byte 04 is a heal, and 0x200000 makes it a critical one (see docs/LogGuide.md).
+      condition: (data, matches) => {
+        const flags = parseInt(matches.flags, 16);
+        return matches.target === data.me && (flags & 0xff) === 0x04 && (flags & 0x200000) !== 0;
       },
-    ],
-  },
-  // ...more triggers here...
-];
+      mistake: (data, matches) => {
+        return { type: 'good', blame: matches.target, text: `${matches.ability} (crit)` };
+      },
+    },
+    // ...more triggers here...
+  ],
+});

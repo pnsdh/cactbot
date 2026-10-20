@@ -88,6 +88,12 @@ check(
 const logText = first.logs.join('\n');
 check('bad syntax reported', /c-bad\.ts:1:\d+/.test(logText));
 check('unavailable import reported', logText.includes('\'./helper\' is not available'));
+check(
+  'copied file without its timeline file gets the built-in one',
+  logText.includes(
+    'no \'the_underkeep.txt\' in the user folder, using 07-dt/dungeon/the_underkeep.txt',
+  ),
+);
 check('.d.ts skipped', !logText.includes('e-types'));
 check('no page errors', first.errors.length === 0, first.errors.join('; '));
 
@@ -133,6 +139,38 @@ check(
   await oopsy.page.evaluate(() => window.__byakko),
 );
 check('oopsy: no page errors', oopsy.errors.length === 0, oopsy.errors.join('; '));
+
+// The examples shipped in user/, copied as their header says.
+const example = (name) => fs.readFileSync(path.join(repoRoot, 'user', name), 'utf8');
+const examples = await openPage(browser, 'raidboss', {
+  query: 'timeline=0&alerts=1',
+  userFiles: {
+    'raidboss.ts': example('raidboss-typescript-example.ts'),
+    'raidboss.js': example('raidboss-example.js'),
+    'test-override.txt': example('test-override.txt'),
+  },
+});
+check('examples: no page errors', examples.errors.length === 0, examples.errors.join('; '));
+await startFight(examples.page, 134, 'Middle La Noscea');
+await sendLines(examples.page, [
+  '00|2026-10-21T00:00:01.0000000+09:00|001D|Tester|Tester은 나무인형을 쿡쿡 찌릅니다.|hash',
+]);
+await wait(800);
+const exampleText = await examples.page.evaluate(() => document.body.innerText);
+check(
+  'examples: .js poke override fires',
+  exampleText.toUpperCase().includes('POKE (USER FILE OVERRIDE)'),
+);
+check('examples: .ts poke count fires', exampleText.includes('1번째 찌르기'));
+const oopsyExample = await openPage(browser, 'oopsy', {
+  userFiles: {
+    // Files in the folder run before the top one, in name order.
+    'oopsyraidsy/a-example.js': example('oopsyraidsy-example.js'),
+    'oopsyraidsy/zz-check.js':
+      `window.__adlo = Options.Triggers.some((s) => s.triggers?.some((t) => t.id === 'Test Self Crit Adlo'));`,
+  },
+});
+check('examples: oopsy example runs', await oopsyExample.page.evaluate(() => window.__adlo));
 
 await browser.close();
 console.log(failed === 0 ? 'all ok' : `${failed} failed`);

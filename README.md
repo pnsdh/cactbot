@@ -94,11 +94,12 @@ ACT, FFXIV ACT Plugin, OverlayPlugin이 필요합니다. 없다면 해루봇이�
 ### 내 트리거 쓰기 (사용자 폴더)
 
 사용자 폴더(`cbkr-user`)에 `.js`뿐 아니라 `.ts` 파일도 넣을 수 있습니다. 레이드보스는 `raidboss.ts` 또는 `raidboss` 폴더 안, 웁시레이지는 `oopsyraidsy.ts` 또는 `oopsyraidsy` 폴더 안입니다.
-cactbot 트리거 파일(`ui/raidboss/data/...`의 `.ts`)을 그대로 복사해 고치면 됩니다. 같은 `id`의 트리거는 cactbot 것을 덮어씁니다.
+예시는 `Plugins\cbkr\user\raidboss-typescript-example.ts`에 있습니다.
 
+* **전투 하나를 통째로 고치기**: cactbot 트리거 파일(`ui/raidboss/data/...`의 `.ts`)을 그대로 복사해 고칩니다. 파일 안의 세트 `id`가 같아서 그 전투의 cactbot 트리거·타임라인을 대신합니다. 타임라인 `.txt`도 복사하면 그것을 쓰고, 복사하지 않으면 cactbot 것을 씁니다. 대신 cactbot이 나중에 그 전투를 고쳐도 반영되지 않습니다.
+* **트리거 몇 개만 바꾸기**: 자기 세트(다른 `id`)에 그 트리거만 넣습니다. 같은 `id`의 트리거는 cactbot 것을 덮어씁니다. 자기 세트에는 cactbot의 번역이 없으므로, 영어 문구로 찾는 트리거는 `timelineReplace`에 한국어 문구를 같이 적습니다(예시 참고).
 * 타입은 지우기만 하고 검사하지 않습니다.
 * `import`는 cactbot의 `resources/` 모듈과 웁시의 `oopsy_common`만 됩니다. 다른 사용자 파일은 가져올 수 없습니다.
-* `timelineFile`을 쓰는 파일은 그 `.txt`도 같은 폴더에 둡니다. 타임라인을 cactbot 것 대신 쓰려면 `overrideTimelineFile: true`를 더합니다.
 * 파일을 처음 읽거나 고친 뒤 처음 열 때만 1초 안쪽으로 더 걸리고, 그 뒤로는 변환해 둔 것을 씁니다.
 * 오류가 있으면 그 파일만 빠집니다. 오류 내용은 `OverlayPlugin.dll` 탭 아래쪽 로그에 `*** ERROR IN USER FILE ***`로 나옵니다.
 
