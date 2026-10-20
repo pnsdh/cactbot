@@ -7,6 +7,7 @@ import { CactbotConfigurator } from '../ui/config/config';
 import { isLang, Lang, langToLocale } from './languages';
 import { UnreachableCode } from './not_reached';
 import { addOverlayListener, callOverlayHandler } from './overlay_plugin_api';
+import { isUserTsFile, runUserTsFile, transpileUserTsFiles } from './user_ts';
 
 // TODO:
 // The convention of "import X as _X; const X = _X;" is currently
@@ -377,13 +378,20 @@ class UserConfig {
       if (localFiles) {
         // localFiles may be null if there is no valid user directory.
         const sortedFiles = this.sortUserFiles(Object.keys(localFiles));
-        const jsFiles = this.filterUserFiles(sortedFiles, overlayName, '.js');
+        // Fork: TypeScript user files too (see user_ts.ts), in the same order as .js ones.
+        const tsFiles = this.filterUserFiles(sortedFiles, overlayName, '.ts').filter(isUserTsFile);
+        const jsOnlyFiles = this.filterUserFiles(sortedFiles, overlayName, '.js');
+        const jsFiles = sortedFiles.filter((f) => jsOnlyFiles.includes(f) || tsFiles.includes(f));
+        const tsOutput = await transpileUserTsFiles(localFiles, tsFiles);
         const cssFiles = loadCss ? this.filterUserFiles(sortedFiles, overlayName, '.css') : [];
 
         for (const jsFile of jsFiles) {
           try {
             printUserFile(`local user file: ${basePath}${jsFile}`);
-            this.evalUserFile(localFiles[jsFile] ?? '', options);
+            if (tsFiles.includes(jsFile))
+              runUserTsFile(jsFile, tsOutput[jsFile], options);
+            else
+              this.evalUserFile(localFiles[jsFile] ?? '', options);
 
             for (const field of warnOnVariableResetMap[overlayName] ?? []) {
               const value = variableTracker[field];

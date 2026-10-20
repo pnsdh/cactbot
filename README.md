@@ -8,6 +8,7 @@
 * 알람·타임라인과 웁시레이지용 `cbkr` 스킨을 제공합니다(기본 스킨).
 * 설정 화면을 새로 디자인했고, 타임라인 항목마다 문구·숨기기·강조색을 바꿀 수 있습니다.
 * TTS가 플레이어를 직업으로 읽고, 출력 문구마다 TTS가 읽을 말을 따로 쓸 수 있습니다.
+* 사용자 폴더에 cactbot 트리거 파일(TypeScript)을 그대로 복사해 고쳐 쓸 수 있습니다.
 
 **[OverlayPlugin 한국어 포크](https://github.com/pnsdh/OverlayPlugin)를 함께 쓰는 것을 권장합니다.** 타임라인이 더 부드럽게 움직이고, TTS가 중요한 알림을 먼저 읽으며 경고·주의·안내별로 크기를 정할 수 있습니다. 본가 OverlayPlugin에서도 이 두 가지 말고는 모두 동작합니다.
 
@@ -89,6 +90,17 @@ ACT, FFXIV ACT Plugin, OverlayPlugin이 필요합니다. 없다면 해루봇이�
 ### 요성난무를 본가 트리거로 쓰기
 
 `Cactbot Config` → `레이드보스`의 트리거 목록에서 절 요성난무를 열고, 맨 위 `트리거·타임라인`을 `본가 캑봇`으로 바꿉니다. 전투마다 따로 고를 수 있고, 타임라인 편집도 버전별로 따로 저장됩니다.
+
+### 내 트리거 쓰기 (사용자 폴더)
+
+사용자 폴더(`cbkr-user`)에 `.js`뿐 아니라 `.ts` 파일도 넣을 수 있습니다. 레이드보스는 `raidboss.ts` 또는 `raidboss` 폴더 안, 웁시레이지는 `oopsyraidsy.ts` 또는 `oopsyraidsy` 폴더 안입니다.
+cactbot 트리거 파일(`ui/raidboss/data/...`의 `.ts`)을 그대로 복사해 고치면 됩니다. 같은 `id`의 트리거는 cactbot 것을 덮어씁니다.
+
+* 타입은 지우기만 하고 검사하지 않습니다.
+* `import`는 cactbot의 `resources/` 모듈만 됩니다. 다른 사용자 파일은 가져올 수 없습니다.
+* `timelineFile`을 쓰는 파일은 그 `.txt`도 같은 폴더에 둡니다. 타임라인을 cactbot 것 대신 쓰려면 `overrideTimelineFile: true`를 더합니다.
+* 파일을 처음 읽거나 고친 뒤 처음 열 때만 1초 안쪽으로 더 걸리고, 그 뒤로는 변환해 둔 것을 씁니다.
+* 오류가 있으면 그 파일만 빠집니다. 오류 내용은 `OverlayPlugin.dll` 탭 아래쪽 로그에 `*** ERROR IN USER FILE ***`로 나옵니다.
 
 ## 자주 묻는 것
 
