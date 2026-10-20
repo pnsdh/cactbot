@@ -2735,12 +2735,10 @@ html:not(.config-classic) {
 }
 
 .config-user-file-overlay {
-  margin-right: 8px;
   color: var(--cfg-muted, inherit);
 }
 
 .config-user-file-notice code {
-  margin-right: 8px;
   font-family: Consolas, monospace;
 }
 

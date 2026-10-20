@@ -255,15 +255,26 @@ check('config: oopsy file error', noticeText.includes('oopsyraidsy/a-throw.js:2'
 check('config: missing user directory', noticeText.includes('C:/gone'));
 check(
   'config: file too big, told once',
-  noticeText.split('raidboss/huge.txt4MB').length === 2,
+  noticeText.split('raidboss/huge.txt: 4MB').length === 2,
   noticeText,
 );
 check('config: runtime SyntaxError with its line', noticeText.includes('raidboss/f-regex.js:3'));
 check('config: own const ZoneId in a .ts file', !noticeText.includes('g-shadow'));
 check(
   'config: $ in a message',
-  noticeText.includes('raidboss/h-dollar.ts:2bad $\' here'),
+  noticeText.includes('raidboss/h-dollar.ts:2: bad $\' here'),
   noticeText,
+);
+// A copied line reads as one (spaces and ": " are text, not margins).
+const copiedLines = await configPage.page.evaluate(() =>
+  [...document.querySelectorAll('.config-user-file-notice li')].map((li) => li.textContent)
+);
+check(
+  'config: a copied line reads as one',
+  copiedLines.includes(
+    '레이드보스 raidboss/b-throw.js:3: Cannot read properties of null (reading \'boom\')',
+  ) && copiedLines.includes('지정한 사용자 폴더가 없어서 기본 폴더를 대신 씁니다: C:/gone'),
+  copiedLines.join(' | '),
 );
 check('config: no page errors', configPage.errors.length === 0, configPage.errors.join('; '));
 // A changed user file: the config page stays (no reload) and checks the files again.
