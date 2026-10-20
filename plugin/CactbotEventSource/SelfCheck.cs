@@ -74,10 +74,10 @@ namespace Cactbot {
       Check("hp", (uint)self.hp, (uint)player.CurrentHP);
       Check("max_hp", (uint)self.max_hp, (uint)player.MaxHP);
       Check("mp", (uint)self.mp, (uint)player.CurrentMP);
-      // cactbot keeps memory's axes; FFXIV_ACT_Plugin swaps y and z.
+      // Both have z as the height (cactbot's entity struct names memory's second float pos_z).
       CheckNear("pos_x", self.pos_x, (float)player.PosX, 0.1f);
-      CheckNear("pos_y (height)", self.pos_y, (float)player.PosZ, 0.1f);
-      CheckNear("pos_z", self.pos_z, (float)player.PosY, 0.1f);
+      CheckNear("pos_y", self.pos_y, (float)player.PosY, 0.1f);
+      CheckNear("pos_z (height)", self.pos_z, (float)player.PosZ, 0.1f);
       CheckNear("rotation", self.rotation, (float)player.Heading, 0.05f);
     }
 
