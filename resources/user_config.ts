@@ -597,25 +597,27 @@ class UserConfig {
       void callOverlayHandler({ call: 'cactbotRequestState' });
     };
 
-    void callOverlayHandler({
+    const load = callOverlayHandler({
       call: 'cactbotLoadUser',
       source: location.href,
       overlayName: overlayName,
     }).then((e: { detail: CactbotLoadUserRet }) => {
-      // Fork: kept until done, for whenUserFilesLoaded.
-      const track = () => {
-        const load = loadUser(e).finally(() => this.userFileLoads.delete(load));
-        this.userFileLoads.add(load);
-      };
       // Wait for DOMContentLoaded if needed.
-      if (document.readyState !== 'loading') {
-        track();
-        return;
-      }
-      document.addEventListener('DOMContentLoaded', () => {
-        track();
+      if (document.readyState !== 'loading')
+        return loadUser(e);
+      return new Promise<void>((resolve, reject) => {
+        document.addEventListener('DOMContentLoaded', () => {
+          loadUser(e).then(resolve, reject);
+        });
       });
     });
+    // Fork: kept from the call until done, failed or not, for whenUserFilesLoaded (a failure is
+    // still in the console, as it was unhandled before).
+    const tracked: Promise<void> = load.then(
+      () => undefined,
+      (error: unknown) => console.error(error),
+    ).finally(() => this.userFileLoads.delete(tracked));
+    this.userFileLoads.add(tracked);
   }
 
   handleSkin(skinName: string, overlayName?: string) {

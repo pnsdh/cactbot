@@ -12,7 +12,8 @@ namespace Cactbot {
   // told once they stop for a moment.
   public class UserDirWatcher {
     private const int QuietMs = 1500;
-    // A directory that keeps failing (a flaky network drive) reloads the overlays at most this often.
+    // A directory that keeps failing (a flaky network drive) reloads the overlays at most this
+    // often: later notices wait, rather than being dropped (only a reload watches it again).
     private const int ErrorNoticeMs = 30000;
     private static readonly HashSet<string> kExtensions =
         new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".js", ".ts", ".css", ".txt" };
@@ -59,19 +60,18 @@ namespace Cactbot {
         // It stops by itself when it fails (its directory deleted, a network drive gone, too many
         // changes at once): the next load watches the directory again.  What changed is unknown.
         watcher.Error += (o, e) => {
-          bool notice;
           lock (sync_) {
             FileSystemWatcher current;
             if (watchers_.TryGetValue(dir, out current) && current == watcher) {
               watchers_.Remove(dir);
               watcher.Dispose();
             }
-            notice = (DateTime.UtcNow - last_error_notice_).TotalMilliseconds >= ErrorNoticeMs;
-            if (notice)
-              last_error_notice_ = DateTime.UtcNow;
+            var now = DateTime.UtcNow;
+            var wait = Math.Max(QuietMs, (last_error_notice_.AddMilliseconds(ErrorNoticeMs) - now).TotalMilliseconds);
+            last_error_notice_ = now.AddMilliseconds(wait);
+            last_file_ = null;
+            timer_.Change((int)wait, Timeout.Infinite);
           }
-          if (notice)
-            Changed(null);
         };
         try {
           watcher.EnableRaisingEvents = true;
