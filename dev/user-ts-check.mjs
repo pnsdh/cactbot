@@ -223,7 +223,7 @@ check('reloads once the fight ends', !(await marked()));
 // oopsy (loaded for this).
 const configPage = await openPage(browser, 'config', {
   viewport: { width: 1000, height: 700 },
-  userDetail: { missingUserLocation: 'C:/gone' },
+  userDetail: { missingUserLocation: 'C:/gone', skippedUserFiles: ['raidboss/huge.txt'] },
   userFiles: {
     'raidboss/a-syntax.js':
       'Options.Triggers.push({\n  zoneId: 1,\n  triggers: [ { id: x y } ],\n});',
@@ -253,6 +253,11 @@ check('config: missing timeline', noticeText.includes('raidboss/nope.txt'));
 check('config: Options.Triggers replaced', noticeText.includes('Options.Triggers'));
 check('config: oopsy file error', noticeText.includes('oopsyraidsy/a-throw.js:2'));
 check('config: missing user directory', noticeText.includes('C:/gone'));
+check(
+  'config: file too big, told once',
+  noticeText.split('raidboss/huge.txt4MB').length === 2,
+  noticeText,
+);
 check('config: runtime SyntaxError with its line', noticeText.includes('raidboss/f-regex.js:3'));
 check('config: own const ZoneId in a .ts file', !noticeText.includes('g-shadow'));
 check(
@@ -381,6 +386,51 @@ check(
   replacedBoot.length === 1 && replacedBoot[0]?.includes('user boot') === true,
   `${replacedBoot}`,
 );
+
+// A failing user trigger: oopsy still runs the others for the line (cactbot's Bootshine), and
+// raidboss and oopsy tell a trigger's errors only a few times.
+const boomLogs = [];
+const boom = await openPage(browser, 'oopsy', {
+  viewport: { width: 500, height: 400 },
+  userFiles: {
+    'oopsyraidsy/boom.js': `Options.Triggers.push({ zoneId: ZoneId.MatchAll, triggers: [{
+  id: 'User Boom', type: 'Ability', netRegex: NetRegexes.ability({ id: '35' }),
+  mistake: () => { throw new Error('boom'); },
+}] });`,
+  },
+  beforeLoad: (p) => p.on('console', (m) => boomLogs.push(m.text())),
+});
+await startFight(boom.page, 134, 'Middle La Noscea');
+const bootLine =
+  '21|2026-10-21T00:00:05.0000000+09:00|10000001|Tester|35|Bootshine|40001234|나무인형|710003|3B9D4002|1C|DF98000|0|0|0|0|0|0|0|0|0|0|0|0|104815|348652|12000|12000|1000|1000|-767.7882|156.939|-672.0446|0.0000|26285|28784|13920|15480|1000|1000|-771.8156|157.1111|-671.3281|0.0000|0000ABCD|0|1|||1|35|35|0.600|0000|hash';
+await sendLines(boom.page, Array(8).fill(bootLine));
+await wait(800);
+const boots = await boom.page.evaluate(() =>
+  [...document.querySelectorAll('#livelist .mistake-row')].filter((r) =>
+    r.textContent?.includes('Bootshine')
+  ).length
+);
+check('oopsy: a failing trigger leaves the others', boots > 0, `${boots}`);
+const oopsyErrors =
+  boomLogs.filter((l) => l.startsWith('Error in oopsy trigger: User Boom')).length;
+check('oopsy: errors told 5 times', oopsyErrors === 5, `${oopsyErrors}`);
+
+const raidLogs = [];
+const raid = await openPage(browser, 'raidboss', {
+  query: 'timeline=0&alerts=1',
+  userFiles: {
+    'raidboss/boom.js': `Options.Triggers.push({ zoneId: ZoneId.MatchAll, triggers: [{
+  id: 'User Boom', type: 'GameLog', netRegex: { line: 'boom.*?' },
+  infoText: () => { throw new Error('boom'); },
+}] });`,
+  },
+  beforeLoad: (p) => p.on('console', (m) => raidLogs.push(m.text())),
+});
+await startFight(raid.page, 134, 'Middle La Noscea');
+await sendLines(raid.page, Array(8).fill('00|2026-10-21T00:00:01.0000000+09:00|0038||boom|hash'));
+await wait(800);
+const raidErrors = raidLogs.filter((l) => l.startsWith('Error in trigger: User Boom')).length;
+check('raidboss: errors told 5 times', raidErrors === 5, `${raidErrors}`);
 
 await browser.close();
 console.log(failed === 0 ? 'all ok' : `${failed} failed`);

@@ -119,7 +119,7 @@ export type OptionsTemplate = {
 // line (or line:column) in `file`; `overlay` is '' for what is not any one overlay's.
 export type UserFileProblem = {
   overlay: string;
-  kind: 'error' | 'overwrite' | 'missingDir' | 'missingTimeline';
+  kind: 'error' | 'overwrite' | 'missingDir' | 'missingTimeline' | 'tooBig';
   file?: string;
   at?: string;
   text: string;
@@ -396,9 +396,11 @@ class UserConfig {
       const basePath = `${(e.detail.userLocation ?? '').replace(/[/\\]*$/, '')}\\`;
       const localFiles = e.detail.localUserFiles;
       const missingDir = e.detail.missingUserLocation;
-      // The same for every overlay, so not told as any one's.
+      // The same for every overlay (a file at the top is read by all), so not told as any one's.
       if (typeof missingDir === 'string')
         this.reportUserFileProblem({ overlay: '', kind: 'missingDir', text: missingDir });
+      for (const file of e.detail.skippedUserFiles ?? [])
+        this.reportUserFileProblem({ overlay: '', kind: 'tooBig', file: file, text: '' });
 
       options.SystemInfo = {
         cactbotVersion: e.detail.cactbotVersion,

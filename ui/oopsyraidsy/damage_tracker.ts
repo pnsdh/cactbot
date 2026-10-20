@@ -675,9 +675,30 @@ export class DamageTracker {
     // listed after the damage from that ability.
     for (const trigger of this.triggers) {
       const matches = trigger.localRegex.exec(line);
-      if (matches)
+      if (!matches)
+        continue;
+      // Fork: a trigger that fails (a user file's, most likely) leaves the others of this line.
+      try {
         this.OnTrigger(trigger, matches, this.lastTimestamp);
+      } catch (e) {
+        this.OnTriggerError(trigger, e);
+      }
     }
+  }
+
+  // Fork: told a few times a trigger, as raidboss does (popup-text.ts onTriggerException).
+  private triggerErrors = new Map<string, number>();
+
+  private OnTriggerError(trigger: LooseOopsyTrigger, e: unknown): void {
+    const id = trigger.id ?? '[unknown trigger id]';
+    const count = (this.triggerErrors.get(id) ?? 0) + 1;
+    this.triggerErrors.set(id, count);
+    if (count > 5)
+      return;
+    console.error(
+      `Error in oopsy trigger: ${id}${count === 5 ? ' (its further errors are not shown)' : ''}`,
+    );
+    console.error(e instanceof Error ? e.stack ?? e.message : e);
   }
 
   private OnAbilityEvent(line: string, splitLine: string[]): void {

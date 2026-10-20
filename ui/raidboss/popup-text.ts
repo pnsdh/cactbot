@@ -152,16 +152,29 @@ const triggerUpperCase = (str: string): string => {
   return str.replace(/[^αβγδ]/g, (x) => x.toUpperCase());
 };
 
+// Fork: errors told of each trigger, to the console (which OverlayPlugin keeps in its log, shown
+// in ACT): a trigger failing on every line it matches would otherwise fill it in a fight.
+const kMaxTriggerErrors = 5;
+const triggerErrors = new Map<string, number>();
+
 const onTriggerException = (trigger: ProcessedTrigger, e: unknown) => {
   // When a fight ends and there are open promises, from delaySeconds or promise itself,
   // all promises will be rejected.  In this case there is no error; simply return without logging.
   if (e === null || typeof e !== 'object')
     return;
 
+  const key = `${trigger.id ?? ''}\n${trigger.filename ?? ''}`;
+  const count = (triggerErrors.get(key) ?? 0) + 1;
+  triggerErrors.set(key, count);
+  if (count > kMaxTriggerErrors)
+    return;
+
   let str = `Error in trigger: ${trigger.id !== undefined ? trigger.id : '[unknown trigger id]'}`;
 
   if (trigger.filename !== undefined)
     str += ` (${trigger.filename})`;
+  if (count === kMaxTriggerErrors)
+    str += ` (its further errors are not shown)`;
   console.error(str);
 
   if (e instanceof Error) {

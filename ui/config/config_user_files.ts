@@ -27,6 +27,10 @@ const kText = {
     en: 'Timeline file not found: ${text}',
     ko: '타임라인 파일이 없습니다: ${text}',
   },
+  tooBig: {
+    en: 'Not read: bigger than 4 MB (not a user file?)',
+    ko: '4MB가 넘어서 읽지 않았습니다(사용자 파일이 아닌 파일인지 확인하세요).',
+  },
   overwrite: {
     en: 'Replaces Options.${text} that earlier files added to (add with push instead).',
     ko: '앞의 파일들이 추가한 Options.${text}를 통째로 바꿉니다(push로 추가하세요).',

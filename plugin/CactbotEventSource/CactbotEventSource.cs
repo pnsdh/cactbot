@@ -489,7 +489,12 @@ namespace Cactbot {
       return filename;
     }
 
-    private Dictionary<string, string> GetLocalUserFiles(string config_dir, string overlay_name) {
+    // Fork: bigger files are not user files (a log or a dump left there): each overlay would read
+    // all of it on every load.  The biggest trigger files are about 0.3 MB.
+    private const long kMaxUserFileBytes = 4 * 1024 * 1024;
+
+    // Fork: `skipped` gets the files left out for their size (relative paths).
+    private Dictionary<string, string> GetLocalUserFiles(string config_dir, string overlay_name, List<string> skipped) {
       // TODO: probably should sanity check overlay_name for no * or ? wildcards as well
       // as GetInvalidPathChars.
       if (String.IsNullOrEmpty(config_dir))
@@ -541,6 +546,8 @@ namespace Cactbot {
           filenames = filenames.Concat(Directory.EnumerateFiles(sub_dir, "*.ts", SearchOption.AllDirectories));
         }
         foreach (string filename in filenames) {
+          if (TooBig(top_dir, filename, skipped))
+            continue;
           var text = ReadUserFile(filename);
           if (text != null)
             user_files[GetRelativePath(top_dir, filename)] = text + $"\n//# sourceURL={filename}";
@@ -551,6 +558,8 @@ namespace Cactbot {
           textFilenames = textFilenames.Concat(Directory.EnumerateFiles(sub_dir, "*.txt", SearchOption.AllDirectories));
         }
         foreach (string filename in textFilenames) {
+          if (TooBig(top_dir, filename, skipped))
+            continue;
           var text = ReadUserFile(filename);
           if (text != null)
             user_files[GetRelativePath(top_dir, filename)] = text;
@@ -587,6 +596,27 @@ namespace Cactbot {
 
     private readonly HashSet<string> ansi_files_ = new HashSet<string>();
 
+    private bool TooBig(string top_dir, string filename, List<string> skipped) {
+      long length;
+      try {
+        length = new FileInfo(filename).Length;
+      } catch (Exception) {
+        // ReadUserFile tells why.
+        return false;
+      }
+      if (length <= kMaxUserFileBytes)
+        return false;
+      skipped.Add(GetRelativePath(top_dir, filename));
+      bool first;
+      lock (big_files_)
+        first = big_files_.Add(filename);
+      if (first)
+        logger.Log(LogLevel.Warning, "Cactbot user file not read, bigger than {0} MB: {1}", kMaxUserFileBytes / 1024 / 1024, filename);
+      return true;
+    }
+
+    private readonly HashSet<string> big_files_ = new HashSet<string>();
+
     private static bool HasByteOrderMark(byte[] b) {
       return (b.Length >= 3 && b[0] == 0xEF && b[1] == 0xBB && b[2] == 0xBF) ||
         (b.Length >= 2 && ((b[0] == 0xFF && b[1] == 0xFE) || (b[0] == 0xFE && b[1] == 0xFF)));
@@ -615,7 +645,7 @@ namespace Cactbot {
       return invalid > valid;
     }
 
-    private void GetUserConfigDirAndFiles(string source, string overlay_name, out string config_dir, out Dictionary<string, string> local_files, out string missing_dir) {
+    private void GetUserConfigDirAndFiles(string source, string overlay_name, out string config_dir, out Dictionary<string, string> local_files, out string missing_dir, List<string> skipped) {
       local_files = null;
       config_dir = null;
       missing_dir = null;
@@ -627,7 +657,7 @@ namespace Cactbot {
       if (chosen) {
         // Explicit user config directory specified.
         config_dir = Config.UserConfigFile;
-        local_files = GetLocalUserFiles(config_dir, overlay_name);
+        local_files = GetLocalUserFiles(config_dir, overlay_name, skipped);
         if (local_files == null) {
           missing_dir = config_dir;
           bool first;
@@ -646,7 +676,7 @@ namespace Cactbot {
             // TODO: maybe replace this with the version checker get cactbot root
             var url_dir = Path.GetDirectoryName(new Uri(source).LocalPath);
             config_dir = Path.GetFullPath(url_dir + "\\..\\..\\user\\");
-            local_files = GetLocalUserFiles(config_dir, overlay_name);
+            local_files = GetLocalUserFiles(config_dir, overlay_name, skipped);
           } catch (Exception e) {
             logger.Log(LogLevel.Error, Strings.CheckingHtmlRelDirErrorMessage, source, e.ToString());
             config_dir = null;
@@ -657,7 +687,7 @@ namespace Cactbot {
           // Second try a user directory relative to the dll.
           try {
             config_dir = Path.GetFullPath((new VersionChecker(this.logger)).GetCactbotDirectory() + "\\user");
-            local_files = GetLocalUserFiles(config_dir, overlay_name);
+            local_files = GetLocalUserFiles(config_dir, overlay_name, skipped);
           } catch (Exception e) {
             // Accessing CactbotEventSourceConfig.CactbotDllRelativeUserUri can throw an exception so don't.
             logger.Log(LogLevel.Error, Strings.CheckingDllRelDirErrorMessage, config_dir, e.ToString());
@@ -679,7 +709,8 @@ namespace Cactbot {
     private JObject FetchUserFiles(JObject msg) {
       Dictionary<string, string> user_files;
       var overlay_name = msg.ContainsKey("overlayName") ? msg["overlayName"].ToString() : null;
-      GetUserConfigDirAndFiles(msg["source"].ToString(), overlay_name, out string config_dir, out user_files, out string missing_dir);
+      var skipped = new List<string>();
+      GetUserConfigDirAndFiles(msg["source"].ToString(), overlay_name, out string config_dir, out user_files, out string missing_dir, skipped);
       // Fork: the directory the files came from, for changes to them.
       if (user_files != null) {
         try {
@@ -694,6 +725,8 @@ namespace Cactbot {
       result["localUserFiles"] = user_files == null ? null : JObject.FromObject(user_files);
       // Fork: the chosen user directory, when it was not found (see GetUserConfigDirAndFiles).
       result["missingUserLocation"] = missing_dir;
+      // Fork: files not read for their size (see TooBig).
+      result["skippedUserFiles"] = JArray.FromObject(skipped);
 
       result["parserLanguage"] = language_;
       result["systemLocale"] = pc_locale_;
