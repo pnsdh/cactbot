@@ -117,6 +117,23 @@ check(
   `${second.transpilerLoads.length}`,
 );
 
+// Oopsy files import ../../../oopsy_common as well.
+const oopsy = await openPage(browser, 'oopsy', {
+  userFiles: {
+    'oopsyraidsy/a-byakko.ts': fs.readFileSync(
+      path.join(repoRoot, 'ui/oopsyraidsy/data/07-dt/trial/byakko-un.ts'),
+      'utf8',
+    ),
+    'oopsyraidsy/zz-check.js':
+      `window.__byakko = Options.Triggers.some((s) => s.damageWarn?.['ByakkoUn Aratama'] === '9C16');`,
+  },
+});
+check(
+  'oopsy file (oopsy_common import) adds its set',
+  await oopsy.page.evaluate(() => window.__byakko),
+);
+check('oopsy: no page errors', oopsy.errors.length === 0, oopsy.errors.join('; '));
+
 await browser.close();
 console.log(failed === 0 ? 'all ok' : `${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

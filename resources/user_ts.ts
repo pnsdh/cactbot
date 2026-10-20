@@ -6,6 +6,7 @@
 // too, so a .js file renamed to .ts runs as before.
 
 import { BaseOptions } from '../types/data';
+import * as oopsyCommon from '../ui/oopsyraidsy/oopsy_common';
 
 import * as conditions from './conditions';
 import * as contentType from './content_type';
@@ -21,8 +22,9 @@ import * as util from './util';
 import * as zoneId from './zone_id';
 import * as zoneInfo from './zone_info';
 
-// What `import ... from '../../../../../resources/<name>'` gives, by file name.  Imports used only
-// as types (types/*, ConfigValue from user_config...) are removed by the transpiler.
+// What `import ... from '../../../../../resources/<name>'` gives, by file name (and oopsy's
+// `../../../oopsy_common`).  Imports used only as types (types/*, ConfigValue from user_config...)
+// are removed by the transpiler.
 const modules: { [name: string]: unknown } = {
   'conditions': conditions,
   'content_type': contentType,
@@ -30,6 +32,7 @@ const modules: { [name: string]: unknown } = {
   'netregexes': netRegexes,
   'not_reached': notReached,
   'occult_crescent_common': occultCrescentCommon,
+  'oopsy_common': oopsyCommon,
   'outputs': outputs,
   'overlay_plugin_api': overlayPluginApi,
   'regexes': regexes,
@@ -180,7 +183,7 @@ export const runUserTsFile = (
     const found = modules[moduleName(path)];
     if (found === undefined) {
       throw new Error(
-        `${filename}: '${path}' is not available to user files (only cactbot's resources/ modules are).`,
+        `${filename}: '${path}' is not available to user files (only cactbot's resources/ modules and oopsy_common are).`,
       );
     }
     return found;

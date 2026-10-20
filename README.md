@@ -97,7 +97,7 @@ ACT, FFXIV ACT Plugin, OverlayPlugin이 필요합니다. 없다면 해루봇이�
 cactbot 트리거 파일(`ui/raidboss/data/...`의 `.ts`)을 그대로 복사해 고치면 됩니다. 같은 `id`의 트리거는 cactbot 것을 덮어씁니다.
 
 * 타입은 지우기만 하고 검사하지 않습니다.
-* `import`는 cactbot의 `resources/` 모듈만 됩니다. 다른 사용자 파일은 가져올 수 없습니다.
+* `import`는 cactbot의 `resources/` 모듈과 웁시의 `oopsy_common`만 됩니다. 다른 사용자 파일은 가져올 수 없습니다.
 * `timelineFile`을 쓰는 파일은 그 `.txt`도 같은 폴더에 둡니다. 타임라인을 cactbot 것 대신 쓰려면 `overrideTimelineFile: true`를 더합니다.
 * 파일을 처음 읽거나 고친 뒤 처음 열 때만 1초 안쪽으로 더 걸리고, 그 뒤로는 변환해 둔 것을 씁니다.
 * 오류가 있으면 그 파일만 빠집니다. 오류 내용은 `OverlayPlugin.dll` 탭 아래쪽 로그에 `*** ERROR IN USER FILE ***`로 나옵니다.
