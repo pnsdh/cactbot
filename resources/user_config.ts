@@ -421,6 +421,9 @@ class UserConfig {
           if (head)
             head.appendChild(userCssText);
         }
+      } else if (options.Skin !== undefined) {
+        // Fork: the skin even without a user directory (cbkr is the default look).
+        this.handleSkin(options.Skin, overlayName);
       }
 
       // Post this callback so that the js and css can be executed first.
