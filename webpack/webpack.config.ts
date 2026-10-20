@@ -105,9 +105,19 @@ export default (
             name: cactbotChunks.oopsyraidsyData,
             chunks: 'all',
           },
+          // Fork: the transpiler for TypeScript user files (resources/user_ts.ts), loaded only
+          // when there are some.  Under ui/ so that the release (util/publish.sh) has it.
+          'typescript': {
+            test: /[\\/]node_modules[\\/]typescript[\\/]/,
+            name: 'ui/common/typescript_lib',
+            chunks: 'async',
+            enforce: true,
+          },
         },
       },
     },
+    // Fork: its Node-only code (perf_hooks, require of computed paths) never runs in an overlay.
+    ignoreWarnings: [{ module: /[\\/]node_modules[\\/]typescript[\\/]/ }],
     output: {
       filename: '[name].bundle.js',
       path: path.resolve(__dirname, '../dist'),

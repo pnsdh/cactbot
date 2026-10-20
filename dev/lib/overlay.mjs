@@ -53,46 +53,50 @@ export const launch = (options = {}) =>
     ],
   });
 
-// OverlayPlugin's API as cactbot uses it: user files and saved options (`data`, as in
-// cactbotLoadData), and no combatants.
-export const mockOverlayPlugin = (page, data = {}) =>
-  page.evaluateOnNewDocument((data) => {
-    window.OverlayPluginApi = {
-      ready: true,
-      callHandler: (msgStr, cb) => {
-        const m = JSON.parse(msgStr);
-        // Every call, for tests that check what the page asked of OverlayPlugin (e.g. say).
-        (window.__overlayCalls ??= []).push(m);
-        let r = {};
-        if (m.call === 'cactbotLoadUser') {
-          r = {
-            detail: {
-              userLocation: 'C:/dev',
-              localUserFiles: {},
-              parserLanguage: 'ko',
-              displayLanguage: 'ko',
-              systemLocale: 'ko-KR',
-              cactbotVersion: '0',
-              overlayPluginVersion: '0',
-              ffxivPluginVersion: '0',
-              actVersion: '0',
-              gameRegion: 'Korean',
-            },
-          };
-        } else if (m.call === 'cactbotLoadData') {
-          r = { data: data };
-        } else if (m.call === 'say' && m.query === 'capabilities') {
-          // As the pnsdh OverlayPlugin's TTS answers, if a test set it.
-          r = window.__ttsCapabilities ?? null;
-        } else if (m.call === 'getCombatants') {
-          r = { combatants: [] };
-        }
-        // Nothing to answer comes as null, as OverlayPlugin sends it (not the text "null").
-        if (cb)
-          setTimeout(() => cb(r === null ? null : JSON.stringify(r)), 0);
-      },
-    };
-  }, data);
+// OverlayPlugin's API as cactbot uses it: user files (`userFiles`, name to text as in
+// cactbotLoadUser), saved options (`data`, as in cactbotLoadData), and no combatants.
+export const mockOverlayPlugin = (page, data = {}, userFiles = {}) =>
+  page.evaluateOnNewDocument(
+    (data, userFiles) => {
+      window.OverlayPluginApi = {
+        ready: true,
+        callHandler: (msgStr, cb) => {
+          const m = JSON.parse(msgStr);
+          // Every call, for tests that check what the page asked of OverlayPlugin (e.g. say).
+          (window.__overlayCalls ??= []).push(m);
+          let r = {};
+          if (m.call === 'cactbotLoadUser') {
+            r = {
+              detail: {
+                userLocation: 'C:/dev',
+                localUserFiles: userFiles,
+                parserLanguage: 'ko',
+                displayLanguage: 'ko',
+                systemLocale: 'ko-KR',
+                cactbotVersion: '0',
+                overlayPluginVersion: '0',
+                ffxivPluginVersion: '0',
+                actVersion: '0',
+                gameRegion: 'Korean',
+              },
+            };
+          } else if (m.call === 'cactbotLoadData') {
+            r = { data: data };
+          } else if (m.call === 'say' && m.query === 'capabilities') {
+            // As the pnsdh OverlayPlugin's TTS answers, if a test set it.
+            r = window.__ttsCapabilities ?? null;
+          } else if (m.call === 'getCombatants') {
+            r = { combatants: [] };
+          }
+          // Nothing to answer comes as null, as OverlayPlugin sends it (not the text "null").
+          if (cb)
+            setTimeout(() => cb(r === null ? null : JSON.stringify(r)), 0);
+        },
+      };
+    },
+    data,
+    userFiles,
+  );
 
 // A page with the mock, loaded and settled (user options and skin applied).
 export const openPage = async (browser, page, options = {}) => {
@@ -100,7 +104,7 @@ export const openPage = async (browser, page, options = {}) => {
   await p.setViewport(options.viewport ?? { width: 490, height: 300 });
   const errors = [];
   p.on('pageerror', (e) => errors.push(e.message));
-  await mockOverlayPlugin(p, options.data ?? { raidboss: { Skin: 'cbkr' } });
+  await mockOverlayPlugin(p, options.data ?? { raidboss: { Skin: 'cbkr' } }, options.userFiles);
   if (options.beforeLoad)
     await options.beforeLoad(p);
   const url = pageUrl(page);

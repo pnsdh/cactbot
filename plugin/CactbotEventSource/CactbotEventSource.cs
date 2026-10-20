@@ -524,10 +524,13 @@ namespace Cactbot {
       try {
         var filenames = Directory.EnumerateFiles(top_dir, $"{overlay_name}.js").Concat(
           Directory.EnumerateFiles(top_dir, $"{overlay_name}.css"));
+        // Fork: TypeScript user files too (resources/user_ts.ts strips the types).
+        filenames = filenames.Concat(Directory.EnumerateFiles(top_dir, $"{overlay_name}.ts"));
         if (sub_dir != null) {
           filenames = filenames.Concat(
             Directory.EnumerateFiles(sub_dir, "*.js", SearchOption.AllDirectories)).Concat(
             Directory.EnumerateFiles(sub_dir, "*.css", SearchOption.AllDirectories));
+          filenames = filenames.Concat(Directory.EnumerateFiles(sub_dir, "*.ts", SearchOption.AllDirectories));
         }
         foreach (string filename in filenames) {
           user_files[GetRelativePath(top_dir, filename)] = File.ReadAllText(filename) +
