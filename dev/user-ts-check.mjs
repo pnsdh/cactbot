@@ -34,6 +34,25 @@ Options.Triggers.push({
   'raidboss/d-import.ts': `import helper from './helper';
 export default { zoneId: 0, triggers: [{ id: helper }] };`,
   'raidboss/e-types.d.ts': 'this is not read',
+  // Throws on line 6 of the .ts (type-only lines and imports move lines in the JavaScript).
+  'raidboss/f-throw.ts': [
+    'interface A { x: number }',
+    'type B = string;',
+    'import ZoneId from \'../resources/zone_id\';',
+    'const a: A = { x: ZoneId.MatchAll as number };',
+    'const b: B = String(a.x);',
+    'null!.boom(b);',
+  ].join('\n'),
+  // The same with the sourceURL the plugin adds.
+  'raidboss/g-throw.ts': [
+    'interface A { x: number }',
+    'type B = string;',
+    'import ZoneId from \'../resources/zone_id\';',
+    'const a: A = { x: ZoneId.MatchAll as number };',
+    'const b: B = String(a.x);',
+    'null!.boom(b);',
+    '//# sourceURL=C:/dev/raidboss/g-throw.ts',
+  ].join('\n'),
   'raidboss/zz-check.js':
     `window.__userSets = Options.Triggers.map((s) => s.id ?? s.triggers?.[0]?.id);
 window.__userFilesAt = performance.now();`,
@@ -94,6 +113,8 @@ check(
     'no \'the_underkeep.txt\' in the user folder, using 07-dt/dungeon/the_underkeep.txt',
   ),
 );
+check('load error at the .ts line', logText.includes('(raidboss/f-throw.ts:6)'));
+check('load error at the .ts line (sourceURL)', logText.includes('(raidboss/g-throw.ts:6)'));
 check('.d.ts skipped', !logText.includes('e-types'));
 check('no page errors', first.errors.length === 0, first.errors.join('; '));
 

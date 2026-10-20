@@ -57,13 +57,63 @@ const globals: { [name: string]: unknown } = {
 };
 
 // Bump when the transpiler options change, so that old output is not reused.
-const cacheVersion = 1;
+const cacheVersion = 2;
 const cachePrefix = 'cbkr-user-ts:';
 
-// The JavaScript, or the errors of a file that does not parse (kept too, so that a broken file
-// does not load the transpiler every time until it is fixed).
-type Result = { js: string } | { errors: string[] };
+// The JavaScript (with the .ts line of each of its lines, for errors), or the errors of a file
+// that does not parse (kept too, so that a broken file does not load the transpiler every time
+// until it is fixed).
+export type UserTsOutput = { js: string; lines: number[] };
+type Result = UserTsOutput | { errors: string[] };
 type CacheEntry = { v: number; hash: string; result: Result };
+
+const base64Digits = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+// For each generated line of a source map's `mappings`, the (1-based) source line it starts in,
+// or 0 for a line with nothing of the source.
+const sourceLines = (mappings: string): number[] => {
+  const lines: number[] = [];
+  let sourceLine = 0;
+  for (const line of mappings.split(';')) {
+    let first = 0;
+    for (const segment of line.split(',')) {
+      if (segment === '')
+        continue;
+      // Base64 VLQ: 5 bits a digit, low bit of the value its sign.
+      const fields: number[] = [];
+      let value = 0;
+      let shift = 0;
+      for (const char of segment) {
+        const digit = base64Digits.indexOf(char);
+        value += (digit & 31) << shift;
+        if (digit & 32) {
+          shift += 5;
+          continue;
+        }
+        fields.push(value & 1 ? -(value >> 1) : value >> 1);
+        value = 0;
+        shift = 0;
+      }
+      // Generated column, source index, source line (relative to the previous one), column.
+      const delta = fields[2];
+      if (delta === undefined)
+        continue;
+      sourceLine += delta;
+      if (first === 0)
+        first = sourceLine + 1;
+    }
+    lines.push(first);
+  }
+  return lines;
+};
+
+// A data: URL of a source map, for the developer tools.
+const inlineSourceMap = (map: string): string => {
+  let binary = '';
+  for (const byte of new TextEncoder().encode(map))
+    binary += String.fromCharCode(byte);
+  return `//# sourceMappingURL=data:application/json;charset=utf-8;base64,${btoa(binary)}`;
+};
 
 export const isUserTsFile = (filename: string): boolean => {
   const lower = filename.toLowerCase();
@@ -107,11 +157,11 @@ const writeCache = (filename: string, hash: string, result: Result): void => {
 export const transpileUserTsFiles = async (
   files: { [filename: string]: string },
   filenames: string[],
-): Promise<{ [filename: string]: string }> => {
-  const output: { [filename: string]: string } = {};
+): Promise<{ [filename: string]: UserTsOutput }> => {
+  const output: { [filename: string]: UserTsOutput } = {};
   const add = (filename: string, result: Result) => {
     if ('js' in result) {
-      output[filename] = result.js;
+      output[filename] = result;
       return;
     }
     console.log('*** ERROR IN USER FILE ***');
@@ -150,6 +200,8 @@ export const transpileUserTsFiles = async (
         // require / exports, given to the file by runUserTsFile.
         module: ts.ModuleKind.CommonJS,
         esModuleInterop: false,
+        sourceMap: true,
+        inlineSources: true,
       },
     });
     const errors = (result.diagnostics ?? []).map((error) => {
@@ -159,7 +211,15 @@ export const transpileUserTsFiles = async (
         : undefined;
       return `${filename}${at ? `:${at.line + 1}:${at.character + 1}` : ''}: ${message}`;
     });
-    const transpiled: Result = errors.length > 0 ? { errors: errors } : { js: result.outputText };
+    const map = result.sourceMapText ?? '{}';
+    const mappings = (JSON.parse(map) as { mappings?: string }).mappings ?? '';
+    // Its own `//# sourceMappingURL=<name>.js.map` replaced by the map itself.
+    const js = `${result.outputText.replace(/\/\/# sourceMappingURL=\S*\s*$/, '')}\n${
+      inlineSourceMap(map)
+    }`;
+    const transpiled: Result = errors.length > 0
+      ? { errors: errors }
+      : { js: js, lines: sourceLines(mappings) };
     add(filename, transpiled);
     writeCache(filename, hash, transpiled);
   }
@@ -174,10 +234,10 @@ const moduleName = (path: string): string => {
 // Runs a transpiled file (transpileUserTsFiles) as user_config.ts runs .js user files.
 export const runUserTsFile = (
   filename: string,
-  js: string | undefined,
+  output: UserTsOutput | undefined,
   options: BaseOptions,
 ): void => {
-  if (js === undefined)
+  if (output === undefined)
     throw new Error(`${filename} could not be read as TypeScript (see the errors above).`);
   const require = (path: string): unknown => {
     const found = modules[moduleName(path)];
@@ -192,8 +252,29 @@ export const runUserTsFile = (
   const names = Object.keys(globals);
   // As user_config.ts evals .js user files: they are arbitrary code from the user's own folder.
   // eslint-disable-next-line @typescript-eslint/no-implied-eval
-  const run = new Function('Options', 'require', 'exports', 'module', ...names, js);
-  run(options, require, module.exports, module, ...names.map((name) => globals[name]));
+  const run = new Function('Options', 'require', 'exports', 'module', ...names, output.js);
+  try {
+    run(options, require, module.exports, module, ...names.map((name) => globals[name]));
+  } catch (e) {
+    // Where in the .ts file (the browser does not apply source maps to the stack).  Its frames
+    // are at the file's sourceURL, or <anonymous> without one, with the 2 lines of the function
+    // header `new Function` adds first.
+    if (e instanceof Error && e.stack !== undefined) {
+      const url = /\/\/# sourceURL=(.*)$/m.exec(output.js)?.[1]?.trim();
+      const at = url !== undefined ? e.stack.indexOf(`${url}:`) : -1;
+      const frame = url !== undefined && at >= 0
+        ? /^:(\d+):\d+/.exec(e.stack.slice(at + url.length))
+        : /<anonymous>:(\d+):\d+/.exec(e.stack);
+      const line = output.lines[parseInt(frame?.[1] ?? '0') - 3];
+      if (line !== undefined && line > 0) {
+        const message = e.message;
+        e.message = `${message} (${filename}:${line})`;
+        // The stack (which the log shows) starts with the message it was made with.
+        e.stack = e.stack.replace(message, e.message);
+      }
+    }
+    throw e;
+  }
 
   // `export default triggerSet;` of a trigger file.
   const exported = module.exports.default;
