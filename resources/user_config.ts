@@ -316,8 +316,20 @@ class UserConfig {
       window.location.reload();
     };
 
+    // Fork: the plugin watches the user folder again (UserDirWatcher.cs).  A fight is not cut
+    // short for it: the reload waits for the fight to end.
+    let inCombat = false;
+    let changedInCombat = false;
+    addOverlayListener('onInCombatChangedEvent', (e) => {
+      inCombat = e.detail.inGameCombat;
+      if (!inCombat && changedInCombat)
+        reloadOnce();
+    });
     addOverlayListener('onUserFileChanged', () => {
-      reloadOnce();
+      if (inCombat)
+        changedInCombat = true;
+      else
+        reloadOnce();
     });
     addOverlayListener('onForceReload', () => {
       reloadOnce();

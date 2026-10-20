@@ -1,8 +1,8 @@
 // Rename this file to `oopsyraidsy.js` then edit to change the oopsyraidsy UI.
 
 // This file is JavaScript.  Anything after "//" on a line is a comment.
-// If you edit this file, remember to reload ACT or click the "Reload overlay"
-// button on the oopsyraidsy overlay.
+// Once you save it edited, the overlays load it again (after the fight, if you are in
+// one).
 // If there are errors in this file, they will appear in the OverlayPlugin.dll
 // log window in ACT.
 

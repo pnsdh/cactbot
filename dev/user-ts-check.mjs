@@ -12,6 +12,7 @@ import {
   launch,
   openPage,
   repoRoot,
+  send,
   sendLines,
   startFight,
   wait,
@@ -192,6 +193,29 @@ const oopsyExample = await openPage(browser, 'oopsy', {
   },
 });
 check('examples: oopsy example runs', await oopsyExample.page.evaluate(() => window.__adlo));
+
+// A changed user file reloads the overlay, after the fight if it is in one.
+const reload = await openPage(browser, 'raidboss', { query: 'timeline=0&alerts=1' });
+const mark = () => reload.page.evaluate(() => window.__mark = true);
+const marked = () => reload.page.evaluate(() => window.__mark === true);
+await mark();
+await send(reload.page, { type: 'onUserFileChanged', file: 'C:/dev/raidboss.js' });
+await wait(1500);
+check('file change out of combat reloads', !(await marked()));
+await mark();
+await send(reload.page, {
+  type: 'onInCombatChangedEvent',
+  detail: { inACTCombat: true, inGameCombat: true },
+});
+await send(reload.page, { type: 'onUserFileChanged', file: 'C:/dev/raidboss.js' });
+await wait(1500);
+check('file change in combat waits', await marked());
+await send(reload.page, {
+  type: 'onInCombatChangedEvent',
+  detail: { inACTCombat: true, inGameCombat: false },
+});
+await wait(1500);
+check('reloads once the fight ends', !(await marked()));
 
 // The config page lists what went wrong, for raidboss (which it loads for its trigger list) and
 // oopsy (loaded for this).

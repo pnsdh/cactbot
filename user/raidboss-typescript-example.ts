@@ -5,7 +5,9 @@
 // those can be copied here as it is and edited.  Its types are only removed, never checked.
 // Its imports can be cactbot's resources/ modules, whatever path they are written with (they are
 // found by file name), and the trigger set the file exports by default is added to the others.
-// If there are errors in this file, they will appear in the OverlayPlugin.dll log window in ACT.
+// Once you save it edited, the overlays load it again (after the fight, if you are in one).
+// If there are errors in this file, they will appear at the top of the Cactbot Config page and
+// in the OverlayPlugin.dll log window in ACT.
 
 import Conditions from '../resources/conditions';
 import ZoneId from '../resources/zone_id';

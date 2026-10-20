@@ -39,6 +39,8 @@ namespace Cactbot {
     private FFXIVProcess ffxiv_;
     // Fork, for development: see SelfCheck (op-selfcheck.enable).
     private SelfCheck self_check_;
+    // Fork: see UserDirWatcher.
+    private readonly UserDirWatcher user_dir_watcher_;
 
     private string language_ = null;
     private string pc_locale_ = null;
@@ -85,6 +87,10 @@ namespace Cactbot {
       container.Register(new CactbotPathWarning(container));
 
       RegisterPresets();
+      user_dir_watcher_ = new UserDirWatcher((file) => DispatchEvent(JObject.FromObject(new {
+        type = "onUserFileChanged",
+        file = file,
+      })));
 
       RegisterEventTypes(new List<string>()
       {
@@ -313,6 +319,7 @@ namespace Cactbot {
     public override void Stop() {
       fast_update_timer_.Stop();
       self_check_?.Dispose();
+      user_dir_watcher_.Stop();
       Advanced_Combat_Tracker.ActGlobals.oFormActMain.OnLogLineRead -= OnLogLineRead;
     }
 
@@ -640,6 +647,14 @@ namespace Cactbot {
       Dictionary<string, string> user_files;
       var overlay_name = msg.ContainsKey("overlayName") ? msg["overlayName"].ToString() : null;
       GetUserConfigDirAndFiles(msg["source"].ToString(), overlay_name, out string config_dir, out user_files, out string missing_dir);
+      // Fork: the directory the files came from, for changes to them.
+      if (user_files != null) {
+        try {
+          user_dir_watcher_.Watch(Path.GetFullPath(new Uri(config_dir).LocalPath).TrimEnd('\\'));
+        } catch (Exception e) {
+          logger.Log(LogLevel.Warning, "Cannot watch the cactbot user directory {0}: {1}", config_dir, e.Message);
+        }
+      }
 
       var result = new JObject();
       result["userLocation"] = config_dir;
