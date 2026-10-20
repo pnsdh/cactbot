@@ -11,7 +11,7 @@ namespace Cactbot {
   // cactbot-types an update rewrites).  An editor writes a file in several steps, so changes are
   // told once they stop for a moment.
   public class UserDirWatcher {
-    private const int QuietMs = 500;
+    private const int QuietMs = 1500;
     private static readonly HashSet<string> kExtensions =
         new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".js", ".ts", ".css", ".txt" };
 

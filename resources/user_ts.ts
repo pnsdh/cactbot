@@ -56,9 +56,13 @@ const globals: { [name: string]: unknown } = {
   ZoneInfo: zoneInfo.default,
 };
 
-// Bump when the transpiler options change, so that old output is not reused.
-const cacheVersion = 3;
+// Bump when the transpiler options change, so that old output is not reused.  Entries are also
+// told apart by the cactbot version (`tag`): a new release may come with a new TypeScript.
+const cacheVersion = 4;
 const cachePrefix = 'cbkr-user-ts:';
+// Problems told of a file that does not parse: the first ones (one missing brace in a big copied
+// file can make dozens more).
+const kMaxErrors = 3;
 
 // The JavaScript (with the .ts line of each of its lines, for errors), or the errors of a file
 // that does not parse (kept too, so that a broken file does not load the transpiler every time
@@ -107,14 +111,6 @@ const sourceLines = (mappings: string): number[] => {
   return lines;
 };
 
-// A data: URL of a source map, for the developer tools.
-const inlineSourceMap = (map: string): string => {
-  let binary = '';
-  for (const byte of new TextEncoder().encode(map))
-    binary += String.fromCharCode(byte);
-  return `//# sourceMappingURL=data:application/json;charset=utf-8;base64,${btoa(binary)}`;
-};
-
 export const isUserTsFile = (filename: string): boolean => {
   const lower = filename.toLowerCase();
   return lower.endsWith('.ts') && !lower.endsWith('.d.ts');
@@ -130,28 +126,70 @@ const hashText = (text: string): string => {
   return `${text.length}-${(hash >>> 0).toString(16)}`;
 };
 
-const readCache = (filename: string, hash: string): Result | undefined => {
+const isResult = (value: unknown): value is Result => {
+  if (typeof value !== 'object' || value === null)
+    return false;
+  const result = value as { js?: unknown; lines?: unknown; errors?: unknown };
+  if (typeof result.js === 'string')
+    return Array.isArray(result.lines);
+  return Array.isArray(result.errors) && result.errors.every((e) => typeof e === 'string');
+};
+
+const readCache = (key: string, hash: string): Result | undefined => {
   try {
-    const item = window.localStorage.getItem(`${cachePrefix}${filename}`);
+    const item = window.localStorage.getItem(`${cachePrefix}${key}`);
     if (item === null)
       return;
     const entry = JSON.parse(item) as Partial<CacheEntry>;
-    const result = entry.result;
-    if (entry.v !== cacheVersion || entry.hash !== hash || typeof result !== 'object')
-      return;
-    if (result !== null && ('js' in result || 'errors' in result))
-      return result;
+    if (entry.v === cacheVersion && entry.hash === hash && isResult(entry.result))
+      return entry.result;
   } catch {
     // No storage (or a broken entry): transpile again.
   }
 };
 
-const writeCache = (filename: string, hash: string, result: Result): void => {
+const cacheKeys = (): string[] => {
+  const keys: string[] = [];
+  for (let i = 0; i < window.localStorage.length; ++i) {
+    const key = window.localStorage.key(i);
+    if (key !== null && key.startsWith(cachePrefix))
+      keys.push(key);
+  }
+  return keys;
+};
+
+const writeCache = (key: string, hash: string, result: Result): void => {
+  const item = JSON.stringify({ v: cacheVersion, hash: hash, result: result });
   try {
-    const entry: CacheEntry = { v: cacheVersion, hash: hash, result: result };
-    window.localStorage.setItem(`${cachePrefix}${filename}`, JSON.stringify(entry));
+    window.localStorage.setItem(`${cachePrefix}${key}`, item);
   } catch {
-    // Full or no storage: it is transpiled again next time.
+    // Full (the storage is shared by every cactbot page): this cache gives way, once.
+    try {
+      for (const old of cacheKeys())
+        window.localStorage.removeItem(old);
+      window.localStorage.setItem(`${cachePrefix}${key}`, item);
+    } catch {
+      // No storage: transpiled again next time.
+    }
+  }
+};
+
+// Drops the entries of an overlay's user files that are no longer there (`filenames`: the .js
+// and .ts files it has now).
+export const pruneUserTsCache = (overlayName: string, filenames: string[]): void => {
+  try {
+    const overlay = overlayName.toLowerCase();
+    const current = new Set(filenames);
+    for (const key of cacheKeys()) {
+      const filename = key.slice(cachePrefix.length).replace(/^js:/, '');
+      const lower = filename.toLowerCase();
+      const own = lower.startsWith(`${overlay}/`) || lower.startsWith(`${overlay}\\`) ||
+        lower === `${overlay}.ts` || lower === `${overlay}.js`;
+      if (own && !current.has(filename))
+        window.localStorage.removeItem(key);
+    }
+  } catch {
+    // No storage.
   }
 };
 
@@ -172,21 +210,53 @@ const loadTranspiler = (): Promise<TypeScript | undefined> => {
   return transpiler;
 };
 
-// "<line>:<column>: <message>" for each problem the parser found.
-const describe = (ts: TypeScript, list: readonly import('typescript').Diagnostic[]): string[] =>
-  list.map((error) => {
+// "<line>:<column>: <message>" for the first problems the parser found in the file (not those of
+// the options, which would be the same for every file).
+const describe = (ts: TypeScript, list: readonly import('typescript').Diagnostic[]): string[] => {
+  const errors = list.filter((error) => error.file !== undefined).map((error) => {
     const message = ts.flattenDiagnosticMessageText(error.messageText, '\n');
-    const at = error.file && error.start !== undefined
+    const at = error.file !== undefined && error.start !== undefined
       ? error.file.getLineAndCharacterOfPosition(error.start)
       : undefined;
     return `${at ? `${at.line + 1}:${at.character + 1}` : ''}: ${message}`;
   });
+  if (errors.length <= kMaxErrors)
+    return errors;
+  return [...errors.slice(0, kMaxErrors), `: (${errors.length - kMaxErrors} more)`];
+};
+
+const errorText = (e: unknown): string => e instanceof Error ? e.message : String(e);
+
+const transpile = (ts: TypeScript, filename: string, source: string): Result => {
+  const result = ts.transpileModule(source, {
+    fileName: filename,
+    reportDiagnostics: true,
+    compilerOptions: {
+      // What the overlays' Chromium runs.
+      target: ts.ScriptTarget.ES2020,
+      // require / exports, given to the file by runUserTsFile.
+      module: ts.ModuleKind.CommonJS,
+      // Only for `lines`: an inline one (with the source again) would make the cache several
+      // times bigger, for the developer tools only.
+      sourceMap: true,
+    },
+  });
+  const errors = describe(ts, result.diagnostics ?? []);
+  if (errors.length > 0)
+    return { errors: errors };
+  const mappings = (JSON.parse(result.sourceMapText ?? '{}') as { mappings?: string }).mappings;
+  return {
+    js: result.outputText.replace(/\/\/# sourceMappingURL=\S*\s*$/, ''),
+    lines: sourceLines(mappings ?? ''),
+  };
+};
 
 // JavaScript for each of `filenames` (keys of `files`); a file that does not parse is left out,
 // with its errors in the console and given to `onErrors`.
 export const transpileUserTsFiles = async (
   files: { [filename: string]: string },
   filenames: string[],
+  tag: string,
   onErrors?: (filename: string, errors: string[]) => void,
 ): Promise<{ [filename: string]: UserTsOutput }> => {
   const output: { [filename: string]: UserTsOutput } = {};
@@ -203,7 +273,7 @@ export const transpileUserTsFiles = async (
   const todo: { filename: string; source: string; hash: string }[] = [];
   for (const filename of filenames) {
     const source = files[filename] ?? '';
-    const hash = hashText(source);
+    const hash = hashText(`${tag}\n${source}`);
     const cached = readCache(filename, hash);
     if (cached !== undefined)
       add(filename, cached);
@@ -214,34 +284,20 @@ export const transpileUserTsFiles = async (
     return output;
 
   const ts = await loadTranspiler();
-  if (ts === undefined)
-    return output;
   for (const { filename, source, hash } of todo) {
-    const result = ts.transpileModule(source, {
-      fileName: filename,
-      reportDiagnostics: true,
-      compilerOptions: {
-        // What the overlays' Chromium runs.
-        target: ts.ScriptTarget.ES2020,
-        // require / exports, given to the file by runUserTsFile.
-        module: ts.ModuleKind.CommonJS,
-        esModuleInterop: false,
-        sourceMap: true,
-        inlineSources: true,
-      },
-    });
-    const errors = describe(ts, result.diagnostics ?? []);
-    const map = result.sourceMapText ?? '{}';
-    const mappings = (JSON.parse(map) as { mappings?: string }).mappings ?? '';
-    // Its own `//# sourceMappingURL=<name>.js.map` replaced by the map itself.
-    const js = `${result.outputText.replace(/\/\/# sourceMappingURL=\S*\s*$/, '')}\n${
-      inlineSourceMap(map)
-    }`;
-    const transpiled: Result = errors.length > 0
-      ? { errors: errors }
-      : { js: js, lines: sourceLines(mappings) };
-    add(filename, transpiled);
-    writeCache(filename, hash, transpiled);
+    if (ts === undefined) {
+      add(filename, { errors: [': the TypeScript transpiler could not be loaded'] });
+      continue;
+    }
+    let result: Result;
+    try {
+      result = transpile(ts, filename, source);
+    } catch (e) {
+      // The transpiler failing on it is the file's problem, not the overlay's.
+      result = { errors: [`: ${errorText(e)}`] };
+    }
+    add(filename, result);
+    writeCache(filename, hash, result);
   }
   return output;
 };
@@ -260,31 +316,41 @@ const stackLine = (stack: string | undefined, source: string): number | undefine
 };
 
 // Where in a .js user file an error while it was run is, as "<line>" or "<line>:<column>:
-// <message>".  A syntax error has no stack in the file: the TypeScript parser finds it (loaded
-// for that, and its answer cached by the file's text, as transpiled files are).
+// <message>".  A syntax error of the file itself has no stack frame in it: with `parse`, the
+// TypeScript parser finds it (loaded for that, and its answer cached by the file's text, as
+// transpiled files are).
 export const locateJsError = async (
   filename: string,
   source: string,
   error: unknown,
+  tag: string,
+  parse: boolean,
 ): Promise<string | undefined> => {
   if (!(error instanceof Error))
     return;
-  if (!(error instanceof SyntaxError))
-    return stackLine(error.stack, source)?.toString();
+  const line = stackLine(error.stack, source);
+  // Also a SyntaxError of something the file ran (e.g. a bad regular expression).
+  if (line !== undefined || !(error instanceof SyntaxError) || !parse)
+    return line?.toString();
   const key = `js:${filename}`;
-  const hash = hashText(source);
+  const hash = hashText(`${tag}\n${source}`);
   const cached = readCache(key, hash);
   if (cached !== undefined)
     return 'errors' in cached ? cached.errors[0] : undefined;
   const ts = await loadTranspiler();
   if (ts === undefined)
     return;
-  const result = ts.transpileModule(source, {
-    fileName: filename,
-    reportDiagnostics: true,
-    compilerOptions: { allowJs: true, target: ts.ScriptTarget.ES2020 },
-  });
-  const errors = describe(ts, result.diagnostics ?? []);
+  let errors: string[];
+  try {
+    const result = ts.transpileModule(source, {
+      fileName: filename,
+      reportDiagnostics: true,
+      compilerOptions: { allowJs: true, target: ts.ScriptTarget.ES2020 },
+    });
+    errors = describe(ts, result.diagnostics ?? []);
+  } catch {
+    return;
+  }
   writeCache(key, hash, { errors: errors });
   return errors[0];
 };
@@ -312,8 +378,17 @@ export const runUserTsFile = (
   const module: { exports: { [name: string]: unknown } } = { exports: {} };
   const names = Object.keys(globals);
   // As user_config.ts evals .js user files: they are arbitrary code from the user's own folder.
+  // In a block, so that the file's own `const ZoneId` and such hide the globals instead of
+  // clashing with the parameters (as in an eval'd .js file); on the same line, for `lines`.
   // eslint-disable-next-line @typescript-eslint/no-implied-eval
-  const run = new Function('Options', 'require', 'exports', 'module', ...names, output.js);
+  const run = new Function(
+    'Options',
+    'require',
+    'exports',
+    'module',
+    ...names,
+    `"use strict";{${output.js}\n}`,
+  );
   try {
     run(options, require, module.exports, module, ...names.map((name) => globals[name]));
   } catch (e) {
@@ -323,9 +398,11 @@ export const runUserTsFile = (
       const line = output.lines[(stackLine(e.stack, output.js) ?? 0) - 3];
       if (line !== undefined && line > 0) {
         const message = e.message;
-        e.message = `${message} (${filename}:${line})`;
+        const located = `${message} (${filename}:${line})`;
+        e.message = located;
         // The stack (which the log shows) starts with the message it was made with.
-        e.stack = e.stack.replace(message, e.message);
+        if (message !== '')
+          e.stack = e.stack.replace(message, () => located);
       }
     }
     throw e;

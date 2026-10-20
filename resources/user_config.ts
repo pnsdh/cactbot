@@ -7,7 +7,14 @@ import { CactbotConfigurator } from '../ui/config/config';
 import { isLang, Lang, langToLocale } from './languages';
 import { UnreachableCode } from './not_reached';
 import { addOverlayListener, callOverlayHandler } from './overlay_plugin_api';
-import { isUserTsFile, locateJsError, runUserTsFile, transpileUserTsFiles } from './user_ts';
+import {
+  isUserTsFile,
+  locateJsError,
+  pruneUserTsCache,
+  runUserTsFile,
+  transpileUserTsFiles,
+  UserTsOutput,
+} from './user_ts';
 
 // TODO:
 // The convention of "import X as _X; const X = _X;" is currently
@@ -172,7 +179,14 @@ class UserConfig {
   }
 
   // Fork: an error of a user file while it was run, with where in it (see UserFileProblem).
-  reportUserFileError(overlay: string, file: string, source: string, e: unknown): void {
+  // `tag`: the cactbot version, for user_ts.ts's cache.
+  reportUserFileError(
+    overlay: string,
+    file: string,
+    source: string,
+    e: unknown,
+    tag: string,
+  ): void {
     const text = e instanceof Error ? e.message : String(e);
     // .ts files: runUserTsFile puts their line at the end of the message.
     const ts = /^(.*) \((.+):(\d+)\)$/s.exec(text);
@@ -191,7 +205,9 @@ class UserConfig {
       return;
     }
     const generation = this.userFileProblemGeneration;
-    void locateJsError(file, source, e).then((where) => {
+    // The parser (loaded for a syntax error) only for a page that shows the problems.
+    const parse = this.userFileProblemListeners.length > 0;
+    void locateJsError(file, source, e, tag, parse).then((where) => {
       if (generation !== this.userFileProblemGeneration)
         return;
       // "<line>", or "<line>:<column>: <the parser's message>" for a syntax error.
@@ -477,17 +493,29 @@ class UserConfig {
         const tsFiles = this.filterUserFiles(sortedFiles, overlayName, '.ts').filter(isUserTsFile);
         const jsOnlyFiles = this.filterUserFiles(sortedFiles, overlayName, '.js');
         const jsFiles = sortedFiles.filter((f) => jsOnlyFiles.includes(f) || tsFiles.includes(f));
-        const tsOutput = await transpileUserTsFiles(localFiles, tsFiles, (file, errors) => {
-          for (const error of errors) {
-            const [, at, text] = /^([\d:]*): (.*)$/s.exec(error) ?? [undefined, '', error];
-            this.reportUserFileProblem({
-              overlay: overlayName,
-              kind: 'error',
-              file: file,
-              at: at !== '' ? at : undefined,
-              text: text ?? error,
-            });
-          }
+        const tag = e.detail.cactbotVersion ?? '';
+        pruneUserTsCache(overlayName, jsFiles);
+        const tsOutput: { [filename: string]: UserTsOutput } = await transpileUserTsFiles(
+          localFiles,
+          tsFiles,
+          tag,
+          (file, errors) => {
+            for (const error of errors) {
+              const [, at, text] = /^([\d:]*): (.*)$/s.exec(error) ?? [undefined, '', error];
+              this.reportUserFileProblem({
+                overlay: overlayName,
+                kind: 'error',
+                file: file,
+                at: at !== '' ? at : undefined,
+                text: text ?? error,
+              });
+            }
+          },
+        ).catch((error: unknown) => {
+          // Whatever goes wrong there leaves out the .ts files, not the overlay.
+          console.log('*** ERROR IN USER FILE ***');
+          console.log(error);
+          return {};
         });
         const cssFiles = loadCss ? this.filterUserFiles(sortedFiles, overlayName, '.css') : [];
 
@@ -495,7 +523,7 @@ class UserConfig {
           try {
             printUserFile(`local user file: ${basePath}${jsFile}`);
             if (tsFiles.includes(jsFile)) {
-              // One that did not parse has had its errors told already.
+              // One that could not be transpiled has had its errors told already.
               const output = tsOutput[jsFile];
               if (output === undefined)
                 continue;
@@ -527,7 +555,7 @@ class UserConfig {
             // Be very visible for users.
             console.log('*** ERROR IN USER FILE ***');
             console.log(e);
-            this.reportUserFileError(overlayName, jsFile, localFiles[jsFile] ?? '', e);
+            this.reportUserFileError(overlayName, jsFile, localFiles[jsFile] ?? '', e, tag);
           }
         }
 

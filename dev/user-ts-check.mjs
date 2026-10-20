@@ -1,7 +1,9 @@
-// TypeScript user files (resources/user_ts.ts) in the built raidboss overlay: a cactbot trigger
-// file copied as it is (and edited), a .js-style file with types, and files that must fail
-// alone (bad syntax, an import user files cannot have) or be skipped (.d.ts).  Then a second
-// page, which must use the cached output instead of loading the transpiler again.
+// User files in the built overlays.  TypeScript ones (resources/user_ts.ts): a cactbot trigger
+// file copied as it is (and edited), a .js-style file with types, files that must fail alone
+// (bad syntax, an import user files cannot have) or be skipped (.d.ts), the .ts line of a load
+// error, the cache (a second page must not load the transpiler again; files gone are dropped),
+// and no transpiler at all.  Then the examples in user/, a copied oopsy file, the reload when a
+// file changes (after the fight), and the problems listed on the config page.
 //
 // node user-ts-check.mjs [--chrome95]   (after `npm run build`; --chrome95 needs CHROME95)
 import fs from 'node:fs';
@@ -231,6 +233,12 @@ const configPage = await openPage(browser, 'config', {
       'Options.Triggers.push({ zoneId: ZoneId.MiddleLaNoscea, timelineFile: \'nope.txt\' });',
     'raidboss/e-reset.js': 'Options.Triggers = [];',
     'oopsyraidsy/a-throw.js': '\nnull.oops();',
+    // A SyntaxError of something the file runs, not of the file.
+    'raidboss/f-regex.js': '\n\nNetRegexes.gameNameLog({ line: \'Foo (bar\' });',
+    // Its own ZoneId hides the global, as in a .js file.
+    'raidboss/g-shadow.ts': 'const ZoneId = 5;\nexport default { zoneId: ZoneId, triggers: [] };',
+    // A message with $' in it.
+    'raidboss/h-dollar.ts': '\nthrow new Error("bad $\' here");',
   },
   settleMs: 4000,
 });
@@ -245,6 +253,13 @@ check('config: missing timeline', noticeText.includes('raidboss/nope.txt'));
 check('config: Options.Triggers replaced', noticeText.includes('Options.Triggers'));
 check('config: oopsy file error', noticeText.includes('oopsyraidsy/a-throw.js:2'));
 check('config: missing user directory', noticeText.includes('C:/gone'));
+check('config: runtime SyntaxError with its line', noticeText.includes('raidboss/f-regex.js:3'));
+check('config: own const ZoneId in a .ts file', !noticeText.includes('g-shadow'));
+check(
+  'config: $ in a message',
+  noticeText.includes('raidboss/h-dollar.ts:2bad $\' here'),
+  noticeText,
+);
 check('config: no page errors', configPage.errors.length === 0, configPage.errors.join('; '));
 // A changed user file: the config page stays (no reload) and checks the files again.
 await configPage.page.evaluate(() => window.__mark = true);
@@ -261,6 +276,66 @@ check(
     refreshed.text.includes('oopsyraidsy/a-throw.js:2') &&
     refreshed.text.includes('raidboss/a-syntax.js:3:'),
   refreshed.text,
+);
+
+// An overlay does not load the transpiler for a .js syntax error (only the config page shows
+// where it is).
+// (An entry of another overlay's file, which this one must leave.)
+await configPage.page.evaluate(() =>
+  window.localStorage.setItem('cbkr-user-ts:oopsyraidsy/keep.ts', '{}')
+);
+let jsOnlyLoads = 0;
+const jsOnly = await openPage(browser, 'raidboss', {
+  query: 'timeline=0&alerts=1',
+  userFiles: { 'raidboss/a-syntax.js': 'Options.Triggers.push({ x y });' },
+  beforeLoad: (p) => {
+    p.on('request', (r) => {
+      if (r.url().includes('typescript_lib'))
+        jsOnlyLoads++;
+    });
+  },
+});
+check('overlay: no transpiler for a .js syntax error', jsOnlyLoads === 0);
+
+// The cache of a file no longer there is dropped.
+const cachedKeys = (p) =>
+  p.evaluate(() => Object.keys(window.localStorage).filter((k) => k.startsWith('cbkr-user-ts:')));
+const before = await cachedKeys(jsOnly.page);
+check(
+  'cache: dropped for files gone',
+  !before.some((k) => k.includes('raidboss/b-plain.ts')),
+  `${before}`,
+);
+check(
+  'cache: kept for other overlays',
+  before.includes('cbkr-user-ts:oopsyraidsy/keep.ts'),
+  `${before}`,
+);
+
+// Without the transpiler (it cannot be loaded), the .ts files are left out and told, not the
+// overlay.
+const noTsLogs = [];
+const noTs = await openPage(browser, 'raidboss', {
+  query: 'timeline=0&alerts=1',
+  userFiles: {
+    'raidboss/a-new.ts':
+      'const x: number = 1;\nOptions.Triggers.push({ zoneId: x, triggers: [] });',
+    'raidboss/b.js': 'window.__ranB = true;',
+  },
+  beforeLoad: async (p) => {
+    await p.setRequestInterception(true);
+    p.on('request', (r) => r.url().includes('typescript_lib') ? r.abort() : r.continue());
+    p.on('console', (m) => noTsLogs.push(m.text()));
+  },
+});
+check(
+  'no transpiler: other files still run',
+  await noTs.page.evaluate(() => window.__ranB === true),
+);
+check(
+  'no transpiler: told',
+  noTsLogs.some((l) => l.includes('a-new.ts:: the TypeScript transpiler could not be loaded')),
+  noTsLogs.join(' | '),
 );
 
 await browser.close();

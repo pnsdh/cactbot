@@ -15,9 +15,9 @@ const kText = {
     ko: '사용자 파일 문제',
   },
   hint: {
-    en: 'A file with an error is skipped. Once it is saved fixed, the overlays load it again ' +
-      '(and this list is checked again).',
-    ko: '오류가 있는 파일은 적용되지 않습니다. 고쳐서 저장하면 오버레이가 다시 불러오고, 이 목록도 다시 확인합니다.',
+    en: 'A file with an error is not used from where the error is (all of it for a syntax ' +
+      'error). Once it is saved fixed, the overlays load it again, and this list is checked again.',
+    ko: '오류가 난 파일은 오류가 난 곳부터 적용되지 않습니다(문법 오류면 파일 전체). 고쳐서 저장하면 오버레이가 다시 불러오고, 이 목록도 다시 확인합니다.',
   },
   missingDir: {
     en: 'The chosen user directory was not found, the default one is used instead: ${text}',
@@ -41,7 +41,7 @@ const kOverlays: { [overlay: string]: LocaleText } = {
 const describe = (problem: UserFileProblem, translate: (text: LocaleText) => string): string =>
   problem.kind === 'error'
     ? problem.text
-    : translate(kText[problem.kind]).replace('${text}', problem.text);
+    : translate(kText[problem.kind]).replace('${text}', () => problem.text);
 
 export const buildUserFileNotice = (
   container: HTMLElement,

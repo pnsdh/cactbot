@@ -103,7 +103,7 @@ ACT, FFXIV ACT Plugin, OverlayPlugin이 필요합니다. 없다면 해루봇이�
 * `import`는 cactbot의 `resources/` 모듈과 웁시의 `oopsy_common`만 됩니다. 다른 사용자 파일은 가져올 수 없습니다.
 * 파일을 처음 읽거나 고친 뒤 처음 열 때만 1초 안쪽으로 더 걸리고, 그 뒤로는 변환해 둔 것을 씁니다.
 * 사용자 폴더의 파일을 고쳐 저장하면 오버레이가 다시 불러옵니다. 전투 중이면 전투가 끝난 뒤에 불러옵니다.
-* 오류가 있으면 그 파일만 빠집니다. 오류는 `Cactbot Config` 화면 맨 위에 파일과 줄 번호로 나오고, `OverlayPlugin.dll` 탭 아래쪽 로그에도 `*** ERROR IN USER FILE ***`로 나옵니다.
+* 오류가 난 파일은 오류가 난 곳부터 적용되지 않습니다(문법 오류면 파일 전체). 다른 파일은 그대로 적용됩니다. 오류는 `Cactbot Config` 화면 맨 위에 파일과 줄 번호로 나오고, `OverlayPlugin.dll` 탭 아래쪽 로그에도 `*** ERROR IN USER FILE ***`로 나옵니다.
 
 ## 자주 묻는 것
 
