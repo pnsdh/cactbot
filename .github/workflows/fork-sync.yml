@@ -98,6 +98,7 @@ jobs:
               echo
               echo "Resolve locally, then push: \`git fetch upstream && git merge upstream/main\`"
             else
-              echo "Sync failed after merging upstream \`$UPSTREAM_SHA\` (test, push or release trigger)."
+              echo "Sync failed after merging upstream \`$UPSTREAM_SHA\`" \
+                "(test, push or release trigger)."
             fi
           } >> "$GITHUB_STEP_SUMMARY"

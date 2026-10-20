@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Windows.Forms;
 using CactbotEventSource.loc;
@@ -38,6 +39,8 @@ namespace Cactbot {
     private FFXIVProcess ffxiv_;
     // Fork, for development: see SelfCheck (op-selfcheck.enable).
     private SelfCheck self_check_;
+    // Fork: see UserDirWatcher.
+    private readonly UserDirWatcher user_dir_watcher_;
 
     private string language_ = null;
     private string pc_locale_ = null;
@@ -84,6 +87,10 @@ namespace Cactbot {
       container.Register(new CactbotPathWarning(container));
 
       RegisterPresets();
+      user_dir_watcher_ = new UserDirWatcher((file) => DispatchEvent(JObject.FromObject(new {
+        type = "onUserFileChanged",
+        file = file,
+      })));
 
       RegisterEventTypes(new List<string>()
       {
@@ -312,6 +319,7 @@ namespace Cactbot {
     public override void Stop() {
       fast_update_timer_.Stop();
       self_check_?.Dispose();
+      user_dir_watcher_.Stop();
       Advanced_Combat_Tracker.ActGlobals.oFormActMain.OnLogLineRead -= OnLogLineRead;
     }
 
@@ -481,7 +489,12 @@ namespace Cactbot {
       return filename;
     }
 
-    private Dictionary<string, string> GetLocalUserFiles(string config_dir, string overlay_name) {
+    // Fork: bigger files are not user files (a log or a dump left there): each overlay would read
+    // all of it on every load.  The biggest trigger files are about 0.3 MB.
+    private const long kMaxUserFileBytes = 4 * 1024 * 1024;
+
+    // Fork: `skipped` gets the files left out for their size (relative paths).
+    private Dictionary<string, string> GetLocalUserFiles(string config_dir, string overlay_name, List<string> skipped) {
       // TODO: probably should sanity check overlay_name for no * or ? wildcards as well
       // as GetInvalidPathChars.
       if (String.IsNullOrEmpty(config_dir))
@@ -533,8 +546,11 @@ namespace Cactbot {
           filenames = filenames.Concat(Directory.EnumerateFiles(sub_dir, "*.ts", SearchOption.AllDirectories));
         }
         foreach (string filename in filenames) {
-          user_files[GetRelativePath(top_dir, filename)] = File.ReadAllText(filename) +
-            $"\n//# sourceURL={filename}";
+          if (TooBig(top_dir, filename, skipped))
+            continue;
+          var text = ReadUserFile(filename);
+          if (text != null)
+            user_files[GetRelativePath(top_dir, filename)] = text + $"\n//# sourceURL={filename}";
         }
 
         var textFilenames = Directory.EnumerateFiles(top_dir, "*.txt");
@@ -542,7 +558,11 @@ namespace Cactbot {
           textFilenames = textFilenames.Concat(Directory.EnumerateFiles(sub_dir, "*.txt", SearchOption.AllDirectories));
         }
         foreach (string filename in textFilenames) {
-          user_files[GetRelativePath(top_dir, filename)] = File.ReadAllText(filename);
+          if (TooBig(top_dir, filename, skipped))
+            continue;
+          var text = ReadUserFile(filename);
+          if (text != null)
+            user_files[GetRelativePath(top_dir, filename)] = text;
         }
       } catch (Exception e) {
         logger.Log(LogLevel.Error, Strings.UserErrorFileException, e.ToString());
@@ -551,15 +571,104 @@ namespace Cactbot {
       return user_files;
     }
 
-    private void GetUserConfigDirAndFiles(string source, string overlay_name, out string config_dir, out Dictionary<string, string> local_files) {
+    // Fork: one file that cannot be read (e.g. while an editor saves it) leaves out only itself.
+    // A file without a byte order mark whose non-ASCII text is mostly not UTF-8 is read in the
+    // ANSI code page: what older Notepad saved, CP949 on Korean Windows (as UTF-8 its Korean text
+    // became U+FFFD).  A UTF-8 file with a stray bad byte stays UTF-8 (only that byte is lost).
+    private string ReadUserFile(string filename) {
+      try {
+        var bytes = File.ReadAllBytes(filename);
+        if (!HasByteOrderMark(bytes) && LooksAnsi(bytes)) {
+          bool first;
+          lock (ansi_files_)
+            first = ansi_files_.Add(filename);
+          if (first)
+            logger.Log(LogLevel.Info, "Cactbot user file is not UTF-8, read as {0}: {1}", Encoding.Default.WebName, filename);
+          return Encoding.Default.GetString(bytes);
+        }
+        using (var reader = new StreamReader(new MemoryStream(bytes), new UTF8Encoding(false), true))
+          return reader.ReadToEnd();
+      } catch (Exception e) {
+        logger.Log(LogLevel.Error, Strings.UserErrorFileException, filename + ": " + e.Message);
+        return null;
+      }
+    }
+
+    private readonly HashSet<string> ansi_files_ = new HashSet<string>();
+
+    private bool TooBig(string top_dir, string filename, List<string> skipped) {
+      long length;
+      try {
+        length = new FileInfo(filename).Length;
+      } catch (Exception) {
+        // ReadUserFile tells why.
+        return false;
+      }
+      if (length <= kMaxUserFileBytes)
+        return false;
+      skipped.Add(GetRelativePath(top_dir, filename));
+      bool first;
+      lock (big_files_)
+        first = big_files_.Add(filename);
+      if (first)
+        logger.Log(LogLevel.Warning, "Cactbot user file not read, bigger than {0} MB: {1}", kMaxUserFileBytes / 1024 / 1024, filename);
+      return true;
+    }
+
+    private readonly HashSet<string> big_files_ = new HashSet<string>();
+
+    private static bool HasByteOrderMark(byte[] b) {
+      return (b.Length >= 3 && b[0] == 0xEF && b[1] == 0xBB && b[2] == 0xBF) ||
+        (b.Length >= 2 && ((b[0] == 0xFF && b[1] == 0xFE) || (b[0] == 0xFE && b[1] == 0xFF)));
+    }
+
+    // More bytes that cannot be UTF-8 than UTF-8 sequences of several bytes: Korean text in
+    // CP949 is almost never valid UTF-8, Korean UTF-8 text almost always is.
+    private static bool LooksAnsi(byte[] b) {
+      int valid = 0;
+      int invalid = 0;
+      for (int i = 0; i < b.Length;) {
+        byte lead = b[i];
+        int length = lead < 0x80 ? 1 : lead >= 0xC2 && lead <= 0xDF ? 2 : lead >= 0xE0 && lead <= 0xEF ? 3 : lead >= 0xF0 && lead <= 0xF4 ? 4 : 0;
+        bool ok = length > 0 && i + length <= b.Length;
+        for (int j = 1; ok && j < length; ++j)
+          ok = (b[i + j] & 0xC0) == 0x80;
+        if (!ok) {
+          ++invalid;
+          ++i;
+          continue;
+        }
+        if (length > 1)
+          ++valid;
+        i += length;
+      }
+      return invalid > valid;
+    }
+
+    private void GetUserConfigDirAndFiles(string source, string overlay_name, out string config_dir, out Dictionary<string, string> local_files, out string missing_dir, List<string> skipped) {
       local_files = null;
       config_dir = null;
+      missing_dir = null;
 
-      if (Config.UserConfigFile != null && Config.UserConfigFile != "") {
+      // Fork: a chosen directory that is gone (moved or deleted, or one an older version saved
+      // without having found it) falls back to the default ones below, for this load only: the
+      // setting is kept for when it comes back, and the config page says it is missing.
+      bool chosen = Config.UserConfigFile != null && Config.UserConfigFile != "";
+      if (chosen) {
         // Explicit user config directory specified.
         config_dir = Config.UserConfigFile;
-        local_files = GetLocalUserFiles(config_dir, overlay_name);
-      } else {
+        local_files = GetLocalUserFiles(config_dir, overlay_name, skipped);
+        if (local_files == null) {
+          missing_dir = config_dir;
+          bool first;
+          lock (warned_missing_dirs_)
+            first = warned_missing_dirs_.Add(config_dir);
+          if (first)
+            logger.Log(LogLevel.Warning, "Cactbot user directory not found, using the default one: {0}", config_dir);
+          config_dir = null;
+        }
+      }
+      if (local_files == null) {
         if (source != null && source != "") {
           // First try a user directory relative to the html.
           try {
@@ -567,7 +676,7 @@ namespace Cactbot {
             // TODO: maybe replace this with the version checker get cactbot root
             var url_dir = Path.GetDirectoryName(new Uri(source).LocalPath);
             config_dir = Path.GetFullPath(url_dir + "\\..\\..\\user\\");
-            local_files = GetLocalUserFiles(config_dir, overlay_name);
+            local_files = GetLocalUserFiles(config_dir, overlay_name, skipped);
           } catch (Exception e) {
             logger.Log(LogLevel.Error, Strings.CheckingHtmlRelDirErrorMessage, source, e.ToString());
             config_dir = null;
@@ -578,7 +687,7 @@ namespace Cactbot {
           // Second try a user directory relative to the dll.
           try {
             config_dir = Path.GetFullPath((new VersionChecker(this.logger)).GetCactbotDirectory() + "\\user");
-            local_files = GetLocalUserFiles(config_dir, overlay_name);
+            local_files = GetLocalUserFiles(config_dir, overlay_name, skipped);
           } catch (Exception e) {
             // Accessing CactbotEventSourceConfig.CactbotDllRelativeUserUri can throw an exception so don't.
             logger.Log(LogLevel.Error, Strings.CheckingDllRelDirErrorMessage, config_dir, e.ToString());
@@ -589,19 +698,35 @@ namespace Cactbot {
 
         // Set any implicitly discovered cactbot user config dirs as explicit.
         // This will help in the future when there aren't local plugins or html.
-        if (config_dir != null)
+        // Fork: only one that was found, and never over a chosen one.
+        if (!chosen && local_files != null)
           Config.UserConfigFile = config_dir;
       }
     }
 
+    private readonly HashSet<string> warned_missing_dirs_ = new HashSet<string>();
+
     private JObject FetchUserFiles(JObject msg) {
       Dictionary<string, string> user_files;
       var overlay_name = msg.ContainsKey("overlayName") ? msg["overlayName"].ToString() : null;
-      GetUserConfigDirAndFiles(msg["source"].ToString(), overlay_name, out string config_dir, out user_files);
+      var skipped = new List<string>();
+      GetUserConfigDirAndFiles(msg["source"].ToString(), overlay_name, out string config_dir, out user_files, out string missing_dir, skipped);
+      // Fork: the directory the files came from, for changes to them.
+      if (user_files != null) {
+        try {
+          user_dir_watcher_.Watch(new Uri(config_dir).LocalPath, overlay_name);
+        } catch (Exception e) {
+          logger.Log(LogLevel.Warning, "Cannot watch the cactbot user directory {0}: {1}", config_dir, e.Message);
+        }
+      }
 
       var result = new JObject();
       result["userLocation"] = config_dir;
       result["localUserFiles"] = user_files == null ? null : JObject.FromObject(user_files);
+      // Fork: the chosen user directory, when it was not found (see GetUserConfigDirAndFiles).
+      result["missingUserLocation"] = missing_dir;
+      // Fork: files not read for their size (see TooBig).
+      result["skippedUserFiles"] = JArray.FromObject(skipped);
 
       result["parserLanguage"] = language_;
       result["systemLocale"] = pc_locale_;

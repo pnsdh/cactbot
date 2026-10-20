@@ -1,0 +1,34 @@
+{
+  // Fork: declarations of what user files can import (resources/user_ts.ts), for editors
+  // (user/tsconfig.json).  Built by the fork release into the zip's user/cactbot-types.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": false,
+    "incremental": false,
+    "declaration": true,
+    "declarationMap": false,
+    "emitDeclarationOnly": true,
+    "sourceMap": false,
+    "inlineSources": false,
+    "noEmit": false,
+    "rootDir": "./",
+    "outDir": "./dist-user-types"
+  },
+  "include": ["./types"],
+  "files": [
+    "./resources/conditions.ts",
+    "./resources/content_type.ts",
+    "./resources/languages.ts",
+    "./resources/netregexes.ts",
+    "./resources/not_reached.ts",
+    "./resources/occult_crescent_common.ts",
+    "./resources/outputs.ts",
+    "./resources/overlay_plugin_api.ts",
+    "./resources/regexes.ts",
+    "./resources/responses.ts",
+    "./resources/util.ts",
+    "./resources/zone_id.ts",
+    "./resources/zone_info.ts",
+    "./ui/oopsyraidsy/oopsy_common.ts"
+  ]
+}

@@ -7,7 +7,14 @@ import { CactbotConfigurator } from '../ui/config/config';
 import { isLang, Lang, langToLocale } from './languages';
 import { UnreachableCode } from './not_reached';
 import { addOverlayListener, callOverlayHandler } from './overlay_plugin_api';
-import { isUserTsFile, runUserTsFile, transpileUserTsFiles } from './user_ts';
+import {
+  isUserTsFile,
+  locateJsError,
+  pruneUserTsCache,
+  runUserTsFile,
+  transpileUserTsFiles,
+  UserTsOutput,
+} from './user_ts';
 
 // TODO:
 // The convention of "import X as _X; const X = _X;" is currently
@@ -107,10 +114,60 @@ export type OptionsTemplate = {
   options: ConfigEntry[];
 };
 
+// Fork: what went wrong with the user files this page loaded, for the config page to show
+// (ui/config/config_user_files.ts) as it is otherwise only in the OverlayPlugin log.  `at` is the
+// line (or line:column) in `file`; `overlay` is '' for what is not any one overlay's.
+export type UserFileProblem = {
+  overlay: string;
+  kind: 'error' | 'overwrite' | 'missingDir' | 'missingTimeline' | 'tooBig';
+  file?: string;
+  at?: string;
+  text: string;
+};
+
 class UserConfig {
   public optionTemplates: { [overlayName: string]: OptionsTemplate } = {};
   public userFileCallbacks: { [overlayName: string]: UserFileCallback } = {};
   public savedConfig: SavedConfig = {};
+  // Fork: see UserFileProblem.
+  public userFileProblems: UserFileProblem[] = [];
+  private userFileProblemListeners: (() => void)[] = [];
+  // Problems found late (locateJsError) for files loaded before a clear are not kept.
+  private userFileProblemGeneration = 0;
+
+  reportUserFileProblem(problem: UserFileProblem): void {
+    const same = (p: UserFileProblem) =>
+      p.overlay === problem.overlay && p.kind === problem.kind && p.file === problem.file &&
+      p.at === problem.at && p.text === problem.text;
+    if (this.userFileProblems.some(same))
+      return;
+    this.userFileProblems.push(problem);
+    for (const listener of this.userFileProblemListeners)
+      listener();
+  }
+
+  onUserFileProblem(listener: () => void): void {
+    this.userFileProblemListeners.push(listener);
+  }
+
+  // Before the files of `overlays` are loaded again (and the user directory's, which every load
+  // tells again).  Call it once loads in progress are done (whenUserFilesLoaded), or they would
+  // add theirs after it.
+  clearUserFileProblems(overlays: string[]): void {
+    this.userFileProblemGeneration++;
+    this.userFileProblems = this.userFileProblems.filter((p) =>
+      p.overlay !== '' && !overlays.includes(p.overlay)
+    );
+    for (const listener of this.userFileProblemListeners)
+      listener();
+  }
+
+  // Fork: loads of user files in progress (see clearUserFileProblems).
+  private userFileLoads = new Set<Promise<void>>();
+
+  whenUserFilesLoaded(): Promise<void> {
+    return Promise.all([...this.userFileLoads]).then(() => undefined);
+  }
 
   getDefaultBaseOptions(): BaseOptions {
     return {
@@ -130,6 +187,50 @@ class UserConfig {
       },
       Debug: false,
     };
+  }
+
+  // Fork: an error of a user file while it was run, with where in it (see UserFileProblem).
+  // `tag`: the cactbot version, for user_ts.ts's cache.
+  reportUserFileError(
+    overlay: string,
+    file: string,
+    source: string,
+    e: unknown,
+    tag: string,
+  ): void {
+    const text = e instanceof Error ? e.message : String(e);
+    // .ts files: runUserTsFile puts their line at the end of the message.
+    const ts = /^(.*) \((.+):(\d+)\)$/s.exec(text);
+    if (ts?.[1] !== undefined && ts[2] === file) {
+      this.reportUserFileProblem({
+        overlay: overlay,
+        kind: 'error',
+        file: file,
+        at: ts[3],
+        text: ts[1],
+      });
+      return;
+    }
+    if (isUserTsFile(file)) {
+      this.reportUserFileProblem({ overlay: overlay, kind: 'error', file: file, text: text });
+      return;
+    }
+    const generation = this.userFileProblemGeneration;
+    // The parser (loaded for a syntax error) only for a page that shows the problems.
+    const parse = this.userFileProblemListeners.length > 0;
+    void locateJsError(file, source, e, tag, parse).then((where) => {
+      if (generation !== this.userFileProblemGeneration)
+        return;
+      // "<line>", or "<line>:<column>: <the parser's message>" for a syntax error.
+      const at = where?.split(': ')[0];
+      this.reportUserFileProblem({
+        overlay: overlay,
+        kind: 'error',
+        file: file,
+        at: at !== undefined && at !== '' ? at : undefined,
+        text: text,
+      });
+    });
   }
 
   evalUserFile(content: string, options: BaseOptions): void {
@@ -255,8 +356,24 @@ class UserConfig {
       window.location.reload();
     };
 
+    // Fork: the plugin watches the user folder again (UserDirWatcher.cs).  A fight is not cut
+    // short for it: the reload waits for the fight to end.
+    let inCombat = false;
+    let changedInCombat = false;
+    addOverlayListener('onInCombatChangedEvent', (e) => {
+      inCombat = e.detail.inGameCombat;
+      if (!inCombat && changedInCombat)
+        reloadOnce();
+    });
     addOverlayListener('onUserFileChanged', () => {
-      reloadOnce();
+      // The config page only looks at them again (config_user_files.ts): a reload would lose
+      // where it was, and what was being typed.
+      if (overlayName === 'config')
+        return;
+      if (inCombat)
+        changedInCombat = true;
+      else
+        reloadOnce();
     });
     addOverlayListener('onForceReload', () => {
       reloadOnce();
@@ -275,8 +392,15 @@ class UserConfig {
       // The basePath isn't using for anything other than cosmetic printing of full paths,
       // so replace any slashes here for uniformity.  In case anybody is using cactbot on
       // Linux (?!?), support any style of slashes elsewhere.
-      const basePath = `${e.detail.userLocation.replace(/[/\\]*$/, '')}\\`;
+      // Fork: none when no user directory was found at all.
+      const basePath = `${(e.detail.userLocation ?? '').replace(/[/\\]*$/, '')}\\`;
       const localFiles = e.detail.localUserFiles;
+      const missingDir = e.detail.missingUserLocation;
+      // The same for every overlay (a file at the top is read by all), so not told as any one's.
+      if (typeof missingDir === 'string')
+        this.reportUserFileProblem({ overlay: '', kind: 'missingDir', text: missingDir });
+      for (const file of e.detail.skippedUserFiles ?? [])
+        this.reportUserFileProblem({ overlay: '', kind: 'tooBig', file: file, text: '' });
 
       options.SystemInfo = {
         cactbotVersion: e.detail.cactbotVersion,
@@ -382,16 +506,44 @@ class UserConfig {
         const tsFiles = this.filterUserFiles(sortedFiles, overlayName, '.ts').filter(isUserTsFile);
         const jsOnlyFiles = this.filterUserFiles(sortedFiles, overlayName, '.js');
         const jsFiles = sortedFiles.filter((f) => jsOnlyFiles.includes(f) || tsFiles.includes(f));
-        const tsOutput = await transpileUserTsFiles(localFiles, tsFiles);
+        const tag = e.detail.cactbotVersion ?? '';
+        pruneUserTsCache(overlayName, jsFiles);
+        const tsOutput: { [filename: string]: UserTsOutput } = await transpileUserTsFiles(
+          localFiles,
+          tsFiles,
+          tag,
+          (file, errors) => {
+            for (const error of errors) {
+              const [, at, text] = /^([\d:]*): (.*)$/s.exec(error) ?? [undefined, '', error];
+              this.reportUserFileProblem({
+                overlay: overlayName,
+                kind: 'error',
+                file: file,
+                at: at !== '' ? at : undefined,
+                text: text ?? error,
+              });
+            }
+          },
+        ).catch((error: unknown) => {
+          // Whatever goes wrong there leaves out the .ts files, not the overlay.
+          console.log('*** ERROR IN USER FILE ***');
+          console.log(error);
+          return {};
+        });
         const cssFiles = loadCss ? this.filterUserFiles(sortedFiles, overlayName, '.css') : [];
 
         for (const jsFile of jsFiles) {
           try {
             printUserFile(`local user file: ${basePath}${jsFile}`);
-            if (tsFiles.includes(jsFile))
-              runUserTsFile(jsFile, tsOutput[jsFile], options);
-            else
+            if (tsFiles.includes(jsFile)) {
+              // One that could not be transpiled has had its errors told already.
+              const output = tsOutput[jsFile];
+              if (output === undefined)
+                continue;
+              runUserTsFile(jsFile, output, options);
+            } else {
               this.evalUserFile(localFiles[jsFile] ?? '', options);
+            }
 
             for (const field of warnOnVariableResetMap[overlayName] ?? []) {
               const value = variableTracker[field];
@@ -401,6 +553,12 @@ class UserConfig {
                 console.log(
                   `*** WARNING: ${basePath}${jsFile} overwrites Options.${field} from previous files.`,
                 );
+                this.reportUserFileProblem({
+                  overlay: overlayName,
+                  kind: 'overwrite',
+                  file: jsFile,
+                  text: field,
+                });
               }
               variableTracker[field] = options[field];
             }
@@ -410,6 +568,7 @@ class UserConfig {
             // Be very visible for users.
             console.log('*** ERROR IN USER FILE ***');
             console.log(e);
+            this.reportUserFileError(overlayName, jsFile, localFiles[jsFile] ?? '', e, tag);
           }
         }
 
@@ -440,20 +599,27 @@ class UserConfig {
       void callOverlayHandler({ call: 'cactbotRequestState' });
     };
 
-    void callOverlayHandler({
+    const load = callOverlayHandler({
       call: 'cactbotLoadUser',
       source: location.href,
       overlayName: overlayName,
     }).then((e: { detail: CactbotLoadUserRet }) => {
       // Wait for DOMContentLoaded if needed.
-      if (document.readyState !== 'loading') {
-        void loadUser(e);
-        return;
-      }
-      document.addEventListener('DOMContentLoaded', () => {
-        void loadUser(e);
+      if (document.readyState !== 'loading')
+        return loadUser(e);
+      return new Promise<void>((resolve, reject) => {
+        document.addEventListener('DOMContentLoaded', () => {
+          loadUser(e).then(resolve, reject);
+        });
       });
     });
+    // Fork: kept from the call until done, failed or not, for whenUserFilesLoaded (a failure is
+    // still in the console, as it was unhandled before).
+    const tracked: Promise<void> = load.then(
+      () => undefined,
+      (error: unknown) => console.error(error),
+    ).finally(() => this.userFileLoads.delete(tracked));
+    this.userFileLoads.add(tracked);
   }
 
   handleSkin(skinName: string, overlayName?: string) {
@@ -462,6 +628,10 @@ class UserConfig {
     // Fork: oopsyraidsy has skins of its own (ui/oopsyraidsy/skins).
     const skinFolder = overlayName === 'oopsyraidsy' ? 'oopsyraidsy' : 'raidboss';
     const skinCSSRelativeHref = `../${skinFolder}/skins/${skinName}/${skinName}.css`;
+    // Fork: once, though a page (the config one) loads user files again.
+    const links = document.querySelectorAll('link[rel="stylesheet"]');
+    if ([...links].some((link) => link.getAttribute('href') === skinCSSRelativeHref))
+      return;
     this.appendCSSLink(skinCSSRelativeHref);
   }
   appendJSLink(src: string) {

@@ -1,8 +1,8 @@
 // Rename this file to `raidboss.js` and edit it to change the raidboss UI.
 
 // This file is JavaScript.  Anything after "//" on a line is a comment.
-// If you edit this file, remember to reload ACT or click the "Reload overlay"
-// button on the raidboss overlay.
+// Once you save it edited, the overlays load it again (after the fight, if you are in
+// one).
 // If there are errors in this file, they will appear in the OverlayPlugin.dll
 // log window in ACT.
 // See: https://github.com/OverlayPlugin/cactbot/blob/main/docs/CactbotCustomization.md#check-the-overlayplugin-log-for-errors
@@ -39,27 +39,26 @@ Options.PlayerNicks = {
 
 // Here's an example of overriding a trigger.
 // This overrides the "Test Poke" trigger from:
-// https://github.com/OverlayPlugin/cactbot/blob/main/ui/raidboss/data/00-misc/test.txt
+// https://github.com/OverlayPlugin/cactbot/blob/main/ui/raidboss/data/00-misc/test.ts
 
 Options.Triggers.push({
   zoneId: ZoneId.MiddleLaNoscea,
+  // A trigger set of your own does not have the translations of cactbot's: give the lines in the
+  // language of your game client here (only the ones it needs).
+  timelineReplace: [
+    {
+      locale: 'ko',
+      replaceSync: {
+        'You poke the striking dummy': '.*나무인형을 쿡쿡 찌릅니다',
+      },
+    },
+  ],
   triggers: [
     {
       id: 'Test Poke',
-      netRegex: NetRegexes.gameNameLog({ line: 'You poke the striking dummy.*?', capture: false }),
-      netRegexDe: NetRegexes.gameNameLog(
-        { line: 'Du stupst die Trainingspuppe an.*?', capture: false },
-      ),
-      netRegexFr: NetRegexes.gameNameLog(
-        {
-          line: 'Vous touchez légèrement le mannequin d\'entraînement du doigt.*?',
-          capture: false,
-        },
-      ),
-      netRegexJa: NetRegexes.gameNameLog({ line: '.*は木人をつついた.*?', capture: false }),
-      netRegexCn: NetRegexes.gameNameLog({ line: '.*用手指戳向木人.*?', capture: false }),
-      netRegexKo: NetRegexes.gameNameLog({ line: '.*나무인형을 쿡쿡 찌릅니다.*?', capture: false }),
-      preRun: function(data) {
+      type: 'GameLog',
+      netRegex: { line: 'You poke the striking dummy.*?', capture: false },
+      preRun: (data) => {
         data.pokes = (data.pokes || 0) + 1;
       },
       // Instead of printing the number of pokes with infoText like the original trigger,
@@ -91,15 +90,16 @@ Options.Triggers.push({
     {
       // This is a made up id that does not exist in Cactbot.
       id: 'User Example Regen',
-      // This will match log lines from ACT that look like this:
-      // "Nacho Queen gains the effect of Regen from Taco Cat for 21.00 Seconds."
-      regex: Regexes.gainsEffect({ effect: 'Regen' }),
-      delaySeconds: function(data, matches) {
+      // When you put Regen on someone: its effect id needs no translation.
+      type: 'GainsEffect',
+      netRegex: { effectId: '9E' },
+      condition: (data, matches) => matches.source === data.me,
+      delaySeconds: (_data, matches) => {
         // Wait the amount of seconds regen lasts before reminding you to
         // reapply it.  This is not smart enough to figure out if you
         // cast it twice, and is left as an exercise for the reader to
         // figure out how to do so via storing variables on `data`.
-        return data.ParseLocaleFloat(matches.duration);
+        return parseFloat(matches.duration);
       },
       alertText: 'Regen',
     },

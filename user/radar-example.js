@@ -1,8 +1,8 @@
 // Rename this file to `radar.js` and edit it to change the radar UI.
 
 // This file is JavaScript.  Anything after "//" on a line is a comment.
-// If you edit this file, remember to reload ACT or click the "Reload overlay"
-// button on the radar overlay.
+// Once you save it edited, the overlays load it again (after the fight, if you are in
+// one).
 // If there are errors in this file, they will appear in the OverlayPlugin.dll
 // log window in ACT.
 

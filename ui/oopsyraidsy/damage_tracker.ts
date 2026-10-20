@@ -204,6 +204,59 @@ export type ProcessedOopsyTriggerSet = LooseOopsyTriggerSet & {
   filename?: string;
 };
 
+// Fork: see withoutTakenIds.
+const kMistakeMapFields = [
+  'damageWarn',
+  'damageFail',
+  'gainsEffectWarn',
+  'gainsEffectFail',
+  'shareWarn',
+  'shareFail',
+  'soloWarn',
+  'soloFail',
+] as const;
+
+// Fork: the set without the triggers and mistake map entries whose id an earlier set of this
+// zone already has; `taken` gets this set's.  User files come first, so a trigger of theirs with
+// the id of one of cactbot's replaces it (as in raidboss), and a copied cactbot file does not
+// report every mistake twice.  Ids repeated in one set stay, as before.
+const withoutTakenIds = (
+  set: ProcessedOopsyTriggerSet,
+  taken: Set<string>,
+): ProcessedOopsyTriggerSet => {
+  const result: ProcessedOopsyTriggerSet = { ...set };
+  const own: string[] = [];
+  for (const field of kMistakeMapFields) {
+    const map = set[field];
+    if (map === undefined)
+      continue;
+    const kept: { [id: string]: string } = {};
+    for (const [id, value] of Object.entries(map)) {
+      if (taken.has(id))
+        continue;
+      kept[id] = value;
+      own.push(id);
+    }
+    result[field] = kept;
+  }
+  if (set.triggers !== undefined) {
+    // (Typed as the field is: LooseOopsyTriggerSet's own `triggers` is intersected with the set's.)
+    const triggers = set.triggers.filter((t) =>
+      t.id === undefined || !taken.has(t.id)
+    ) as NonNullable<
+      ProcessedOopsyTriggerSet['triggers']
+    >;
+    result.triggers = triggers;
+    for (const trigger of triggers) {
+      if (trigger.id !== undefined)
+        own.push(trigger.id);
+    }
+  }
+  for (const id of own)
+    taken.add(id);
+  return result;
+};
+
 type ProcessedOopsyTrigger = LooseOopsyTrigger & {
   localRegex: RegExp;
 };
@@ -622,9 +675,30 @@ export class DamageTracker {
     // listed after the damage from that ability.
     for (const trigger of this.triggers) {
       const matches = trigger.localRegex.exec(line);
-      if (matches)
+      if (!matches)
+        continue;
+      // Fork: a trigger that fails (a user file's, most likely) leaves the others of this line.
+      try {
         this.OnTrigger(trigger, matches, this.lastTimestamp);
+      } catch (e) {
+        this.OnTriggerError(trigger, e);
+      }
     }
+  }
+
+  // Fork: told a few times a trigger, as raidboss does (popup-text.ts onTriggerException).
+  private triggerErrors = new Map<string, number>();
+
+  private OnTriggerError(trigger: LooseOopsyTrigger, e: unknown): void {
+    const id = trigger.id ?? '[unknown trigger id]';
+    const count = (this.triggerErrors.get(id) ?? 0) + 1;
+    this.triggerErrors.set(id, count);
+    if (count > 5)
+      return;
+    console.error(
+      `Error in oopsy trigger: ${id}${count === 5 ? ' (its further errors are not shown)' : ''}`,
+    );
+    console.error(e instanceof Error ? e.stack ?? e.message : e);
   }
 
   private OnAbilityEvent(line: string, splitLine: string[]): void {
@@ -1171,6 +1245,8 @@ export class DamageTracker {
     if (this.ignoreZone)
       return;
 
+    // Fork: see withoutTakenIds.
+    const takenIds = new Set<string>();
     for (const set of this.triggerSets) {
       if ('zoneId' in set) {
         if (
@@ -1228,20 +1304,21 @@ export class DamageTracker {
         });
       }
 
-      this.AddDamageTriggers('warn', set.damageWarn);
-      this.AddDamageTriggers('fail', set.damageFail);
-      this.AddGainsEffectTriggers('warn', set.gainsEffectWarn);
-      this.AddGainsEffectTriggers('fail', set.gainsEffectFail);
-      this.AddShareTriggers('warn', set.shareWarn);
-      this.AddShareTriggers('fail', set.shareFail);
-      this.AddSoloTriggers('warn', set.soloWarn);
-      this.AddSoloTriggers('fail', set.soloFail);
+      const live = withoutTakenIds(set, takenIds);
+      this.AddDamageTriggers('warn', live.damageWarn);
+      this.AddDamageTriggers('fail', live.damageFail);
+      this.AddGainsEffectTriggers('warn', live.gainsEffectWarn);
+      this.AddGainsEffectTriggers('fail', live.gainsEffectFail);
+      this.AddShareTriggers('warn', live.shareWarn);
+      this.AddShareTriggers('fail', live.shareFail);
+      this.AddSoloTriggers('warn', live.soloWarn);
+      this.AddSoloTriggers('fail', live.soloFail);
 
-      for (const trigger of set.triggers ?? [])
-        this.ProcessTrigger(trigger, set);
-      this.SkipDamageDowns(set);
+      for (const trigger of live.triggers ?? [])
+        this.ProcessTrigger(trigger, live);
+      this.SkipDamageDowns(live);
 
-      this.playerStateTracker.PushTriggerSet(set);
+      this.playerStateTracker.PushTriggerSet(live);
     }
 
     // Fork: Reset() above ran before this zone's initData was known.

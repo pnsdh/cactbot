@@ -2052,11 +2052,55 @@ const flattenTimeline = (
 
   if (!(timelineFile in files)) {
     console.log(`ERROR: '${filename}' specifies non-existent timeline file '${timelineFile}'.`);
+    // Fork: shown on the config page too (UserFileProblem).
+    if (set.isUserTriggerSet) {
+      UserConfig.reportUserFileProblem({
+        overlay: 'raidboss',
+        kind: 'missingTimeline',
+        file: filename,
+        text: timelineFile,
+      });
+    }
     return;
   }
 
   // set.timeline is processed recursively.
   set.timeline = [set.timeline, files[timelineFile]];
+};
+
+// Fork: a cactbot trigger file copied to the user folder as it is has the set id of cactbot's
+// one, so it replaces that whole set, timeline included.  If its timeline file was not copied
+// too, the built-in one (of the version chosen for the fight, fork or upstream) is used instead.
+const builtInTimeline = (
+  set: ConfigLooseTriggerSet,
+  filename: string,
+  files: { [filename: string]: string },
+  options: Partial<RaidbossOptions>,
+) => {
+  if (set.timelineFile === undefined || set.id === undefined)
+    return;
+  const dirOf = (path: string) =>
+    path.slice(0, Math.max(0, Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\')) + 1));
+  if (`${dirOf(filename)}${set.timelineFile}` in files)
+    return;
+  const chosen = selectVariants(
+    raidbossFileData,
+    (id) => options.TriggerSetVariant?.[id] ?? 'custom',
+  );
+  for (const [builtInFile, builtIn] of Object.entries(chosen)) {
+    if (typeof builtIn === 'string' || builtIn.id !== set.id)
+      continue;
+    const timelineFile = `${dirOf(builtInFile)}${set.timelineFile}`;
+    const text = raidbossFileData[timelineFile];
+    if (typeof text !== 'string')
+      return;
+    console.log(
+      `'${filename}': no '${set.timelineFile}' in the user folder, using ${timelineFile}.`,
+    );
+    delete set.timelineFile;
+    set.timeline = [set.timeline, text];
+    return;
+  }
 };
 
 // Raidboss needs to do some extra processing of user files.
@@ -2084,6 +2128,7 @@ const userFileHandler: UserFileCallback = (
     set.filename = `${basePath}${name}`;
     set.isUserTriggerSet = true;
 
+    builtInTimeline(set, name, files, baseOptions);
     flattenTimeline(set, name, files);
   }
 };

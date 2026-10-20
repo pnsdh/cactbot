@@ -32,6 +32,8 @@ const settings = {
     'plugin/',
     'publish/',
     'resources/lib/',
+    // Fork: for user folders, with imports from `cactbot/` (see its tsconfig.json).
+    'user-types/',
   ],
   'parser': '@typescript-eslint/parser',
   'parserOptions': {
@@ -310,6 +312,14 @@ const overrides = [
     'rules': {
       'rulesdir/cactbot-trigger-property-order': ['warn', { 'module': 'oopsyraidsy' }],
       'rulesdir/cactbot-triggerset-property-order': ['warn', { 'module': 'oopsyraidsy' }],
+    },
+  },
+  {
+    // Fork: user files import from `cactbot/` (user-types/tsconfig.json), found by file name
+    // when they run (resources/user_ts.ts); tsconfig.eslint.json maps it for the types.
+    'files': ['user/*.ts'],
+    'rules': {
+      'import/no-unresolved': 'off',
     },
   },
 ];
