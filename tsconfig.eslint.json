@@ -1,5 +1,11 @@
 {
   "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // Fork: as user files import with user-types/tsconfig.json (user/*-example.ts).
+    "paths": {
+      "cactbot/*": ["./*"]
+    }
+  },
   "include": [
     "./ui",
     "./types",

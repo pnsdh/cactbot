@@ -99,6 +99,7 @@ ACT, FFXIV ACT Plugin, OverlayPlugin이 필요합니다. 없다면 해루봇이�
 * **전투 하나를 통째로 고치기**: cactbot 트리거 파일(`ui/raidboss/data/...`의 `.ts`)을 그대로 복사해 고칩니다. 파일 안의 세트 `id`가 같아서 그 전투의 cactbot 트리거·타임라인을 대신합니다. 타임라인 `.txt`도 복사하면 그것을 쓰고, 복사하지 않으면 cactbot 것을 씁니다. 대신 cactbot이 나중에 그 전투를 고쳐도 반영되지 않습니다.
 * **트리거 몇 개만 바꾸기**: 자기 세트(다른 `id`)에 그 트리거만 넣습니다. 같은 `id`의 트리거는 cactbot 것을 덮어씁니다. 자기 세트에는 cactbot의 번역이 없으므로, 영어 문구로 찾는 트리거는 `timelineReplace`에 한국어 문구를 같이 적습니다(예시 참고).
 * 타입은 지우기만 하고 검사하지 않습니다.
+* **편집기 도움(선택)**: VS Code 같은 편집기에서 자동 완성과 형식 오류를 보려면 `Plugins\cbkr\user\tsconfig.json`을 사용자 폴더에 복사하고, import를 `cactbot/`으로 시작하게 씁니다(예: `cactbot/resources/zone_id`). 복사한 cactbot 파일은 import의 `../../../../../`를 `cactbot/`으로 바꿉니다(웁시의 `../../../oopsy_common`은 `cactbot/ui/oopsyraidsy/oopsy_common`). 바꾸지 않아도 실행에는 문제가 없습니다.
 * `import`는 cactbot의 `resources/` 모듈과 웁시의 `oopsy_common`만 됩니다. 다른 사용자 파일은 가져올 수 없습니다.
 * 파일을 처음 읽거나 고친 뒤 처음 열 때만 1초 안쪽으로 더 걸리고, 그 뒤로는 변환해 둔 것을 씁니다.
 * 사용자 폴더의 파일을 고쳐 저장하면 오버레이가 다시 불러옵니다. 전투 중이면 전투가 끝난 뒤에 불러옵니다.

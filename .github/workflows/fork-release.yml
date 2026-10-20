@@ -124,6 +124,20 @@ jobs:
           ./util/publish.sh
         shell: bash
 
+      # For editors on .ts user files (README: user-types/tsconfig.json): the types of what they
+      # can import, where that tsconfig.json looks for them.
+      - name: Add User File Types
+        run: |
+          npx tsc -p tsconfig.user-types.json
+          dir=publish/cactbot-release/cactbot/user/cactbot-types
+          mkdir -p "$dir"
+          cp -r dist-user-types/. "$dir/"
+          cp -r types "$dir/"
+          cp user-types/globals.d.mts "$dir/"
+          cp user-types/tsconfig.json publish/cactbot-release/cactbot/user/
+          test -f "$dir/resources/zone_id.d.ts"
+        shell: bash
+
       # Folder is "cbkr" (no "cactbot" in the name): Haerubot rewrites file:// overlay URLs
       # containing "/cactbot/ui/" to the official site and matches ACT plugins by "cactbot".
       # The updater strips the top 2 dirs (strippedDirs = 2), so the names don't affect updates.

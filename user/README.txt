@@ -7,3 +7,7 @@ that will load the config.  Files in a <module> folder here are loaded too.
 Copy and rename the <module>-example.js file to <module>.js for an easy
 starting point.  raidboss-typescript-example.ts is a TypeScript one, written like
 cactbot's own trigger files (which can be copied here as they are).
+
+tsconfig.json is for editors (VS Code and the like) on .ts files: copied to your
+user folder, it gives them the types of cactbot's modules in cactbot-types here,
+for imports written from `cactbot/` (e.g. cactbot/resources/zone_id).

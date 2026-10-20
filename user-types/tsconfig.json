@@ -1,0 +1,25 @@
+{
+  // For editors (VS Code and the like) on .ts user files: copy this file into your user folder
+  // (cbkr-user).  Imports written as `cactbot/resources/zone_id` are then found in the types the
+  // release puts in Plugins\cbkr\user\cactbot-types (cactbot's own files write them as paths,
+  // like '../../../../../resources/zone_id': the overlays take both).  Nothing here changes how
+  // the overlays run the files.
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2020", "DOM"],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "types": [],
+    "paths": {
+      "cactbot/*": ["../Plugins/cbkr/user/cactbot-types/*", "./cactbot-types/*"]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "../Plugins/cbkr/user/cactbot-types/globals.d.mts"
+  ]
+}

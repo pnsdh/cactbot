@@ -11,6 +11,7 @@ plugin/**/*.csproj.user
 plugin/ThirdParty/
 publish/
 dist/
+dist-user-types/
 node_modules
 .idea/*
 .idea/
