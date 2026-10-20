@@ -95,13 +95,16 @@ export const buildUserFileNotice = (
     );
   loadOopsy();
   addOverlayListener('onUserFileChanged', () => {
-    UserConfig.clearUserFileProblems();
-    UserConfig.loadUserFiles(
-      'raidboss',
-      { ...raidbossOptions, Triggers: [] },
-      () => undefined,
-      false,
-    );
-    loadOopsy();
+    void UserConfig.whenUserFilesLoaded().then(() => {
+      // The page's own (config.js...) are only loaded with the page.
+      UserConfig.clearUserFileProblems(['raidboss', 'oopsyraidsy']);
+      UserConfig.loadUserFiles(
+        'raidboss',
+        { ...raidbossOptions, Triggers: [] },
+        () => undefined,
+        false,
+      );
+      loadOopsy();
+    });
   });
 };

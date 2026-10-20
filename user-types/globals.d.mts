@@ -21,7 +21,10 @@ type UserTriggerSet = Omit<TriggerSet<any>, 'id'> & { id?: string };
 
 declare global {
   // Raidboss's (oopsy's own trigger sets are better given with `export default`).
-  const Options: Omit<RaidbossOptions, 'Triggers'> & { Triggers: UserTriggerSet[] };
+  // (Not Omit<>, which loses the named options: BaseOptions has an index signature.)
+  const Options:
+    & { [K in keyof RaidbossOptions as K extends 'Triggers' ? never : K]: RaidbossOptions[K] }
+    & { Triggers: UserTriggerSet[] };
   const Conditions: typeof ConditionsType;
   const ContentType: typeof ContentTypeType;
   const NetRegexes: typeof NetRegexesType;

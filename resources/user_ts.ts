@@ -163,7 +163,8 @@ const writeCache = (key: string, hash: string, result: Result): void => {
   try {
     window.localStorage.setItem(`${cachePrefix}${key}`, item);
   } catch {
-    // Full (the storage is shared by every cactbot page): this cache gives way, once.
+    // Full (the storage is shared by every cactbot page): this cache gives way (all of it, so
+    // files too big for the storage together are transpiled again on every load).
     try {
       for (const old of cacheKeys())
         window.localStorage.removeItem(old);
@@ -370,7 +371,7 @@ export const runUserTsFile = (
     const found = modules[moduleName(path)];
     if (found === undefined) {
       throw new Error(
-        `${filename}: '${path}' is not available to user files (only cactbot's resources/ modules and oopsy_common are).`,
+        `${filename}: '${path}' is not available to user files (only those of cactbot's resources/ modules trigger files use, and oopsy_common, are).`,
       );
     }
     return found;

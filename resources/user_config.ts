@@ -150,12 +150,23 @@ class UserConfig {
     this.userFileProblemListeners.push(listener);
   }
 
-  // Before the files are loaded again.
-  clearUserFileProblems(): void {
+  // Before the files of `overlays` are loaded again (and the user directory's, which every load
+  // tells again).  Call it once loads in progress are done (whenUserFilesLoaded), or they would
+  // add theirs after it.
+  clearUserFileProblems(overlays: string[]): void {
     this.userFileProblemGeneration++;
-    this.userFileProblems = [];
+    this.userFileProblems = this.userFileProblems.filter((p) =>
+      p.overlay !== '' && !overlays.includes(p.overlay)
+    );
     for (const listener of this.userFileProblemListeners)
       listener();
+  }
+
+  // Fork: loads of user files in progress (see clearUserFileProblems).
+  private userFileLoads = new Set<Promise<void>>();
+
+  whenUserFilesLoaded(): Promise<void> {
+    return Promise.all([...this.userFileLoads]).then(() => undefined);
   }
 
   getDefaultBaseOptions(): BaseOptions {
@@ -591,13 +602,18 @@ class UserConfig {
       source: location.href,
       overlayName: overlayName,
     }).then((e: { detail: CactbotLoadUserRet }) => {
+      // Fork: kept until done, for whenUserFilesLoaded.
+      const track = () => {
+        const load = loadUser(e).finally(() => this.userFileLoads.delete(load));
+        this.userFileLoads.add(load);
+      };
       // Wait for DOMContentLoaded if needed.
       if (document.readyState !== 'loading') {
-        void loadUser(e);
+        track();
         return;
       }
       document.addEventListener('DOMContentLoaded', () => {
-        void loadUser(e);
+        track();
       });
     });
   }
@@ -608,6 +624,10 @@ class UserConfig {
     // Fork: oopsyraidsy has skins of its own (ui/oopsyraidsy/skins).
     const skinFolder = overlayName === 'oopsyraidsy' ? 'oopsyraidsy' : 'raidboss';
     const skinCSSRelativeHref = `../${skinFolder}/skins/${skinName}/${skinName}.css`;
+    // Fork: once, though a page (the config one) loads user files again.
+    const links = document.querySelectorAll('link[rel="stylesheet"]');
+    if ([...links].some((link) => link.getAttribute('href') === skinCSSRelativeHref))
+      return;
     this.appendCSSLink(skinCSSRelativeHref);
   }
   appendJSLink(src: string) {

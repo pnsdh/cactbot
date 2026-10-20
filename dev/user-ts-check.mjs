@@ -271,6 +271,12 @@ const refreshed = await configPage.page.evaluate(() => ({
 }));
 check('config: file change does not reload the page', refreshed.mark);
 check(
+  'config: skin style sheets not added again',
+  await configPage.page.evaluate(() =>
+    document.querySelectorAll('link[href$="/skins/cbkr/cbkr.css"]').length <= 2
+  ),
+);
+check(
   'config: file change checks again',
   refreshed.text.includes('raidboss/b-throw.js:3') &&
     refreshed.text.includes('oopsyraidsy/a-throw.js:2') &&
