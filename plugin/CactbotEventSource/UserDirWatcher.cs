@@ -66,20 +66,25 @@ namespace Cactbot {
               watchers_.Remove(dir);
               watcher.Dispose();
             }
+            // One already coming covers this error too (several folders failing together).
             var now = DateTime.UtcNow;
-            var wait = Math.Max(QuietMs, (last_error_notice_.AddMilliseconds(ErrorNoticeMs) - now).TotalMilliseconds);
+            if (last_error_notice_ > now)
+              return;
+            var wait = Math.Min(ErrorNoticeMs, Math.Max(QuietMs, (last_error_notice_.AddMilliseconds(ErrorNoticeMs) - now).TotalMilliseconds));
             last_error_notice_ = now.AddMilliseconds(wait);
             last_file_ = null;
             timer_.Change((int)wait, Timeout.Infinite);
           }
         };
+        // Registered first: an error raised as it starts (some network shares) finds and drops it.
+        watchers_[dir] = watcher;
         try {
           watcher.EnableRaisingEvents = true;
         } catch (Exception) {
+          watchers_.Remove(dir);
           watcher.Dispose();
           throw;
         }
-        watchers_[dir] = watcher;
       }
     }
 
