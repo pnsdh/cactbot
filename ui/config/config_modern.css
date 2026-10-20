@@ -2696,3 +2696,55 @@ html:not(.config-classic) {
     transition-duration: 1ms !important;
   }
 }
+
+/* Fork: problems of the user files (config_user_files.ts), in both styles. */
+.config-user-file-notice {
+  max-width: 1000px;
+  margin: 16px auto 0;
+  padding: 12px 14px;
+  box-sizing: border-box;
+  color: var(--cfg-text, inherit);
+  background-color: var(--cfg-warn-bg, rgb(253 209 102 / 10%));
+  border: 1px solid var(--cfg-alert, #c9a227);
+  border-radius: 8px;
+  font-size: 12.5px;
+}
+
+.config-tabs .config-user-file-notice {
+  width: calc(100% - 36px);
+}
+
+.config-user-file-notice[hidden] {
+  display: none;
+}
+
+.config-user-file-title {
+  margin-bottom: 6px;
+  font-weight: 700;
+  color: var(--cfg-alert, inherit);
+}
+
+.config-user-file-notice ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.config-user-file-notice li {
+  margin: 2px 0;
+  overflow-wrap: anywhere;
+}
+
+.config-user-file-overlay {
+  margin-right: 8px;
+  color: var(--cfg-muted, inherit);
+}
+
+.config-user-file-notice code {
+  margin-right: 8px;
+  font-family: Consolas, monospace;
+}
+
+.config-user-file-hint {
+  margin-top: 6px;
+  color: var(--cfg-muted, inherit);
+}

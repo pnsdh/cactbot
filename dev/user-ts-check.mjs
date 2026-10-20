@@ -193,6 +193,36 @@ const oopsyExample = await openPage(browser, 'oopsy', {
 });
 check('examples: oopsy example runs', await oopsyExample.page.evaluate(() => window.__adlo));
 
+// The config page lists what went wrong, for raidboss (which it loads for its trigger list) and
+// oopsy (loaded for this).
+const configPage = await openPage(browser, 'config', {
+  viewport: { width: 1000, height: 700 },
+  userDetail: { missingUserLocation: 'C:/gone' },
+  userFiles: {
+    'raidboss/a-syntax.js':
+      'Options.Triggers.push({\n  zoneId: 1,\n  triggers: [ { id: x y } ],\n});',
+    'raidboss/b-throw.js': 'const a = 1;\n\nnull.boom(a);',
+    'raidboss/c-bad.ts': 'const x: = ;',
+    'raidboss/d-timeline.js':
+      'Options.Triggers.push({ zoneId: ZoneId.MiddleLaNoscea, timelineFile: \'nope.txt\' });',
+    'raidboss/e-reset.js': 'Options.Triggers = [];',
+    'oopsyraidsy/a-throw.js': '\nnull.oops();',
+  },
+  settleMs: 4000,
+});
+const noticeText = await configPage.page.evaluate(() =>
+  document.querySelector('.config-user-file-notice:not([hidden])')?.textContent ?? ''
+);
+check('config: notice shown', noticeText !== '', noticeText);
+check('config: js syntax error with its line', noticeText.includes('raidboss/a-syntax.js:3:'));
+check('config: js runtime error with its line', noticeText.includes('raidboss/b-throw.js:3'));
+check('config: ts syntax error', noticeText.includes('raidboss/c-bad.ts:1:'));
+check('config: missing timeline', noticeText.includes('raidboss/nope.txt'));
+check('config: Options.Triggers replaced', noticeText.includes('Options.Triggers'));
+check('config: oopsy file error', noticeText.includes('oopsyraidsy/a-throw.js:2'));
+check('config: missing user directory', noticeText.includes('C:/gone'));
+check('config: no page errors', configPage.errors.length === 0, configPage.errors.join('; '));
+
 await browser.close();
 console.log(failed === 0 ? 'all ok' : `${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

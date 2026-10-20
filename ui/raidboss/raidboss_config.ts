@@ -2052,6 +2052,15 @@ const flattenTimeline = (
 
   if (!(timelineFile in files)) {
     console.log(`ERROR: '${filename}' specifies non-existent timeline file '${timelineFile}'.`);
+    // Fork: shown on the config page too (UserFileProblem).
+    if (set.isUserTriggerSet) {
+      UserConfig.reportUserFileProblem({
+        overlay: 'raidboss',
+        kind: 'missingTimeline',
+        file: filename,
+        text: timelineFile,
+      });
+    }
     return;
   }
 

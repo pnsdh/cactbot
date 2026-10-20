@@ -54,10 +54,11 @@ export const launch = (options = {}) =>
   });
 
 // OverlayPlugin's API as cactbot uses it: user files (`userFiles`, name to text as in
-// cactbotLoadUser), saved options (`data`, as in cactbotLoadData), and no combatants.
-export const mockOverlayPlugin = (page, data = {}, userFiles = {}) =>
+// cactbotLoadUser, and `userDetail` for its other fields), saved options (`data`, as in
+// cactbotLoadData), and no combatants.
+export const mockOverlayPlugin = (page, data = {}, userFiles = {}, userDetail = {}) =>
   page.evaluateOnNewDocument(
-    (data, userFiles) => {
+    (data, userFiles, userDetail) => {
       window.OverlayPluginApi = {
         ready: true,
         callHandler: (msgStr, cb) => {
@@ -78,6 +79,7 @@ export const mockOverlayPlugin = (page, data = {}, userFiles = {}) =>
                 ffxivPluginVersion: '0',
                 actVersion: '0',
                 gameRegion: 'Korean',
+                ...userDetail,
               },
             };
           } else if (m.call === 'cactbotLoadData') {
@@ -96,6 +98,7 @@ export const mockOverlayPlugin = (page, data = {}, userFiles = {}) =>
     },
     data,
     userFiles,
+    userDetail,
   );
 
 // A page with the mock, loaded and settled (user options and skin applied).
@@ -104,7 +107,12 @@ export const openPage = async (browser, page, options = {}) => {
   await p.setViewport(options.viewport ?? { width: 490, height: 300 });
   const errors = [];
   p.on('pageerror', (e) => errors.push(e.message));
-  await mockOverlayPlugin(p, options.data ?? { raidboss: { Skin: 'cbkr' } }, options.userFiles);
+  await mockOverlayPlugin(
+    p,
+    options.data ?? { raidboss: { Skin: 'cbkr' } },
+    options.userFiles,
+    options.userDetail,
+  );
   if (options.beforeLoad)
     await options.beforeLoad(p);
   const url = pageUrl(page);

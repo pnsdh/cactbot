@@ -34,6 +34,7 @@ import {
   buildSectionTabs,
 } from './config_tabs';
 import { setTriggerBrowserContext } from './config_triggers';
+import { buildUserFileNotice } from './config_user_files';
 
 // Load other config files
 import './general_config';
@@ -405,6 +406,8 @@ export class CactbotConfigurator {
       throw new UnreachableCode();
     this.buildUI(container, this.contents);
     buildSectionTabs(container, this.lang, (text) => this.translate(text));
+    // Fork: problems of the user files, above the tabs' pages.
+    buildUserFileNotice(container, (text) => this.translate(text));
   }
 
   // Fork: text inputs save on every keystroke, and each save sends the whole config, so saves

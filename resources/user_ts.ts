@@ -57,7 +57,7 @@ const globals: { [name: string]: unknown } = {
 };
 
 // Bump when the transpiler options change, so that old output is not reused.
-const cacheVersion = 2;
+const cacheVersion = 3;
 const cachePrefix = 'cbkr-user-ts:';
 
 // The JavaScript (with the .ts line of each of its lines, for errors), or the errors of a file
@@ -152,11 +152,39 @@ const writeCache = (filename: string, hash: string, result: Result): void => {
   }
 };
 
+type TypeScript = typeof import('typescript');
+
+// Loaded the first time it is needed (undefined if it cannot be: then .ts files are skipped, not
+// the overlay).
+let transpiler: Promise<TypeScript | undefined> | undefined;
+const loadTranspiler = (): Promise<TypeScript | undefined> => {
+  transpiler ??= import(/* webpackChunkName: "ui/common/typescript" */ 'typescript').then(
+    (m) => m.default,
+    (e) => {
+      console.log('*** ERROR IN USER FILE ***');
+      console.log('The TypeScript transpiler could not be loaded:', e);
+      return undefined;
+    },
+  );
+  return transpiler;
+};
+
+// "<line>:<column>: <message>" for each problem the parser found.
+const describe = (ts: TypeScript, list: readonly import('typescript').Diagnostic[]): string[] =>
+  list.map((error) => {
+    const message = ts.flattenDiagnosticMessageText(error.messageText, '\n');
+    const at = error.file && error.start !== undefined
+      ? error.file.getLineAndCharacterOfPosition(error.start)
+      : undefined;
+    return `${at ? `${at.line + 1}:${at.character + 1}` : ''}: ${message}`;
+  });
+
 // JavaScript for each of `filenames` (keys of `files`); a file that does not parse is left out,
-// with its errors in the console.
+// with its errors in the console and given to `onErrors`.
 export const transpileUserTsFiles = async (
   files: { [filename: string]: string },
   filenames: string[],
+  onErrors?: (filename: string, errors: string[]) => void,
 ): Promise<{ [filename: string]: UserTsOutput }> => {
   const output: { [filename: string]: UserTsOutput } = {};
   const add = (filename: string, result: Result) => {
@@ -166,7 +194,8 @@ export const transpileUserTsFiles = async (
     }
     console.log('*** ERROR IN USER FILE ***');
     for (const error of result.errors)
-      console.log(error);
+      console.log(`${filename}:${error}`);
+    onErrors?.(filename, result.errors);
   };
   const todo: { filename: string; source: string; hash: string }[] = [];
   for (const filename of filenames) {
@@ -181,15 +210,9 @@ export const transpileUserTsFiles = async (
   if (todo.length === 0)
     return output;
 
-  let ts: typeof import('typescript');
-  try {
-    ts = (await import(/* webpackChunkName: "ui/common/typescript" */ 'typescript')).default;
-  } catch (e) {
-    // Without it the .ts files are skipped, not the overlay.
-    console.log('*** ERROR IN USER FILE ***');
-    console.log('The TypeScript transpiler could not be loaded:', e);
+  const ts = await loadTranspiler();
+  if (ts === undefined)
     return output;
-  }
   for (const { filename, source, hash } of todo) {
     const result = ts.transpileModule(source, {
       fileName: filename,
@@ -204,13 +227,7 @@ export const transpileUserTsFiles = async (
         inlineSources: true,
       },
     });
-    const errors = (result.diagnostics ?? []).map((error) => {
-      const message = ts.flattenDiagnosticMessageText(error.messageText, '\n');
-      const at = error.file && error.start !== undefined
-        ? error.file.getLineAndCharacterOfPosition(error.start)
-        : undefined;
-      return `${filename}${at ? `:${at.line + 1}:${at.character + 1}` : ''}: ${message}`;
-    });
+    const errors = describe(ts, result.diagnostics ?? []);
     const map = result.sourceMapText ?? '{}';
     const mappings = (JSON.parse(map) as { mappings?: string }).mappings ?? '';
     // Its own `//# sourceMappingURL=<name>.js.map` replaced by the map itself.
@@ -226,6 +243,49 @@ export const transpileUserTsFiles = async (
   return output;
 };
 
+// The line in a user file of the first stack frame in it: frames are at the file's sourceURL
+// (which the plugin adds), or <anonymous> without one.
+const stackLine = (stack: string | undefined, source: string): number | undefined => {
+  if (stack === undefined)
+    return;
+  const url = /\/\/# sourceURL=(.*)$/m.exec(source)?.[1]?.trim();
+  const at = url !== undefined ? stack.indexOf(`${url}:`) : -1;
+  const frame = url !== undefined && at >= 0
+    ? /^:(\d+):\d+/.exec(stack.slice(at + url.length))
+    : /<anonymous>:(\d+):\d+/.exec(stack);
+  return frame?.[1] !== undefined ? parseInt(frame[1]) : undefined;
+};
+
+// Where in a .js user file an error while it was run is, as "<line>" or "<line>:<column>:
+// <message>".  A syntax error has no stack in the file: the TypeScript parser finds it (loaded
+// for that, and its answer cached by the file's text, as transpiled files are).
+export const locateJsError = async (
+  filename: string,
+  source: string,
+  error: unknown,
+): Promise<string | undefined> => {
+  if (!(error instanceof Error))
+    return;
+  if (!(error instanceof SyntaxError))
+    return stackLine(error.stack, source)?.toString();
+  const key = `js:${filename}`;
+  const hash = hashText(source);
+  const cached = readCache(key, hash);
+  if (cached !== undefined)
+    return 'errors' in cached ? cached.errors[0] : undefined;
+  const ts = await loadTranspiler();
+  if (ts === undefined)
+    return;
+  const result = ts.transpileModule(source, {
+    fileName: filename,
+    reportDiagnostics: true,
+    compilerOptions: { allowJs: true, target: ts.ScriptTarget.ES2020 },
+  });
+  const errors = describe(ts, result.diagnostics ?? []);
+  writeCache(key, hash, { errors: errors });
+  return errors[0];
+};
+
 const moduleName = (path: string): string => {
   const name = path.replace(/\\/g, '/').split('/').pop() ?? path;
   return name.replace(/\.[jt]s$/, '');
@@ -234,11 +294,9 @@ const moduleName = (path: string): string => {
 // Runs a transpiled file (transpileUserTsFiles) as user_config.ts runs .js user files.
 export const runUserTsFile = (
   filename: string,
-  output: UserTsOutput | undefined,
+  output: UserTsOutput,
   options: BaseOptions,
 ): void => {
-  if (output === undefined)
-    throw new Error(`${filename} could not be read as TypeScript (see the errors above).`);
   const require = (path: string): unknown => {
     const found = modules[moduleName(path)];
     if (found === undefined) {
@@ -256,16 +314,10 @@ export const runUserTsFile = (
   try {
     run(options, require, module.exports, module, ...names.map((name) => globals[name]));
   } catch (e) {
-    // Where in the .ts file (the browser does not apply source maps to the stack).  Its frames
-    // are at the file's sourceURL, or <anonymous> without one, with the 2 lines of the function
-    // header `new Function` adds first.
+    // Where in the .ts file (the browser does not apply source maps to the stack), after the 2
+    // lines of the function header `new Function` adds.
     if (e instanceof Error && e.stack !== undefined) {
-      const url = /\/\/# sourceURL=(.*)$/m.exec(output.js)?.[1]?.trim();
-      const at = url !== undefined ? e.stack.indexOf(`${url}:`) : -1;
-      const frame = url !== undefined && at >= 0
-        ? /^:(\d+):\d+/.exec(e.stack.slice(at + url.length))
-        : /<anonymous>:(\d+):\d+/.exec(e.stack);
-      const line = output.lines[parseInt(frame?.[1] ?? '0') - 3];
+      const line = output.lines[(stackLine(e.stack, output.js) ?? 0) - 3];
       if (line !== undefined && line > 0) {
         const message = e.message;
         e.message = `${message} (${filename}:${line})`;
