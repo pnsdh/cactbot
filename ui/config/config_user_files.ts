@@ -1,10 +1,13 @@
+import { addOverlayListener } from '../../resources/overlay_plugin_api';
 import UserConfig, { UserFileProblem } from '../../resources/user_config';
 import { LocaleText } from '../../types/trigger';
 import oopsyOptions from '../oopsyraidsy/oopsy_options';
+import raidbossOptions from '../raidboss/raidboss_options';
 
 // Fork: the problems of the user files (UserFileProblem) at the top of the config page, as they
 // are otherwise only in the OverlayPlugin log.  The page loads raidboss's user files for its
-// trigger list; oopsy's are loaded here only for this.
+// trigger list; oopsy's are loaded here only for this, and both again when a user file changes
+// (the page does not reload for it, see user_config.ts).
 
 const kText = {
   title: {
@@ -12,8 +15,9 @@ const kText = {
     ko: '사용자 파일 문제',
   },
   hint: {
-    en: 'A file with an error is skipped. Once it is saved fixed, the overlays load it again.',
-    ko: '오류가 있는 파일은 적용되지 않습니다. 고쳐서 저장하면 오버레이가 다시 불러옵니다.',
+    en: 'A file with an error is skipped. Once it is saved fixed, the overlays load it again ' +
+      '(and this list is checked again).',
+    ko: '오류가 있는 파일은 적용되지 않습니다. 고쳐서 저장하면 오버레이가 다시 불러오고, 이 목록도 다시 확인합니다.',
   },
   missingDir: {
     en: 'The chosen user directory was not found, the default one is used instead: ${text}',
@@ -82,10 +86,22 @@ export const buildUserFileNotice = (
   UserConfig.onUserFileProblem(render);
   render();
 
-  UserConfig.loadUserFiles(
-    'oopsyraidsy',
-    { ...oopsyOptions, Triggers: [] },
-    () => undefined,
-    false,
-  );
+  const loadOopsy = () =>
+    UserConfig.loadUserFiles(
+      'oopsyraidsy',
+      { ...oopsyOptions, Triggers: [] },
+      () => undefined,
+      false,
+    );
+  loadOopsy();
+  addOverlayListener('onUserFileChanged', () => {
+    UserConfig.clearUserFileProblems();
+    UserConfig.loadUserFiles(
+      'raidboss',
+      { ...raidbossOptions, Triggers: [] },
+      () => undefined,
+      false,
+    );
+    loadOopsy();
+  });
 };

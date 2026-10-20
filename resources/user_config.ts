@@ -125,6 +125,8 @@ class UserConfig {
   // Fork: see UserFileProblem.
   public userFileProblems: UserFileProblem[] = [];
   private userFileProblemListeners: (() => void)[] = [];
+  // Problems found late (locateJsError) for files loaded before a clear are not kept.
+  private userFileProblemGeneration = 0;
 
   reportUserFileProblem(problem: UserFileProblem): void {
     const same = (p: UserFileProblem) =>
@@ -139,6 +141,14 @@ class UserConfig {
 
   onUserFileProblem(listener: () => void): void {
     this.userFileProblemListeners.push(listener);
+  }
+
+  // Before the files are loaded again.
+  clearUserFileProblems(): void {
+    this.userFileProblemGeneration++;
+    this.userFileProblems = [];
+    for (const listener of this.userFileProblemListeners)
+      listener();
   }
 
   getDefaultBaseOptions(): BaseOptions {
@@ -180,7 +190,10 @@ class UserConfig {
       this.reportUserFileProblem({ overlay: overlay, kind: 'error', file: file, text: text });
       return;
     }
+    const generation = this.userFileProblemGeneration;
     void locateJsError(file, source, e).then((where) => {
+      if (generation !== this.userFileProblemGeneration)
+        return;
       // "<line>", or "<line>:<column>: <the parser's message>" for a syntax error.
       const at = where?.split(': ')[0];
       this.reportUserFileProblem({
@@ -326,6 +339,10 @@ class UserConfig {
         reloadOnce();
     });
     addOverlayListener('onUserFileChanged', () => {
+      // The config page only looks at them again (config_user_files.ts): a reload would lose
+      // where it was, and what was being typed.
+      if (overlayName === 'config')
+        return;
       if (inCombat)
         changedInCombat = true;
       else
@@ -348,7 +365,8 @@ class UserConfig {
       // The basePath isn't using for anything other than cosmetic printing of full paths,
       // so replace any slashes here for uniformity.  In case anybody is using cactbot on
       // Linux (?!?), support any style of slashes elsewhere.
-      const basePath = `${e.detail.userLocation.replace(/[/\\]*$/, '')}\\`;
+      // Fork: none when no user directory was found at all.
+      const basePath = `${(e.detail.userLocation ?? '').replace(/[/\\]*$/, '')}\\`;
       const localFiles = e.detail.localUserFiles;
       const missingDir = e.detail.missingUserLocation;
       // The same for every overlay, so not told as any one's.

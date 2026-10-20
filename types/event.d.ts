@@ -357,7 +357,8 @@ interface SystemInfo {
 }
 
 interface CactbotLoadUserRet extends SystemInfo {
-  userLocation: string;
+  // Fork: null when no user directory was found at all.
+  userLocation: string | null;
   // Fork: the chosen user directory, when it was not found (the default one is used instead).
   missingUserLocation?: string | null;
   localUserFiles: { [filename: string]: string } | null;

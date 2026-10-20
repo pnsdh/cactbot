@@ -246,6 +246,22 @@ check('config: Options.Triggers replaced', noticeText.includes('Options.Triggers
 check('config: oopsy file error', noticeText.includes('oopsyraidsy/a-throw.js:2'));
 check('config: missing user directory', noticeText.includes('C:/gone'));
 check('config: no page errors', configPage.errors.length === 0, configPage.errors.join('; '));
+// A changed user file: the config page stays (no reload) and checks the files again.
+await configPage.page.evaluate(() => window.__mark = true);
+await send(configPage.page, { type: 'onUserFileChanged', file: 'C:/dev/raidboss/b-throw.js' });
+await wait(3000);
+const refreshed = await configPage.page.evaluate(() => ({
+  mark: window.__mark === true,
+  text: document.querySelector('.config-user-file-notice:not([hidden])')?.textContent ?? '',
+}));
+check('config: file change does not reload the page', refreshed.mark);
+check(
+  'config: file change checks again',
+  refreshed.text.includes('raidboss/b-throw.js:3') &&
+    refreshed.text.includes('oopsyraidsy/a-throw.js:2') &&
+    refreshed.text.includes('raidboss/a-syntax.js:3:'),
+  refreshed.text,
+);
 
 await browser.close();
 console.log(failed === 0 ? 'all ok' : `${failed} failed`);

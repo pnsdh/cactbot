@@ -563,23 +563,56 @@ namespace Cactbot {
     }
 
     // Fork: one file that cannot be read (e.g. while an editor saves it) leaves out only itself.
-    // A file without a byte order mark that is no valid UTF-8 is read in the ANSI code page: what
-    // older Notepad saved, CP949 on Korean Windows (as UTF-8 its Korean text became U+FFFD).
+    // A file without a byte order mark whose non-ASCII text is mostly not UTF-8 is read in the
+    // ANSI code page: what older Notepad saved, CP949 on Korean Windows (as UTF-8 its Korean text
+    // became U+FFFD).  A UTF-8 file with a stray bad byte stays UTF-8 (only that byte is lost).
     private string ReadUserFile(string filename) {
       try {
         var bytes = File.ReadAllBytes(filename);
-        try {
-          var strict = new UTF8Encoding(false, true);
-          using (var reader = new StreamReader(new MemoryStream(bytes), strict, true))
-            return reader.ReadToEnd();
-        } catch (DecoderFallbackException) {
-          logger.Log(LogLevel.Info, "Cactbot user file is not UTF-8, read as {0}: {1}", Encoding.Default.WebName, filename);
+        if (!HasByteOrderMark(bytes) && LooksAnsi(bytes)) {
+          bool first;
+          lock (ansi_files_)
+            first = ansi_files_.Add(filename);
+          if (first)
+            logger.Log(LogLevel.Info, "Cactbot user file is not UTF-8, read as {0}: {1}", Encoding.Default.WebName, filename);
           return Encoding.Default.GetString(bytes);
         }
+        using (var reader = new StreamReader(new MemoryStream(bytes), new UTF8Encoding(false), true))
+          return reader.ReadToEnd();
       } catch (Exception e) {
         logger.Log(LogLevel.Error, Strings.UserErrorFileException, filename + ": " + e.Message);
         return null;
       }
+    }
+
+    private readonly HashSet<string> ansi_files_ = new HashSet<string>();
+
+    private static bool HasByteOrderMark(byte[] b) {
+      return (b.Length >= 3 && b[0] == 0xEF && b[1] == 0xBB && b[2] == 0xBF) ||
+        (b.Length >= 2 && ((b[0] == 0xFF && b[1] == 0xFE) || (b[0] == 0xFE && b[1] == 0xFF)));
+    }
+
+    // More bytes that cannot be UTF-8 than UTF-8 sequences of several bytes: Korean text in
+    // CP949 is almost never valid UTF-8, Korean UTF-8 text almost always is.
+    private static bool LooksAnsi(byte[] b) {
+      int valid = 0;
+      int invalid = 0;
+      for (int i = 0; i < b.Length;) {
+        byte lead = b[i];
+        int length = lead < 0x80 ? 1 : lead >= 0xC2 && lead <= 0xDF ? 2 : lead >= 0xE0 && lead <= 0xEF ? 3 : lead >= 0xF0 && lead <= 0xF4 ? 4 : 0;
+        bool ok = length > 0 && i + length <= b.Length;
+        for (int j = 1; ok && j < length; ++j)
+          ok = (b[i + j] & 0xC0) == 0x80;
+        if (!ok) {
+          ++invalid;
+          ++i;
+          continue;
+        }
+        if (length > 1)
+          ++valid;
+        i += length;
+      }
+      return invalid > valid;
     }
 
     private void GetUserConfigDirAndFiles(string source, string overlay_name, out string config_dir, out Dictionary<string, string> local_files, out string missing_dir) {
@@ -650,7 +683,7 @@ namespace Cactbot {
       // Fork: the directory the files came from, for changes to them.
       if (user_files != null) {
         try {
-          user_dir_watcher_.Watch(Path.GetFullPath(new Uri(config_dir).LocalPath).TrimEnd('\\'));
+          user_dir_watcher_.Watch(new Uri(config_dir).LocalPath, overlay_name);
         } catch (Exception e) {
           logger.Log(LogLevel.Warning, "Cannot watch the cactbot user directory {0}: {1}", config_dir, e.Message);
         }

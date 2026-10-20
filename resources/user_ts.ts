@@ -136,8 +136,11 @@ const readCache = (filename: string, hash: string): Result | undefined => {
     if (item === null)
       return;
     const entry = JSON.parse(item) as Partial<CacheEntry>;
-    if (entry.v === cacheVersion && entry.hash === hash && typeof entry.result === 'object')
-      return entry.result;
+    const result = entry.result;
+    if (entry.v !== cacheVersion || entry.hash !== hash || typeof result !== 'object')
+      return;
+    if (result !== null && ('js' in result || 'errors' in result))
+      return result;
   } catch {
     // No storage (or a broken entry): transpile again.
   }

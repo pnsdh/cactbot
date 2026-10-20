@@ -20,6 +20,7 @@
   },
   "include": [
     "**/*.ts",
-    "../Plugins/cbkr/user/cactbot-types/globals.d.mts"
+    "../Plugins/cbkr/user/cactbot-types/globals.d.mts",
+    "./cactbot-types/globals.d.mts"
   ]
 }
