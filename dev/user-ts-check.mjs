@@ -344,6 +344,44 @@ check(
   noTsLogs.join(' | '),
 );
 
+// Oopsy: a copied file's trigger with the id of cactbot's replaces it (reported once, as
+// edited), instead of both reporting.  (Its damageWarn/damageFail entries were reported once
+// anyway: one hit is one mistake.)
+const oopsyTest = fs.readFileSync(
+  path.join(repoRoot, 'ui/oopsyraidsy/data/00-misc/test.ts'),
+  'utf8',
+);
+const bootText =
+  'const text = `${matches.ability} (${data.bootCount}): ${data.DamageFromMatches(matches)}`;';
+if (!oopsyTest.includes(bootText))
+  throw new Error('Test Bootshine changed: update this check');
+const bootRows = async (userFiles) => {
+  const { page } = await openPage(browser, 'oopsy', {
+    viewport: { width: 500, height: 400 },
+    userFiles: userFiles,
+  });
+  await startFight(page, 134, 'Middle La Noscea');
+  await sendLines(page, [
+    '21|2026-10-21T00:00:05.0000000+09:00|10000001|Tester|35|Bootshine|40001234|나무인형|710003|3B9D4002|1C|DF98000|0|0|0|0|0|0|0|0|0|0|0|0|104815|348652|12000|12000|1000|1000|-767.7882|156.939|-672.0446|0.0000|26285|28784|13920|15480|1000|1000|-771.8156|157.1111|-671.3281|0.0000|0000ABCD|0|1|||1|35|35|0.600|0000|hash',
+  ]);
+  await wait(800);
+  return page.evaluate(() =>
+    [...document.querySelectorAll('#livelist .mistake-row')]
+      .map((row) => row.textContent ?? '')
+      .filter((text) => text.includes('Bootshine') || text.includes('user boot'))
+  );
+};
+const builtInBoot = await bootRows({});
+check('oopsy: cactbot trigger alone', builtInBoot.length === 1, `${builtInBoot}`);
+const replacedBoot = await bootRows({
+  'oopsyraidsy/test.ts': oopsyTest.replace(bootText, 'const text = \'user boot\';'),
+});
+check(
+  'oopsy: copied trigger replaces it, once',
+  replacedBoot.length === 1 && replacedBoot[0]?.includes('user boot') === true,
+  `${replacedBoot}`,
+);
+
 await browser.close();
 console.log(failed === 0 ? 'all ok' : `${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

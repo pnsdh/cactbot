@@ -97,8 +97,8 @@ ACT, FFXIV ACT Plugin, OverlayPlugin이 필요합니다. 없다면 해루봇이�
 예시는 `Plugins\cbkr\user\raidboss-typescript-example.ts`에 있습니다.
 
 * **전투 하나를 통째로 고치기**(레이드보스): cactbot 트리거 파일(`ui/raidboss/data/...`의 `.ts`)을 그대로 복사해 고칩니다. 파일 안의 세트 `id`가 같아서 그 전투의 cactbot 트리거·타임라인을 대신합니다. 타임라인 `.txt`도 복사하면 그것을 쓰고, 복사하지 않으면 cactbot 것을 씁니다. 대신 cactbot이 나중에 그 전투를 고쳐도 반영되지 않습니다.
-* **트리거 몇 개만 바꾸기**: 자기 세트(다른 `id`)에 그 트리거만 넣습니다. 레이드보스에서는 같은 `id`의 트리거가 cactbot 것을 덮어씁니다. 자기 세트에는 cactbot의 번역이 없으므로, 영어 문구로 찾는 트리거는 `timelineReplace`에 한국어 문구를 같이 적습니다(예시 참고).
-* **웁시레이지**는 같은 `id`라도 cactbot 것을 대신하지 않고 둘 다 실행합니다(파일째 복사하면 같은 실수가 두 번 나옵니다). `ui/oopsyraidsy/data/...`에서 바꿀 트리거만 다른 `id`로 자기 세트에 넣고, 원래 트리거는 `Cactbot Config`의 웁시레이지 트리거 목록에서 끕니다(같은 `id`면 함께 꺼집니다).
+* **트리거 몇 개만 바꾸기**: 자기 세트(다른 `id`)에 그 트리거만 넣습니다. 같은 `id`의 트리거는 cactbot 것을 덮어씁니다. 자기 세트에는 cactbot의 번역이 없으므로, 영어 문구로 찾는 트리거는 `timelineReplace`에 한국어 문구를 같이 적습니다(예시 참고).
+* **웁시레이지**도 같은 `id`의 트리거와 실수 항목(`damageWarn` 등)은 사용자 것이 cactbot 것을 대신하므로, `ui/oopsyraidsy/data/...` 파일을 그대로 복사해 고쳐도 됩니다. 다만 웁시 세트에는 `id`가 없어 트리거마다 대신하는 것이라, 복사본에서 지운 트리거는 cactbot 것이 그대로 남습니다. 없애려면 `Cactbot Config`의 웁시레이지 트리거 목록에서 끕니다.
 * `import`는 트리거 파일이 쓰는 cactbot 모듈(`resources/`의 `conditions`, `netregexes`, `outputs`, `responses`, `util`, `zone_id` 등)과 웁시의 `oopsy_common`만 됩니다. 다른 사용자 파일은 가져올 수 없습니다.
 * 타입은 지우기만 하고 검사하지 않습니다.
 * **편집기 도움(선택)**: VS Code 같은 편집기에서 자동 완성과 형식 오류를 보려면 `Plugins\cbkr\user\tsconfig.json`을 사용자 폴더에 복사하고, import를 `cactbot/`으로 시작하게 씁니다(예: `cactbot/resources/zone_id`). 복사한 cactbot 파일은 import의 `../../../../../`를 `cactbot/`으로 바꿉니다(웁시의 `../../../oopsy_common`은 `cactbot/ui/oopsyraidsy/oopsy_common`). 바꾸지 않아도 실행에는 문제가 없습니다.
