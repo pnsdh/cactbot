@@ -156,6 +156,9 @@ type TtsPlan = {
 };
 // Fork: the kinds of alert, the most important first.
 const kSeverities = ['alarm', 'alert', 'info'] as const;
+// Fork: the kind of alert of a trigger's response (e.g. Responses.tankBuster('alarm')), which
+// its fields don't say (see processTrigger).
+const responseSeverities = new WeakMap<object, typeof kSeverities[number]>();
 const outputsUsedBy = (f: unknown): string[] =>
   typeof f === 'function'
     ? [...f.toString().matchAll(/output\.(\w+)/g)].map((m) => m[1] ?? '')
@@ -1051,8 +1054,10 @@ class RaidbossConfigurator {
       // What it says: its output, or else (with output strings) the first of them.
       // With output strings, its color only when it says them in one way.
       const fields = severities.filter((s) => `${s}Text` in trig);
+      // Fork: or its response's.
       const severity = severities.find((s) => trig.configOutput?.[`${s}Text`] !== undefined) ??
-        (fields.length === 1 ? fields[0] : undefined);
+        (fields.length === 1 ? fields[0] : undefined) ??
+        (fields.length === 0 ? responseSeverities.get(trig) : undefined);
       const said = severity !== undefined ? trig.configOutput?.[`${severity}Text`] : outputs[0];
       triggers.push({
         id: trigId,
@@ -1285,9 +1290,17 @@ class RaidbossConfigurator {
         const ttsRows: HTMLElement[] = [];
         const ttsPlan = ttsPlanOf(trig, Object.keys(outputStrings));
         // Fork: a button to hear what TTS says for a box (see sayTts), off while that is nothing.
+        // Its kind of alert: of the text that says the box's output string, else the trigger's.
         const severity = kSeverities.find((s) => trig.configOutput?.[`${s}Text`] !== undefined) ??
-          kSeverities.find((s) => `${s}Text` in trig) ?? 'info';
-        const addPlay = (box: HTMLElement, said: () => string, ...inputs: HTMLInputElement[]) => {
+          kSeverities.find((s) => `${s}Text` in trig) ?? responseSeverities.get(trig) ?? 'info';
+        const severityOf = (key: string) =>
+          kSeverities.find((s) => outputsUsedBy(trig[`${s}Text`]).includes(key)) ?? severity;
+        const addPlay = (
+          box: HTMLElement,
+          key: string,
+          said: () => string,
+          ...inputs: HTMLInputElement[]
+        ) => {
           const play = document.createElement('button');
           play.type = 'button';
           play.classList.add('trigger-tts-play');
@@ -1296,7 +1309,7 @@ class RaidbossConfigurator {
           for (const input of inputs)
             input.addEventListener('input', update);
           update();
-          play.onclick = () => this.sayTts(said(), severity);
+          play.onclick = () => this.sayTts(said(), severityOf(key));
           box.appendChild(play);
         };
 
@@ -1345,7 +1358,7 @@ class RaidbossConfigurator {
             label.classList.add('trigger-ttsstring-label');
             div.classList.add('trigger-ttsstring');
             ttsRows.push(label, div);
-            addPlay(div, () => input.value !== '' ? input.value : template, input);
+            addPlay(div, key, () => input.value !== '' ? input.value : template, input);
           }
 
           // Fork: what TTS says for it, if not the same as the screen (same ${params}).  Not for
@@ -1394,6 +1407,7 @@ class RaidbossConfigurator {
           ttsInput.value = savedTts;
           addPlay(
             ttsDiv,
+            key,
             () => ttsInput.value !== '' ? ttsInput.value : ttsPlan.off ? '' : ttsInput.placeholder,
             ttsInput,
             input,
@@ -1993,6 +2007,11 @@ class RaidbossConfigurator {
           }
           if (!response)
             continue;
+          // Fork: its kind of alert, for the list's color and the TTS preview.
+          const said = response;
+          const kind = kSeverities.find((s) => `${s}Text` in said);
+          if (kind !== undefined)
+            responseSeverities.set(trig, kind);
 
           if (!trig.outputStrings) {
             for (const key of outputKeys)

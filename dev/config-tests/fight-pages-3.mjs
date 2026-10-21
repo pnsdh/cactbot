@@ -433,6 +433,27 @@ const shownIds = (p) =>
     return row.nextElementSibling.querySelector('.trigger-tts-play')?.disabled;
   });
   check('listen: off while nothing would be said', silent === true, `${silent}`);
+  // A response's trigger (Responses.tankBusterSwap: alarm for one tank, alert for others): heard,
+  // and colored in the list, as its most important kind (not info).
+  await look('황금의 유산', kFight, 'FRU P1 Powder Mark Trail');
+  const kind = await p.evaluate(async () => {
+    window.__overlayCalls.length = 0;
+    const row = [...document.querySelectorAll('.config-page .config-compact > .trigger')].find((
+      r,
+    ) => r.querySelector('.trigger-id').textContent === 'FRU P1 Powder Mark Trail');
+    row.nextElementSibling.querySelector('.trigger-tts-play').click();
+    await new Promise((r) => setTimeout(r, 100));
+    const said = window.__overlayCalls.find((c) => c.call === 'say' && c.text !== undefined);
+    return {
+      heard: said?.severity,
+      color: row.querySelector('.config-trigger-preview').className,
+    };
+  });
+  check(
+    'listen: a response\'s kind',
+    kind.heard === 'alarm' && kind.color.includes('config-trigger-alarm'),
+    JSON.stringify(kind),
+  );
   check('no page errors (own TTS)', errors.length === 0, errors.join('; '));
   await p.close();
 }
