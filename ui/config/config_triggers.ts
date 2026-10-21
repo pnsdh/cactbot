@@ -482,7 +482,9 @@ const compactTriggers = (file: TriggerFile): void => {
   // Under the fight's header, which stays in view too.
   const header = file.container.querySelector<HTMLElement>(':scope > .trigger-file-header');
   if (header !== null && typeof ResizeObserver !== 'undefined')
-    new ResizeObserver(() => bar.style.top = `${header.offsetHeight}px`).observe(header);
+    new ResizeObserver(() => bar.style.top = `${header.offsetHeight}px`).observe(header, {
+      box: 'border-box',
+    });
 
   triggerBars.set(file.container, {
     refresh: () => {

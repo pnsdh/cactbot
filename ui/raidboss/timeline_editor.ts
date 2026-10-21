@@ -416,8 +416,10 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
     closeOpenPicker();
   });
 
-  // Called on scroll while the entries show (set as they are built).
+  // Called on scroll while the entries show (set as they are built), and as the fight's header
+  // changes height (watched once, whatever rebuilds the entries).
   let onScroll: () => void = () => undefined;
+  let headerWatched = false;
   let scrollQueued = false;
   let scroller: HTMLElement | null = null;
   const listenScroll = () => {
@@ -1432,6 +1434,14 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
         sticky.style.top = top;
     };
     placeSticky();
+    // And as the header's height changes (a narrower window wraps it), as the triggers' bar does.
+    if (
+      !headerWatched && fileHeader !== null && fileHeader !== undefined &&
+      typeof ResizeObserver !== 'undefined'
+    ) {
+      headerWatched = true;
+      new ResizeObserver(() => onScroll()).observe(fileHeader, { box: 'border-box' });
+    }
     onScroll = () => {
       // Not while the fight's timeline edits are closed.
       if (editor.offsetParent === null)
