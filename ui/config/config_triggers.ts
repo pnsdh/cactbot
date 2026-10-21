@@ -62,7 +62,7 @@ const kNoTriggerChanged: LocaleText = {
   en: 'No trigger has changes.',
   ko: '변경한 트리거가 없습니다.',
 };
-const kWas: LocaleText = { en: 'Was: ${text}', ko: '원래: ${text}' };
+const kWas: LocaleText = { en: 'Original: ${text}', ko: '원본: ${text}' };
 const kInfo: LocaleText = { en: 'Description', ko: '설명' };
 const kTriggerChangedKey = 'cactbot-config-trigger-changed';
 

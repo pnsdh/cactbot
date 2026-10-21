@@ -152,7 +152,7 @@ const shownIds = (p) =>
   }, kChanged);
   check(
     'was: the default text, right of its box',
-    details.was === `원래: ${details.placeholder}` && details.wasRight,
+    details.was === `원본: ${details.placeholder}` && details.wasRight,
     JSON.stringify(details),
   );
   check(
@@ -236,6 +236,72 @@ const shownIds = (p) =>
     JSON.stringify(back),
   );
   check('no page errors (timeline)', errors.length === 0, errors.join('; '));
+  await p.close();
+}
+
+// 6. Changes counted by item: an entry's text, hiding and color are one; a name hidden and
+// renamed is one; times shown with their tenths.
+{
+  const p = await b.newPage();
+  await p.setViewport({ width: 1280, height: 900 });
+  const errors = [];
+  p.on('pageerror', (e) => errors.push(e.message));
+  await mockOverlayPlugin(p, {
+    raidboss: {
+      timeline: {
+        '1238': {
+          entries: {
+            '14.6|Cyclonic Break 1 (targeted)': { text: '바꿈', hide: true, highlight: 'red' },
+          },
+          enable: { 'Powder Mark Trail': false },
+          globalReplace: { 'Powder Mark Trail': '탱버' },
+        },
+      },
+    },
+  });
+  await p.evaluateOnNewDocument(() => {
+    try {
+      localStorage.clear();
+    } catch {}
+  });
+  await p.goto(pageUrl('config'), { waitUntil: 'load' });
+  await wait(2500);
+  await p.evaluate(() => document.querySelectorAll('.config-tab')[1].click());
+  await wait(300);
+  await p.evaluate(() =>
+    [...document.querySelectorAll('.config-active .config-view-switch button')][1].click()
+  );
+  await wait(800);
+  await p.evaluate((name) => {
+    const c = [...document.querySelectorAll('.config-active .trigger-file-container')].find((x) =>
+      x.offsetParent !== null &&
+      x.querySelector('.trigger-file-header-part')?.textContent.trim().startsWith(name)
+    );
+    c.querySelector('.trigger-file-header').click();
+  }, kFight);
+  await wait(600);
+  await tab(p, 2);
+  await wait(800);
+  const got = await p.evaluate(() => ({
+    tab: document.querySelectorAll('.config-page .config-page-tab')[2]
+      ?.querySelector('.config-page-tab-changed')?.textContent,
+    bar: document.querySelector('.config-page .config-tl-sticky .config-tl-count')?.textContent,
+    times: [...document.querySelectorAll('.config-page .config-tl-time')].map((x) => x.textContent),
+  }));
+  check(
+    'timeline changes by item',
+    got.tab === '변경 2' && got.bar === '1',
+    JSON.stringify({
+      tab: got.tab,
+      bar: got.bar,
+    }),
+  );
+  check(
+    'times with tenths',
+    got.times.length > 0 && got.times.every((x) => /^-?\d+\.\d$/.test(x)),
+    got.times.filter((x) => !/^-?\d+\.\d$/.test(x)).slice(0, 5).join(),
+  );
+  check('no page errors (counts)', errors.length === 0, errors.join('; '));
   await p.close();
 }
 
