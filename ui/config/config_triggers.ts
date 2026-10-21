@@ -291,6 +291,11 @@ const openTriggerRow = (row: HTMLElement, open: boolean): void => {
     ?.setAttribute('aria-expanded', open ? 'true' : 'false');
 };
 
+// A compacted file's bar (see compactTriggers): "changed only" as last set (in another fight
+// too), and a row shown whatever the filters (a search result), and the bar's height.
+type TriggerBar = { refresh: () => void; show: (row: HTMLElement) => void; height: () => number };
+const triggerBars = new WeakMap<HTMLElement, TriggerBar>();
+
 // A file's trigger rows as single lines (the trigger, what it says, its output, whether it was
 // changed), each opened to the rest of its settings: open, a file of many triggers was a page of
 // forms many screens long.
@@ -326,7 +331,10 @@ const compactTriggers = (file: TriggerFile): void => {
   const found: { row: HTMLElement; details: HTMLElement; entry?: TriggerEntry }[] = [];
   const count = document.createElement('span');
   count.classList.add('config-tl-count');
+  let building = true;
   const updateCount = () => {
+    if (building)
+      return;
     const n = rows.filter((r) => r.classList.contains('config-trigger-changed')).length;
     count.textContent = n > 0 ? n.toString() : '';
   };
@@ -401,9 +409,11 @@ const compactTriggers = (file: TriggerFile): void => {
       toggle();
     });
   }
+  building = false;
   if (!compacted)
     return;
   options.classList.add('config-compact');
+  updateCount();
 
   // A bar that stays in view, as the timeline's: search, "changed only" and "open all".
   const bar = document.createElement('div');
@@ -412,6 +422,7 @@ const compactTriggers = (file: TriggerFile): void => {
   search.type = 'text';
   search.classList.add('config-tl-search');
   search.placeholder = context.translate(kFindTrigger);
+  search.setAttribute('aria-label', context.translate(kFindTrigger));
   let changedOnly = storageGet(kTriggerChangedKey) === '1';
   const changedToggle = document.createElement('button');
   changedToggle.type = 'button';
@@ -441,6 +452,8 @@ const compactTriggers = (file: TriggerFile): void => {
       details.classList.toggle('config-hidden', !hit);
       if (hit)
         shown++;
+      else
+        openTriggerRow(row, false);
     }
     changedToggle.classList.toggle('config-active', changedOnly);
     changedToggle.setAttribute('aria-checked', changedOnly ? 'true' : 'false');
@@ -451,6 +464,14 @@ const compactTriggers = (file: TriggerFile): void => {
     updateAll();
   };
   search.oninput = filter;
+  // Enter goes to the first trigger found, as the timeline's search does.
+  search.onkeydown = (e) => {
+    if (e.key !== 'Enter')
+      return;
+    e.preventDefault();
+    found.find((f) => !f.row.classList.contains('config-hidden'))?.row
+      .querySelector<HTMLElement>('.config-trigger-line > .trigger-id')?.focus();
+  };
   changedToggle.onclick = () => {
     changedOnly = !changedOnly;
     storageSet(kTriggerChangedKey, changedOnly ? '1' : '0');
@@ -462,6 +483,27 @@ const compactTriggers = (file: TriggerFile): void => {
   const header = file.container.querySelector<HTMLElement>(':scope > .trigger-file-header');
   if (header !== null && typeof ResizeObserver !== 'undefined')
     new ResizeObserver(() => bar.style.top = `${header.offsetHeight}px`).observe(header);
+
+  triggerBars.set(file.container, {
+    refresh: () => {
+      const stored = storageGet(kTriggerChangedKey) === '1';
+      if (stored === changedOnly)
+        return;
+      changedOnly = stored;
+      filter();
+    },
+    show: (row) => {
+      if (!row.classList.contains('config-hidden'))
+        return;
+      search.value = '';
+      if (changedOnly && !row.classList.contains('config-trigger-changed')) {
+        changedOnly = false;
+        storageSet(kTriggerChangedKey, '0');
+      }
+      filter();
+    },
+    height: () => bar.offsetHeight,
+  });
 };
 
 // An explanation behind an icon, as for options (config_rows.ts).
@@ -972,6 +1014,7 @@ export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void 
       toggling = false;
     }
     compactTriggers(file);
+    triggerBars.get(file.container)?.refresh();
     const p = pages.get(file) ?? buildPage(file, header);
     pages.set(file, p);
     page = p;
@@ -1118,14 +1161,17 @@ export const revealTrigger = (hit: TriggerHit): void => {
     flash([file.container]);
     return;
   }
+  const bar = triggerBars.get(file.container);
+  bar?.show(row);
   openTriggerRow(row, true);
-  // The row's top goes right under the file's header, which stays on top while open (rows with
-  // many output strings are taller than the page, so centering them would hide their name).
+  // The row's top goes right under the file's header and the triggers' bar, which stay on top
+  // while open (rows with many output strings are taller than the page, so centering them would
+  // hide their name).
   row.scrollIntoView({ block: 'start' });
   const scroller = row.closest('.config-scroll');
   if (scroller !== null && header !== null)
     // offsetHeight, unlike rects, is in the page's own pixels whatever its scale.
-    scroller.scrollTop -= header.offsetHeight + 8;
+    scroller.scrollTop -= header.offsetHeight + (bar?.height() ?? 0) + 8;
   const details = row.nextElementSibling;
   flash(details instanceof HTMLElement ? [row, details] : [row]);
   const name = row.querySelector<HTMLElement>('.config-trigger-line > .trigger-id');

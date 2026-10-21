@@ -318,7 +318,9 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
   let entriesBar: HTMLElement | undefined;
   let byNameBuilt = false;
   let entriesStale = true;
-  const showPane = (entries: boolean) => {
+  // focused: whether the switch had the focus, which it loses as it is moved (or rebuilt with
+  // the entries): given back to the one pressed.
+  const showPane = (entries: boolean, focused = false) => {
     if (entries)
       entriesBar?.prepend(tabs);
     else
@@ -327,6 +329,9 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
     byNamePane.classList.toggle('config-hidden', entries);
     entriesButton.classList.toggle('config-active', entries);
     byNameButton.classList.toggle('config-active', !entries);
+    // Once shown (a hidden one takes no focus).
+    if (focused)
+      (entries ? entriesButton : byNameButton).focus({ preventScroll: true });
   };
 
   // Kept as the entries are rebuilt.
@@ -599,6 +604,7 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
     const search = make('input', 'config-tl-search');
     search.type = 'text';
     search.placeholder = tr(t.search);
+    search.setAttribute('aria-label', tr(t.search));
     search.value = filters.query;
     // "Edited only" says how many there are.
     const count = make('span', 'config-tl-count');
@@ -1464,19 +1470,21 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
   };
 
   entriesButton.onclick = () => {
+    const focused = tabs.contains(document.activeElement);
     if (entriesStale) {
       entriesPane.replaceChildren();
       buildEntries(entriesPane);
     }
     entriesStale = false;
-    showPane(true);
+    showPane(true, focused);
   };
   byNameButton.onclick = () => {
+    const focused = tabs.contains(document.activeElement);
     if (!byNameBuilt)
       ctx.buildByName(byNamePane);
     byNameBuilt = true;
     entriesStale = true;
-    showPane(false);
+    showPane(false, focused);
   };
   entriesButton.click();
 };

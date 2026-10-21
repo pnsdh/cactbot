@@ -305,6 +305,100 @@ const shownIds = (p) =>
   await p.close();
 }
 
+// 8. "Changed only" as last set in another fight; a search result shown whatever the filters
+// (not under the bar); the view switch keeps the focus as it moves.
+{
+  const { p, errors } = await open();
+  const openFight = async (name) => {
+    await p.evaluate((name) => {
+      document.querySelector('.config-page .config-page-back')?.click();
+      const c = [...document.querySelectorAll('.config-active .trigger-file-container')].find((x) =>
+        x.offsetParent !== null &&
+        x.querySelector('.trigger-file-header-part')?.textContent.trim().startsWith(name)
+      );
+      c.querySelector('.trigger-file-header').click();
+    }, name);
+    await wait(600);
+    await tab(p, 1);
+    await wait(300);
+  };
+  const toggleOn = () =>
+    p.evaluate(() =>
+      document.querySelector('.config-page .config-trigger-bar .config-changed-toggle')
+        .classList.contains('config-active')
+    );
+  await tab(p, 1);
+  await wait(300);
+  const before = await toggleOn();
+  await openFight('절 요성난무');
+  await p.evaluate(() =>
+    document.querySelector('.config-page .config-trigger-bar .config-changed-toggle').click()
+  );
+  await openFight(kFight);
+  check('changed only as set in another fight', !before && await toggleOn(), `${before}`);
+
+  // Found by the page's search: an unchanged trigger, with "changed only" on.
+  await p.evaluate(() => {
+    const i = document.querySelector('.config-search-input');
+    i.focus();
+    i.value = 'FRU P1 Powder Mark Trail';
+    i.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await wait(600);
+  await p.evaluate(() =>
+    document.querySelector(
+      '.config-trigger-results button, .config-trigger-results [role="button"], .config-trigger-results a',
+    ).click()
+  );
+  await wait(800);
+  const shown = await p.evaluate(() => {
+    const row = [...document.querySelectorAll('.config-page .config-compact > .trigger')].find((
+      r,
+    ) => r.querySelector('.trigger-id').textContent === 'FRU P1 Powder Mark Trail');
+    const bar = document.querySelector('.config-page .config-trigger-bar').getBoundingClientRect();
+    const top = row?.getBoundingClientRect().top ?? -1;
+    return {
+      visible: row?.offsetParent !== null,
+      open: row?.classList.contains('config-trigger-open'),
+      focused: document.activeElement === row?.querySelector('.trigger-id'),
+      underBar: top >= bar.bottom - 1,
+      changedOnly: document.querySelector('.config-page .config-changed-toggle')
+        .classList.contains('config-active'),
+    };
+  });
+  check(
+    'search result shown whatever the filters, under the bar',
+    shown.visible && shown.open && shown.focused && shown.underBar && !shown.changedOnly,
+    JSON.stringify(shown),
+  );
+
+  // The view switch from the keyboard.
+  await tab(p, 2);
+  await wait(800);
+  await p.focus('.config-page .config-tl-tabs button:nth-child(2)');
+  await p.keyboard.press('Enter');
+  await wait(400);
+  const byName = await p.evaluate(() =>
+    document.activeElement ===
+      document.querySelector('.config-page .config-tl-tabs button:nth-child(2)')
+  );
+  await p.keyboard.down('Shift');
+  await p.keyboard.press('Tab');
+  await p.keyboard.up('Shift');
+  const onEntries = await p.evaluate(() => document.activeElement.textContent);
+  await p.keyboard.press('Enter');
+  await wait(600);
+  const back = await p.evaluate(() =>
+    document.activeElement ===
+        document.querySelector('.config-page .config-tl-tabs button:nth-child(1)')
+      ? true
+      : `${document.activeElement.tagName}.${document.activeElement.className}`
+  );
+  check('view switch keeps the focus', byName && back === true, `${byName} ${onEntries} ${back}`);
+  check('no page errors (filters, focus)', errors.length === 0, errors.join('; '));
+  await p.close();
+}
+
 // 5. Oopsy's triggers (only their output, nothing to open): the bar without "open all".
 {
   const p = await b.newPage();
