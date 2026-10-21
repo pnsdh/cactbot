@@ -420,6 +420,9 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
   // changes height (watched once, whatever rebuilds the entries).
   let onScroll: () => void = () => undefined;
   let headerWatched = false;
+  // Puts the bar under the header (set as the entries are built), also while they are out of
+  // sight (as the header changes on another tab), so it is right when they show again.
+  let placeBar: () => void = () => undefined;
   let scrollQueued = false;
   let scroller: HTMLElement | null = null;
   const listenScroll = () => {
@@ -1312,7 +1315,7 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
       filter();
     };
     search.onkeydown = (ev) => {
-      if (ev.key !== 'Enter')
+      if (ev.key !== 'Enter' || ev.isComposing)
         return;
       ev.preventDefault();
       visibleRows()[0]?.input.focus();
@@ -1434,13 +1437,14 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
         sticky.style.top = top;
     };
     placeSticky();
+    placeBar = placeSticky;
     // And as the header's height changes (a narrower window wraps it), as the triggers' bar does.
     if (
       !headerWatched && fileHeader !== null && fileHeader !== undefined &&
       typeof ResizeObserver !== 'undefined'
     ) {
       headerWatched = true;
-      new ResizeObserver(() => onScroll()).observe(fileHeader, { box: 'border-box' });
+      new ResizeObserver(() => placeBar()).observe(fileHeader, { box: 'border-box' });
     }
     onScroll = () => {
       // Not while the fight's timeline edits are closed.

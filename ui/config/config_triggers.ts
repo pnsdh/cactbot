@@ -464,13 +464,18 @@ const compactTriggers = (file: TriggerFile): void => {
     updateAll();
   };
   search.oninput = filter;
-  // Enter goes to the first trigger found, as the timeline's search does.
+  // Enter goes to the first trigger found, as the timeline's search does: its name, or (with
+  // nothing to open, as oopsy's) its output.  Not while a Korean word is being typed.
   search.onkeydown = (e) => {
-    if (e.key !== 'Enter')
+    if (e.key !== 'Enter' || e.isComposing)
       return;
     e.preventDefault();
-    found.find((f) => !f.row.classList.contains('config-hidden'))?.row
-      .querySelector<HTMLElement>('.config-trigger-line > .trigger-id')?.focus();
+    const line = found.find((f) => !f.row.classList.contains('config-hidden'))?.row
+      .querySelector<HTMLElement>(':scope > .config-trigger-line');
+    const name = line?.querySelector<HTMLElement>(':scope > .trigger-id');
+    (name !== undefined && name !== null && name.tabIndex >= 0
+      ? name
+      : line?.querySelector<HTMLElement>('select'))?.focus();
   };
   changedToggle.onclick = () => {
     changedOnly = !changedOnly;
