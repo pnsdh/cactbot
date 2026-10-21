@@ -504,6 +504,22 @@ const shownIds = (p) =>
     JSON.stringify(shown),
   );
 
+  // The fight's header grows: the triggers' bar goes under it.
+  const triggersPlaced = await p.evaluate(async () => {
+    const header = document.querySelector('.config-page > .trigger-file-header');
+    header.style.paddingTop = '40px';
+    await new Promise((r) => setTimeout(r, 200));
+    const top = document.querySelector('.config-page .config-trigger-bar').style.top;
+    const height = header.offsetHeight;
+    header.style.paddingTop = '';
+    return [top, `${height}px`];
+  });
+  check(
+    'triggers bar follows the header\'s height',
+    triggersPlaced[0] === triggersPlaced[1],
+    triggersPlaced.join(' '),
+  );
+
   // The view switch from the keyboard.
   await tab(p, 2);
   await wait(800);
@@ -526,6 +542,19 @@ const shownIds = (p) =>
       ? true
       : `${document.activeElement.tagName}.${document.activeElement.className}`
   );
+  // The fight's header grows (as wrapped on a narrower window): the bar goes under it without
+  // waiting for a scroll.
+  const placed = await p.evaluate(async () => {
+    const header = document.querySelector('.config-page > .trigger-file-header');
+    header.style.paddingTop = '40px';
+    await new Promise((r) => setTimeout(r, 200));
+    const top = document.querySelector('.config-page .config-tl-sticky').style.top;
+    const height = header.offsetHeight;
+    header.style.paddingTop = '';
+    return `${top} ${height}px`;
+  });
+  const [placedTop, wanted] = placed.split(' ');
+  check('timeline bar follows the header\'s height', placedTop === wanted, placed);
   check('view switch keeps the focus', byName && back === true, `${byName} ${onEntries} ${back}`);
   check('no page errors (filters, focus)', errors.length === 0, errors.join('; '));
   await p.close();
