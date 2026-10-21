@@ -305,8 +305,9 @@ const shownIds = (p) =>
   await p.close();
 }
 
-// 7. A trigger's own TTS: off, a fixed text, or texts of its own (marked TTS, no TTS box of
-// their own); said by the TTS button's note.
+// 7. A trigger's own TTS, the same TTS boxes whatever it is: what an empty one says is in it
+// (not read aloud, a fixed text, the trigger's own text for TTS, which is no box of its own).
+// The same note for all.
 {
   const p = await b.newPage();
   await p.setViewport({ width: 1280, height: 900 });
@@ -353,12 +354,17 @@ const shownIds = (p) =>
       row.querySelector('.trigger-id').click();
       const d = row.nextElementSibling;
       d.querySelector('.trigger-tts-toggle')?.click();
+      // Not read aloud: nothing typed in on focus.
+      const first = d.querySelector('.trigger-ttsstring > input');
+      first?.focus();
+      const typed = first?.value;
+      first?.blur();
       const labels = [...d.querySelectorAll('.trigger-outputstring-label')]
         .filter((l) => l.offsetParent !== null);
       return {
         note: d.querySelector('.config-trigger-tts .config-help')?.getAttribute('data-config-tip'),
-        tagged: labels.filter((l) => l.querySelector('.trigger-tts-only') !== null)
-          .map((l) => l.firstChild.textContent),
+        typed: typed,
+        labels: labels.map((l) => l.textContent),
         ttsRows: labels.filter((l) => l.classList.contains('trigger-ttsstring-label'))
           .map((l) => l.textContent.split(' · ')[0]),
         placeholders: [...d.querySelectorAll('.trigger-ttsstring > input')].map((i) =>
@@ -368,23 +374,24 @@ const shownIds = (p) =>
     }, id);
   };
   const off = await look('황금의 유산', kFight, 'FRU P3 Apoc Safe Early');
+  const kNote = '비우면 원래대로 읽습니다';
   check(
-    'own TTS off: said, empty TTS boxes',
-    off?.note?.includes('원래 TTS로 읽지 않습니다') && !off.note.includes('비우면 화면') &&
-      off.placeholders.every((x) => x === ''),
+    'own TTS off: said in its boxes, not typed in',
+    off?.note?.includes(kNote) && off.placeholders.every((x) => x === '(원래 읽지 않음)') &&
+      off.typed === '',
     JSON.stringify(off),
   );
   const fixed = await look('칠흑의 반역자', '절 알렉산더 토벌전', 'TEA Contact Prohibition');
   check(
     'own TTS fixed: said, its text in the TTS box',
-    fixed?.note?.includes('항상 "접촉금지"') && fixed.placeholders.join() === '접촉금지',
+    fixed?.note?.includes(kNote) && fixed.placeholders.join() === '접촉금지',
     JSON.stringify(fixed),
   );
   const own = await look('홍련의 해방자', '절 바하무트 토벌전', 'UCU Megaflare Tower');
   check(
-    'own TTS texts: marked, no TTS box of their own',
-    own?.tagged.join() === 'towerTTS' && !own.ttsRows.includes('towerTTS') &&
-      own.ttsRows.length === 3 && own.note?.includes('TTS로 표시된 문구'),
+    'own TTS texts: in the boxes of what is on screen, not boxes of their own',
+    own?.note?.includes(kNote) && !own.labels.some((l) => l.includes('towerTTS')) &&
+      own.ttsRows.length === 3 && own.placeholders.every((x) => x === '기둥'),
     JSON.stringify(own),
   );
   check('no page errors (own TTS)', errors.length === 0, errors.join('; '));

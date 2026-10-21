@@ -99,24 +99,14 @@ const kTtsToggle = {
     tc: '單獨設定TTS文字…',
   },
   note: {
-    en: 'What TTS says instead of each text above (same ${params}); empty: the same as the screen.',
-    de: 'Was TTS statt jedes Textes oben sagt (gleiche ${params}); leer: wie auf dem Bildschirm.',
+    en: 'What TTS says instead of each text above (same ${params}); empty: as by default.',
+    de: 'Was TTS statt jedes Textes oben sagt (gleiche ${params}); leer: wie standardmäßig.',
     fr:
-      'Ce que dit le TTS à la place de chaque texte ci-dessus (mêmes ${params}) ; vide : comme à l’écran.',
-    ja: '上の各文の代わりにTTSが読む文（同じ${params}）。空なら画面と同じ。',
-    cn: 'TTS代替上面每个文本读出的内容（相同的${params}）；留空则与屏幕相同。',
-    ko: '위 각 문구 대신 TTS가 읽을 말 (같은 ${params} 사용). 비우면 화면 문구와 같습니다.',
-    tc: 'TTS代替上面每個文字讀出的內容（相同的${params}）；留空則與螢幕相同。',
-  },
-  // For a trigger with its own TTS (see kOwnTtsNote), which says what an empty one does.
-  noteOwn: {
-    en: 'What TTS says instead of each text above (same ${params}).',
-    de: 'Was TTS statt jedes Textes oben sagt (gleiche ${params}).',
-    fr: 'Ce que dit le TTS à la place de chaque texte ci-dessus (mêmes ${params}).',
-    ja: '上の各文の代わりにTTSが読む文（同じ${params}）。',
-    cn: 'TTS代替上面每个文本读出的内容（相同的${params}）。',
-    ko: '위 각 문구 대신 TTS가 읽을 말 (같은 ${params} 사용).',
-    tc: 'TTS代替上面每個文字讀出的內容（相同的${params}）。',
+      'Ce que dit le TTS à la place de chaque texte ci-dessus (mêmes ${params}) ; vide : comme par défaut.',
+    ja: '上の各文の代わりにTTSが読む文（同じ${params}）。空なら元のまま。',
+    cn: 'TTS代替上面每个文本读出的内容（相同的${params}）；留空则保持默认。',
+    ko: '위 각 문구를 TTS로 다르게 읽게 합니다 (같은 ${params} 사용). 비우면 원래대로 읽습니다.',
+    tc: 'TTS代替上面每個文字讀出的內容（相同的${params}）；留空則保持預設。',
   },
   hide: {
     en: 'Hide TTS texts',
@@ -127,85 +117,68 @@ const kTtsToggle = {
     ko: 'TTS 문구 숨기기',
     tc: '隱藏TTS文字',
   },
-};
-
-// Fork: what a trigger's own TTS (its tts field) is, said with its TTS texts, which win over it
-// (see _onTriggerInternalTTS in popup-text.ts).
-const kOwnTtsNote = {
-  off: {
-    en: 'This trigger is not read aloud by itself (on screen only); a TTS text written here is.',
-    de:
-      'Dieser Trigger wird von sich aus nicht vorgelesen (nur Anzeige); ein hier geschriebener TTS-Text schon.',
-    fr:
-      'Ce déclencheur n’est pas lu à voix haute de lui-même (affichage seulement) ; un texte TTS écrit ici l’est.',
-    ja: 'このトリガーは本来TTSで読み上げません（画面表示のみ）。ここに書いたTTSの文は読み上げます。',
-    cn: '此触发器本身不朗读（仅在屏幕显示）；在此填写的TTS文本会被朗读。',
-    ko: '이 트리거는 원래 TTS로 읽지 않습니다(화면에만 표시). 여기에 TTS 문구를 쓰면 그 문구를 읽습니다.',
-    tc: '此觸發器本身不朗讀（僅在螢幕顯示）；在此填寫的TTS文字會被朗讀。',
-  },
-  fixed: {
-    en:
-      'By itself, TTS always says "${text}" for this trigger; a TTS text written here is said instead.',
-    de:
-      'Von sich aus sagt TTS bei diesem Trigger immer „${text}“; ein hier geschriebener TTS-Text wird stattdessen gesagt.',
-    fr:
-      'De lui-même, le TTS dit toujours « ${text} » pour ce déclencheur ; un texte TTS écrit ici est dit à la place.',
-    ja: 'このトリガーは本来TTSで常に「${text}」と読みます。ここに書いたTTSの文を代わりに読みます。',
-    cn: '此触发器本身总是朗读“${text}”；在此填写的TTS文本会代替它被朗读。',
-    ko: '이 트리거는 원래 TTS로 항상 "${text}"라고 읽습니다. 여기에 TTS 문구를 쓰면 그 문구를 대신 읽습니다.',
-    tc: '此觸發器本身總是朗讀「${text}」；在此填寫的TTS文字會代替它被朗讀。',
-  },
-  own: {
-    en: 'This trigger has its own words for TTS; a TTS text written here is said instead.',
-    de:
-      'Dieser Trigger hat eigene Worte für TTS; ein hier geschriebener TTS-Text wird stattdessen gesagt.',
-    fr:
-      'Ce déclencheur a ses propres mots pour le TTS ; un texte TTS écrit ici est dit à la place.',
-    ja: 'このトリガーはTTSで読む言葉を別に決めています。ここに書いたTTSの文を代わりに読みます。',
-    cn: '此触发器另外设定了TTS朗读的内容；在此填写的TTS文本会代替它被朗读。',
-    ko: '이 트리거는 TTS로 읽을 말을 따로 정해 두었습니다. 여기에 TTS 문구를 쓰면 그 문구를 대신 읽습니다.',
-    tc: '此觸發器另外設定了TTS朗讀的內容；在此填寫的TTS文字會代替它被朗讀。',
-  },
-  ownMarked: {
-    en:
-      'This trigger has its own texts for TTS (marked TTS above, not on screen); a TTS text written here for one on screen is said instead.',
-    de:
-      'Dieser Trigger hat eigene Texte für TTS (oben mit TTS markiert, nicht angezeigt); ein hier für einen angezeigten Text geschriebener TTS-Text wird stattdessen gesagt.',
-    fr:
-      'Ce déclencheur a ses propres textes pour le TTS (marqués TTS ci-dessus, non affichés) ; un texte TTS écrit ici pour un texte affiché est dit à la place.',
-    ja: 'このトリガーはTTS用の文を別に持っています（上のTTS印の文、画面には出ません）。画面の文にここでTTSの文を書くと、それを代わりに読みます。',
-    cn: '此触发器有单独的TTS文本（上方标有TTS，不在屏幕显示）；在此为屏幕文本填写的TTS文本会代替它被朗读。',
-    ko: '이 트리거는 TTS로 읽을 문구를 따로 두었습니다(위에 TTS로 표시된 문구, 화면에는 안 나옴). 화면 문구에 TTS 문구를 쓰면 그 문구를 대신 읽습니다.',
-    tc: '此觸發器有單獨的TTS文字（上方標有TTS，不在螢幕顯示）；在此為螢幕文字填寫的TTS文字會代替它被朗讀。',
+  // An empty TTS text of a trigger that is not read aloud by default.
+  notRead: {
+    en: '(not read aloud)',
+    de: '(wird nicht vorgelesen)',
+    fr: '(non lu)',
+    ja: '（読み上げなし）',
+    cn: '（不朗读）',
+    ko: '(원래 읽지 않음)',
+    tc: '（不朗讀）',
   },
 };
 
-// Fork: a trigger's own TTS: none, off (null or empty), a fixed text, or made by a function from
-// output strings (those it uses that no text on screen does are its own, for TTS only).
-type OwnTts =
-  | { kind: 'none' }
-  | { kind: 'off' }
-  | { kind: 'fixed'; text: unknown }
-  | { kind: 'func'; ttsOnly: string[] };
+// Fork: what TTS says by default for each output string, by the trigger's own tts (without one,
+// what is on screen): nothing (null or empty), a fixed text, or output strings of its own, only
+// for TTS.  One of those goes with the one on screen it is named for (landmine, landmineTTS), or,
+// the only one, with all of them; it is not a box of its own then, as a TTS text for what is on
+// screen wins over it (see _onTriggerInternalTTS in popup-text.ts).  The others are TTS texts
+// of their own.
+type TtsPlan = {
+  off: boolean;
+  fixed?: unknown;
+  saidFor: Map<string, string>;
+  ttsOnly: Set<string>;
+  hidden: Set<string>;
+};
 const outputsUsedBy = (f: unknown): string[] =>
   typeof f === 'function'
     ? [...f.toString().matchAll(/output\.(\w+)/g)].map((m) => m[1] ?? '')
     : [];
-const ownTtsOf = (trig: ConfigLooseTrigger): OwnTts => {
+const ttsPlanOf = (trig: ConfigLooseTrigger, keys: string[]): TtsPlan => {
+  const plan: TtsPlan = { off: false, saidFor: new Map(), ttsOnly: new Set(), hidden: new Set() };
   const tts: unknown = trig.tts;
   if (tts === undefined)
-    return { kind: 'none' };
+    return plan;
   if (tts === null || tts === '')
-    return { kind: 'off' };
+    return { ...plan, off: true };
   if (typeof tts !== 'function')
-    return { kind: 'fixed', text: tts };
-  const onScreen = new Set(
-    [trig.alarmText, trig.alertText, trig.infoText].flatMap(outputsUsedBy),
-  );
-  return {
-    kind: 'func',
-    ttsOnly: [...new Set(outputsUsedBy(tts))].filter((k) => !onScreen.has(k)),
-  };
+    return { ...plan, fixed: tts };
+  const onScreen = [
+    ...new Set([trig.alarmText, trig.alertText, trig.infoText].flatMap(outputsUsedBy)),
+  ]
+    .filter((k) => keys.includes(k));
+  const own = [...new Set(outputsUsedBy(tts))]
+    .filter((k) => keys.includes(k) && !onScreen.includes(k));
+  const unpaired: string[] = [];
+  for (const k of own) {
+    const base = k.replace(/(?:TtsText|TTS|Tts|ttsText|tts)$/, '') || 'text';
+    if (base !== k && onScreen.includes(base) && !plan.saidFor.has(base)) {
+      plan.saidFor.set(base, k);
+      plan.hidden.add(k);
+    } else {
+      unpaired.push(k);
+    }
+  }
+  const [only] = unpaired;
+  if (only !== undefined && unpaired.length === 1 && plan.saidFor.size === 0) {
+    for (const k of onScreen)
+      plan.saidFor.set(k, only);
+    plan.hidden.add(only);
+  }
+  plan.ttsOnly = new Set(own);
+  return plan;
 };
 
 const kOptionKeys = {
@@ -1294,7 +1267,7 @@ class RaidbossConfigurator {
         const outputStrings = trig.outputStrings || {};
         // Fork: each one's TTS text, shown once asked for (or once one is set).
         const ttsRows: HTMLElement[] = [];
-        const ownTts = ownTtsOf(trig);
+        const ttsPlan = ttsPlanOf(trig, Object.keys(outputStrings));
 
         for (const [key, outputString] of Object.entries(outputStrings)) {
           const optionKey = kOptionKeys.outputStrings;
@@ -1303,17 +1276,22 @@ class RaidbossConfigurator {
             : this.base.translate(outputString);
 
           const label = document.createElement('div');
-          label.innerText = key;
+          // Fork: one only TTS says (ttsPlanOf): not here when another's TTS text stands for it
+          // (unless it was changed), else a TTS text of its own.
+          const ttsOnly = ttsPlan.ttsOnly.has(key);
+          if (
+            ttsPlan.hidden.has(key) &&
+            this.base.getStringOption(
+                'raidboss',
+                [kOptionKeys.triggers, trigId, optionKey, key],
+                '',
+              ) ===
+              ''
+          )
+            continue;
+          label.innerText = ttsOnly ? `${key} · ${this.base.translate(kTtsStringLabel)}` : key;
           label.classList.add('trigger-outputstring-label');
           triggerDetails.appendChild(label);
-          // Fork: one the trigger's own TTS says, not shown on screen: its text is what TTS says.
-          const ttsOnly = ownTts.kind === 'func' && ownTts.ttsOnly.includes(key);
-          if (ttsOnly) {
-            const tag = document.createElement('span');
-            tag.classList.add('trigger-tts-only');
-            tag.innerText = 'TTS';
-            label.appendChild(tag);
-          }
 
           const div = document.createElement('div');
           div.classList.add('option-input-container', 'trigger-outputstring');
@@ -1337,6 +1315,11 @@ class RaidbossConfigurator {
           input.oninput = setFunc;
 
           triggerDetails.appendChild(div);
+          if (ttsOnly) {
+            label.classList.add('trigger-ttsstring-label');
+            div.classList.add('trigger-ttsstring');
+            ttsRows.push(label, div);
+          }
 
           // Fork: what TTS says for it, if not the same as the screen (same ${params}).  Not for
           // one only TTS says (its own text is that), unless one was set before.
@@ -1360,14 +1343,24 @@ class RaidbossConfigurator {
           const ttsInput = document.createElement('input');
           ttsDiv.appendChild(ttsInput);
           ttsInput.type = 'text';
-          // Empty, TTS says what the screen does: the edited text, or the default.  Or the
-          // trigger's own fixed text, or nothing (an empty box, nothing to start from).
+          // Empty, TTS says what it does by default (ttsPlanOf): what the screen does (the
+          // edited text, or the default), the trigger's own text for it, or nothing (said, with
+          // nothing to start typing from).
           const shownText = () => input.value !== '' ? input.value : template;
-          if (ownTts.kind === 'fixed') {
-            ttsInput.placeholder = typeof ownTts.text === 'string'
-              ? ownTts.text
-              : this.base.translate(ownTts.text as LocaleText);
-          } else if (ownTts.kind !== 'off') {
+          const saidBy = ttsPlan.saidFor.get(key);
+          const saidByString = saidBy !== undefined ? outputStrings[saidBy] : undefined;
+          if (ttsPlan.off) {
+            ttsInput.placeholder = this.base.translate(kTtsToggle.notRead);
+            ttsInput.dataset.noPrefill = '';
+          } else if (ttsPlan.fixed !== undefined) {
+            ttsInput.placeholder = typeof ttsPlan.fixed === 'string'
+              ? ttsPlan.fixed
+              : this.base.translate(ttsPlan.fixed as LocaleText);
+          } else if (saidByString !== undefined) {
+            ttsInput.placeholder = typeof saidByString === 'string'
+              ? saidByString
+              : this.base.translate(saidByString);
+          } else {
             ttsInput.placeholder = shownText();
             input.addEventListener('input', () => ttsInput.placeholder = shownText());
           }
@@ -1387,10 +1380,16 @@ class RaidbossConfigurator {
         if (ttsRows.length > 0) {
           const anySet = Object.keys(outputStrings).some((key) =>
             this.base.getStringOption(
-              'raidboss',
-              [kOptionKeys.triggers, trigId, kOptionKeys.ttsStrings, key],
-              '',
-            ) !== ''
+                'raidboss',
+                [kOptionKeys.triggers, trigId, kOptionKeys.ttsStrings, key],
+                '',
+              ) !== '' ||
+            ttsPlan.ttsOnly.has(key) &&
+              this.base.getStringOption(
+                  'raidboss',
+                  [kOptionKeys.triggers, trigId, kOptionKeys.outputStrings, key],
+                  '',
+                ) !== ''
           );
           // A row of its own after the output strings: the button, and what it is for.
           const toggleLabel = document.createElement('div');
@@ -1401,23 +1400,7 @@ class RaidbossConfigurator {
           toggleLabel.appendChild(toggle);
           const toggleDiv = document.createElement('div');
           toggleDiv.classList.add('trigger-tts-toggle-note');
-          toggleDiv.innerText = this.base.translate(
-            ownTts.kind === 'none' ? kTtsToggle.note : kTtsToggle.noteOwn,
-          );
-          // Fork: and what its own TTS is, which a TTS text written here wins over.
-          if (ownTts.kind === 'off') {
-            toggleDiv.innerText += ` ${this.base.translate(kOwnTtsNote.off)}`;
-          } else if (ownTts.kind === 'fixed') {
-            const fixed = typeof ownTts.text === 'string'
-              ? ownTts.text
-              : this.base.translate(ownTts.text as LocaleText);
-            toggleDiv.innerText += ` ${
-              this.base.translate(kOwnTtsNote.fixed).replace('${text}', () => fixed)
-            }`;
-          } else if (ownTts.kind === 'func') {
-            const note = ownTts.ttsOnly.length > 0 ? kOwnTtsNote.ownMarked : kOwnTtsNote.own;
-            toggleDiv.innerText += ` ${this.base.translate(note)}`;
-          }
+          toggleDiv.innerText = this.base.translate(kTtsToggle.note);
           const show = (shown: boolean) => {
             for (const row of ttsRows)
               row.style.display = shown ? '' : 'none';
