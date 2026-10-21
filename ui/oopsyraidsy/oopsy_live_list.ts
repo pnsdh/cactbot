@@ -324,7 +324,14 @@ export class OopsyLiveList implements MistakeObserver {
       // right (row-reverse) on its right.
       const box = list.getBoundingClientRect();
       const right = document.body.classList.contains('report-side-right');
-      width = this.SetListWidth(right ? e.clientX - box.left : box.right - e.clientX);
+      // No wider than the window leaves it, or the width shown and saved isn't the one seen.
+      let room = list.parentElement?.getBoundingClientRect().width ?? Infinity;
+      for (const other of list.parentElement?.children ?? []) {
+        if (other !== list)
+          room -= other.getBoundingClientRect().width;
+      }
+      const wanted = right ? e.clientX - box.left : box.right - e.clientX;
+      width = this.SetListWidth(Math.min(wanted, room));
       handle.dataset.width = `${width}px`;
     });
     handle.addEventListener('lostpointercapture', () => {
