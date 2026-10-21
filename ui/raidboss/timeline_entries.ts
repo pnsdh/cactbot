@@ -117,14 +117,15 @@ export const countTimelineEdits = (zone: SavedConfigEntry | undefined): number =
       .length;
   };
   const jobs = isObject(zone.jobEntries) ? Object.entries(zone.jobEntries) : [];
-  const hidden = isObject(zone.enable)
-    ? Object.values(zone.enable).filter((v) => v === false).length
-    : 0;
-  const renamed = isObject(zone.globalReplace)
-    ? Object.values(zone.globalReplace).filter((v) => typeof v === 'string' && v !== '').length
-    : 0;
+  // By name, each name once, hidden and renamed both.
+  const byName = new Set([
+    ...Object.entries(isObject(zone.enable) ? zone.enable : {})
+      .filter(([, v]) => v === false).map(([name]) => name),
+    ...Object.entries(isObject(zone.globalReplace) ? zone.globalReplace : {})
+      .filter(([, v]) => typeof v === 'string' && v !== '').map(([name]) => name),
+  ]);
   return count(zone.entries, '') + jobs.reduce((n: number, [job, j]) => n + count(j, job), 0) +
-    added.length + hidden + renamed;
+    added.length + byName.size;
 };
 
 // The entry each edit is for: the one with its name at its time, or else one with its name moved

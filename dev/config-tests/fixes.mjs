@@ -209,14 +209,10 @@ const openFile = (page, title) =>
     JSON.stringify(s),
   );
   // 9. Two new entries get different texts.
-  await page.evaluate(() =>
-    document.querySelector('.config-tl-sticky .config-tl-tool:not(.config-tl-step)').click()
-  );
+  await page.evaluate(() => document.querySelector('.config-tl-sticky .config-tl-add').click());
   await wait(300);
   await page.keyboard.press('Escape');
-  await page.evaluate(() =>
-    document.querySelector('.config-tl-sticky .config-tl-tool:not(.config-tl-step)').click()
-  );
+  await page.evaluate(() => document.querySelector('.config-tl-sticky .config-tl-add').click());
   await wait(300);
   await wait(400);
   s = await page.evaluate(() =>
@@ -224,7 +220,7 @@ const openFile = (page, title) =>
   );
   check('new entries unique', s.includes('새 항목') && s.includes('새 항목 2'), JSON.stringify(s));
   // 6. Custom color: invalid hex then a name keeps the color.
-  await page.evaluate(() => document.querySelector('.config-tl-head .config-tl-tool').click());
+  await page.evaluate(() => document.querySelector('.config-tl-colors-button').click());
   await wait(200);
   await page.evaluate(() => {
     const line = [...document.querySelectorAll('.config-tl-color-line')].pop();

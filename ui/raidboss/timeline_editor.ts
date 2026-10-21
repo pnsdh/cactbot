@@ -65,7 +65,6 @@ const t = {
   prevPart: { en: 'Previous section', ko: '이전 구간' },
   nextPart: { en: 'Next section', ko: '다음 구간' },
   movedFlag: { en: 'Time changed', ko: '시간 바뀜' },
-  editingFor: { en: 'Editing for ${job}', ko: '${job} 편집 중' },
   toCommon: { en: 'Use common', ko: '공통으로' },
   hiddenByNameShort: { en: 'Hidden by name', ko: '이름별에서 숨김' },
   details: { en: 'Details', ko: '자세히' },
@@ -78,7 +77,7 @@ const t = {
       '<p>타임라인은 전투 진행(보스 패턴 등)에 따라 구간 사이를 건너뛰므로, 시간은 전투 경과 시간이 아니라 타임라인 파일 안의 위치(초)입니다.</p><p>구간 목록이나 ‹ › 버튼으로 다른 구간으로 이동할 수 있습니다.</p><p>문구 칸에서 ↑ ↓와 Enter로 위아래 항목으로 옮겨 가고, Esc로 고치기 전으로 되돌립니다.</p>',
   },
   start: { en: 'Start', ko: '시작' },
-  original: { en: 'Was: ${text}', ko: '원래: ${text}' },
+  original: { en: 'Original: ${text}', ko: '원본: ${text}' },
   twin: {
     en: 'Another entry has this time and name, so edits apply to both.',
     ko: '같은 시각에 같은 이름의 항목이 하나 더 있어 편집이 함께 적용됩니다.',
@@ -193,6 +192,8 @@ const luminance = (hex: string): number => {
 };
 
 const formatSeconds = (seconds: number): string => parseFloat(seconds.toFixed(1)).toString();
+// Shown with its tenths always (12.0, not 12), lined up as the timeline's file has them.
+const showSeconds = (seconds: number): string => seconds.toFixed(1);
 
 const asObject = (value: SavedConfigEntry | undefined): { [key: string]: SavedConfigEntry } =>
   typeof value === 'object' && !Array.isArray(value) ? value : {};
@@ -305,7 +306,8 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
   parent.appendChild(editor);
 
   // Tabs: each entry, and by name (built when first shown).  The entries are rebuilt on coming
-  // back from by name, which changes what they show.
+  // back from by name, which changes what they show.  They go in the entries' bar (set as it is
+  // built), and on a line of their own over the names.
   const tabs = make('div', 'config-view-switch config-tl-tabs');
   const entriesButton = make('button', undefined, tr(t.entries));
   const byNameButton = make('button', undefined, tr(t.byName));
@@ -313,13 +315,23 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
   const entriesPane = make('div', 'config-tl-pane');
   const byNamePane = make('div', 'config-tl-pane config-hidden');
   editor.append(tabs, entriesPane, byNamePane);
+  let entriesBar: HTMLElement | undefined;
   let byNameBuilt = false;
   let entriesStale = true;
-  const showPane = (entries: boolean) => {
+  // focused: whether the switch had the focus, which it loses as it is moved (or rebuilt with
+  // the entries): given back to the one pressed.
+  const showPane = (entries: boolean, focused = false) => {
+    if (entries)
+      entriesBar?.prepend(tabs);
+    else
+      byNamePane.before(tabs);
     entriesPane.classList.toggle('config-hidden', !entries);
     byNamePane.classList.toggle('config-hidden', entries);
     entriesButton.classList.toggle('config-active', entries);
     byNameButton.classList.toggle('config-active', !entries);
+    // Once shown (a hidden one takes no focus).
+    if (focused)
+      (entries ? entriesButton : byNameButton).focus({ preventScroll: true });
   };
 
   // Kept as the entries are rebuilt.
@@ -404,8 +416,13 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
     closeOpenPicker();
   });
 
-  // Called on scroll while the entries show (set as they are built).
+  // Called on scroll while the entries show (set as they are built), and as the fight's header
+  // changes height (watched once, whatever rebuilds the entries).
   let onScroll: () => void = () => undefined;
+  let headerWatched = false;
+  // Puts the bar under the header (set as the entries are built), also while they are out of
+  // sight (as the header changes on another tab), so it is right when they show again.
+  let placeBar: () => void = () => undefined;
   let scrollQueued = false;
   let scroller: HTMLElement | null = null;
   const listenScroll = () => {
@@ -552,13 +569,14 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
     const shownText = (e: Event) => edit(e).text ?? commonEdit(e).text ?? baseText(e);
     const isHidden = (e: Event) => hiddenByName(e) || (edit(e).hide ?? commonEdit(e).hide) === true;
 
-    // ---- The bar on top: the edited layer, search, filters, adding, colors; the parts ----
-    // What to edit and the colors on top; finding and going around stays in view.
-    const head = make('div', 'config-tl-toolbar config-tl-head');
+    // ---- The bar on top: the view, the edited layer, search, filters, adding, the parts,
+    // colors ----
+    // One bar that stays in view (a line on a wide page, wrapping on a narrow one).
     const sticky = make('div', 'config-tl-sticky');
     const toolbar = make('div', 'config-tl-toolbar');
     sticky.appendChild(toolbar);
-    pane.append(head, sticky);
+    pane.appendChild(sticky);
+    entriesBar = toolbar;
 
     const layerName = (l: Layer) => l === '' ? tr(t.common) : ctx.jobName(l);
     const withCount = (l: Layer) => {
@@ -576,6 +594,9 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
     }
     layerSelect.value = layer;
     layerSelect.setAttribute('aria-label', tr(t.layer));
+    // Which edits are made stands out while they are a job's (it is kept across fights and
+    // sessions).
+    layerSelect.classList.toggle('config-tl-layer-job', isJob);
     // A control's ⓘ goes on its name, not in the way of its control.
     const nameWithHelp = (text: LocaleText, html: () => string) => {
       const element = make('span', 'config-tl-part-label', tr(text));
@@ -588,6 +609,7 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
     const search = make('input', 'config-tl-search');
     search.type = 'text';
     search.placeholder = tr(t.search);
+    search.setAttribute('aria-label', tr(t.search));
     search.value = filters.query;
     // "Edited only" says how many there are.
     const count = make('span', 'config-tl-count');
@@ -596,8 +618,8 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
     editedOnly.setAttribute('role', 'switch');
     editedOnly.setAttribute('aria-checked', filters.onlyEdited ? 'true' : 'false');
     editedOnly.append(make('span', 'config-mini-switch'), tr(t.editedOnly), count);
-    const addButton = make('button', 'config-tl-tool', tr(t.add));
-    const colorsButton = make('button', 'config-tl-tool', tr(t.colors));
+    const addButton = make('button', 'config-tl-tool config-tl-add', tr(t.add));
+    const colorsButton = make('button', 'config-tl-tool config-tl-colors-button', tr(t.colors));
     colorsButton.classList.toggle('config-active', colorsOpen);
 
     // Copy another layer's edits (and entries added for it) here, leaving the ones here.
@@ -626,15 +648,10 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
       prevPart,
       nextPart,
     );
-    head.append(layerGroup, colorsButton);
-    // Which edits are made stays in view (it is kept across fights and sessions).
-    if (isJob)
-      toolbar.appendChild(
-        make('span', 'config-tl-editing', format(t.editingFor, { job: ctx.jobName(layer) })),
-      );
-    toolbar.append(search, editedOnly, addButton);
+    toolbar.append(tabs, layerGroup, search, editedOnly, addButton);
     if (sections.length > 0)
       toolbar.appendChild(partGroup);
+    toolbar.appendChild(colorsButton);
 
     const colorsBox = make('div', 'config-tl-colors');
     colorsBox.classList.toggle('config-hidden', !colorsOpen);
@@ -657,7 +674,7 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
             : undefined,
         ].filter((p) => p !== undefined);
         const where = s.at.added ? ` (${tr(t.addedBadge)})` : '';
-        const when = format(t.seconds, { s: formatSeconds(s.at.time) });
+        const when = format(t.seconds, { s: showSeconds(s.at.time) });
         const what = make(
           'span',
           undefined,
@@ -767,7 +784,7 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
       const section = sectionOfRow.get(e);
       if (section !== undefined)
         notes.push({
-          text: format(t.offset, { s: formatSeconds(e.time - section.time) }),
+          text: format(t.offset, { s: showSeconds(e.time - section.time) }),
           warn: false,
         });
       if (isAdded(e)) {
@@ -788,7 +805,7 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
       const key = own.state.get(canon(e))?.key;
       const at = key !== undefined ? parseEntryKey(key) : undefined;
       if (at !== undefined && Math.abs(at.time - e.time) > 0.001)
-        notes.push({ text: format(t.moved, { time: formatSeconds(at.time) }), warn: true });
+        notes.push({ text: format(t.moved, { time: showSeconds(at.time) }), warn: true });
       return notes;
     };
     const isMoved = (e: Event) => {
@@ -805,7 +822,7 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
       if (sections.length > 0 && currentSection !== lastSection) {
         lastSection = currentSection;
         const when = currentSection !== undefined
-          ? format(t.from, { time: formatSeconds(currentSection.time) })
+          ? format(t.from, { time: showSeconds(currentSection.time) })
           : undefined;
         const title = currentSection?.title ?? tr(t.start);
         const heading = make(
@@ -822,7 +839,7 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
       // details.
       const row = make('div', 'config-tl-row');
       headings[headings.length - 1]?.rows.push(row);
-      const time = make('span', 'config-tl-time', formatSeconds(e.time));
+      const time = make('span', 'config-tl-time', showSeconds(e.time));
       const cell = make('span', 'config-tl-cell');
       const input = make('input', 'config-tl-inline');
       input.type = 'text';
@@ -994,7 +1011,8 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
     list.appendChild(empty);
 
     const updateCount = () => {
-      const n = events.filter(isEdited).length;
+      // Entries with the same edits (see canon) count once, as they are saved.
+      const n = new Set(events.filter(isEdited).map(canon)).size;
       count.textContent = n > 0 ? n.toString() : '';
       // The edited layer's count in its list too.
       const option = [...layerSelect.options].find((o) => o.value === layer);
@@ -1297,7 +1315,7 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
       filter();
     };
     search.onkeydown = (ev) => {
-      if (ev.key !== 'Enter')
+      if (ev.key !== 'Enter' || ev.isComposing)
         return;
       ev.preventDefault();
       visibleRows()[0]?.input.focus();
@@ -1419,6 +1437,15 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
         sticky.style.top = top;
     };
     placeSticky();
+    placeBar = placeSticky;
+    // And as the header's height changes (a narrower window wraps it), as the triggers' bar does.
+    if (
+      !headerWatched && fileHeader !== null && fileHeader !== undefined &&
+      typeof ResizeObserver !== 'undefined'
+    ) {
+      headerWatched = true;
+      new ResizeObserver(() => placeBar()).observe(fileHeader, { box: 'border-box' });
+    }
     onScroll = () => {
       // Not while the fight's timeline edits are closed.
       if (editor.offsetParent === null)
@@ -1457,19 +1484,21 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
   };
 
   entriesButton.onclick = () => {
+    const focused = tabs.contains(document.activeElement);
     if (entriesStale) {
       entriesPane.replaceChildren();
       buildEntries(entriesPane);
     }
     entriesStale = false;
-    showPane(true);
+    showPane(true, focused);
   };
   byNameButton.onclick = () => {
+    const focused = tabs.contains(document.activeElement);
     if (!byNameBuilt)
       ctx.buildByName(byNamePane);
     byNameBuilt = true;
     entriesStale = true;
-    showPane(false);
+    showPane(false, focused);
   };
   entriesButton.click();
 };

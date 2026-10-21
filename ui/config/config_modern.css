@@ -912,12 +912,33 @@ html:not(.config-classic) {
   font-size: 0.9em;
 }
 
+/* A text box, and what it was when changed (config_triggers.ts arrangeDetails) on its right,
+   or under it when there is no room. */
+:root:not(.config-classic) .trigger-details > .trigger-outputstring {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+}
+
 :root:not(.config-classic) .trigger-details > .trigger-outputstring > input[type="text"] {
+  flex: 1 1 280px;
   width: 100%;
   max-width: 560px;
 }
 
-/* The source link on its own line at the end (config.css puts an empty cell before it). */
+:root:not(.config-classic) .config-trigger-was {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  color: var(--cfg-muted);
+  font-size: 12px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Config.css puts an empty cell before the source link. */
 :root:not(.config-classic) .trigger-details > div:empty {
   display: none;
 }
@@ -929,6 +950,26 @@ html:not(.config-classic) {
 
 :root:not(.config-classic) .trigger-source a {
   font-size: 12px;
+}
+
+/* The TTS texts' button and the source link: one line at the end. */
+:root:not(.config-classic) .trigger-details > .config-trigger-foot {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  min-height: 24px;
+}
+
+:root:not(.config-classic) .config-trigger-tts {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+:root:not(.config-classic) .config-trigger-foot > .trigger-source {
+  margin-left: auto;
 }
 
 :root:not(.config-classic) .trigger-set-override-warning {
@@ -1847,17 +1888,10 @@ html:not(.config-classic) {
 
 /* ===== Trigger rows as single lines (config_triggers.ts compactTriggers) ===== */
 
-:root:not(.config-classic) .config-compact > .config-trigger-tools {
-  display: flex;
-  justify-content: flex-end;
-  padding: 0 0 6px;
-}
-
-:root:not(.config-classic) .config-trigger-tools > button {
-  height: 26px;
-  padding: 0 10px;
-  border-radius: 99px;
-  font-size: 12px;
+/* The bar on top: as the timeline's, the box's first line. */
+:root:not(.config-classic) .config-trigger-group > .config-trigger-bar {
+  border-top: none;
+  border-radius: 7px 7px 0 0;
 }
 
 :root:not(.config-classic) .trigger-file-options.config-compact > .trigger {
@@ -2004,7 +2038,8 @@ html:not(.config-classic) {
 }
 
 /* The bar on top stays under the fight's header (its top is set from the header's height). */
-:root:not(.config-classic) .config-tl-sticky {
+:root:not(.config-classic) .config-tl-sticky,
+:root:not(.config-classic) .config-trigger-bar {
   position: sticky;
   z-index: 3;
   border-top: 1px solid var(--cfg-line);
@@ -2093,12 +2128,28 @@ html:not(.config-classic) {
   min-width: 140px;
 }
 
-:root:not(.config-classic) .config-tl-head {
-  border-top: 1px solid var(--cfg-line);
+:root:not(.config-classic) .config-tl-toolbar > .config-tl-colors-button,
+:root:not(.config-classic) .config-tl-toolbar > .config-tl-all {
+  margin-left: auto;
 }
 
-:root:not(.config-classic) .config-tl-head > .config-tl-tool {
-  margin-left: auto;
+/* The view switch in the bar: as tall as its other controls. */
+:root:not(.config-classic) .config-tl-toolbar > .config-tl-tabs {
+  margin: 0;
+  padding: 2px;
+}
+
+:root:not(.config-classic) .config-tl-toolbar > .config-tl-tabs > button {
+  height: 24px;
+  padding: 0 11px;
+  font-size: 12px;
+}
+
+/* A job's edits (kept across fights and sessions) stand out. */
+:root:not(.config-classic) .config-tl-toolbar select.config-tl-layer-job {
+  border-color: var(--cfg-accent);
+  color: var(--cfg-accent);
+  font-weight: 650;
 }
 
 :root:not(.config-classic) .config-tl-tool.config-tl-step {
@@ -2277,17 +2328,6 @@ html:not(.config-classic) {
 
 :root:not(.config-classic) .config-tl-row.config-tl-highlighted {
   background-color: var(--config-tl-tint);
-}
-
-/* Which edits are made, in the bar that stays in view. */
-:root:not(.config-classic) .config-tl-editing {
-  padding: 2px 10px;
-  border-radius: 99px;
-  color: var(--cfg-accent-ink);
-  background-color: var(--cfg-accent);
-  font-size: 12px;
-  font-weight: 650;
-  white-space: nowrap;
 }
 
 :root:not(.config-classic) .config-tl-hidden input[type="text"].config-tl-inline:not(:focus),
