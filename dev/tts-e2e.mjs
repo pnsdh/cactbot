@@ -99,6 +99,46 @@ for (const [name, data] of cases) {
   }
 }
 
+// A trigger's own TTS: a fixed text ("Test Psych") is said unless the user gave the screen's text
+// a TTS text, which then wins; one made of the screen's text ("Test Clap") takes it as before.
+for (
+  const [name, triggers, line, expect] of [
+    ['fixed TTS of the trigger', {}, '나무인형에게 힘을 불어넣습니다', '힘내라'],
+    [
+      'user TTS text over the fixed one',
+      { 'Test Psych': { TtsStrings: { text: '기합 넣기' } } },
+      '나무인형에게 힘을 불어넣습니다',
+      '기합 넣기',
+    ],
+    [
+      'user TTS text in the trigger\'s TTS',
+      { 'Test Clap': { TtsStrings: { text: '짝짝' } } },
+      '나무인형에게 박수를 보냅니다',
+      '짝짝',
+    ],
+  ]
+) {
+  const browser = await launch();
+  const { page } = await openPage(browser, 'raidboss', {
+    query: 'alerts=1&timeline=0',
+    data: { raidboss: { ...ttsOnly, triggers } },
+  });
+  await startFight(page, 134, 'Middle La Noscea');
+  await page.evaluate(() => window.__overlayCalls.length = 0);
+  await sendLines(page, [echo(`Tester: ${line}`)]);
+  await wait(500);
+  const said = await page.evaluate(() =>
+    window.__overlayCalls.filter((c) => c.call === 'say').map((c) => c.text)
+  );
+  await browser.close();
+  console.log(`== ${name}`);
+  console.log(`  ${said.join(' | ')}`);
+  if (said.length !== 1 || said[0] !== expect) {
+    failed++;
+    console.log(`  FAIL: expected "${expect}" only`);
+  }
+}
+
 // Players: TTS reads them as set (jobs by default) while the screen keeps its label, and with
 // TtsPreparePlayers an alert naming one player is made ahead for each party member.
 const party = {

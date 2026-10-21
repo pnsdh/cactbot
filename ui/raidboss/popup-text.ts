@@ -43,6 +43,7 @@ import AutoplayHelper from './autoplay_helper';
 import BrowserTTSEngine from './browser_tts_engine';
 import { PerTriggerAutoConfig, PerTriggerOption, RaidbossOptions } from './raidboss_options';
 import { TimelineLoader } from './timeline';
+import { cleanupTtsText } from './tts_cleanup';
 
 const isRaidbossLooseTimelineTrigger = (
   trigger: ProcessedTrigger,
@@ -295,6 +296,17 @@ type TriggerParams = { [key: string]: unknown };
 // for that output string, same params), for the trigger instance being evaluated (they are
 // evaluated one at a time, see the note in TriggerOutputProxy).
 const ttsSubstitutions = new WeakMap<ProcessedTrigger, Map<string, string>>();
+// Fork: of those, the texts the user's own TTS text was for (not only players relabeled).
+const userTtsTexts = new WeakMap<ProcessedTrigger, Set<string>>();
+
+// Fork: any of `texts` in `text`, as a word of its own: "1" not inside "10", "북" not inside "북동"
+// (a particle written onto it, "북으로", is then left as it is).  The longest first, so a text
+// made of others (e.g. "${inOut} + ${spread}") is found whole before its parts.
+const wordsPattern = (texts: Iterable<string>): RegExp => {
+  const keys = [...texts].sort((a, b) => b.length - a.length);
+  const escaped = keys.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+  return new RegExp(`(?<![\\p{L}\\p{N}])(?:${escaped})(?![\\p{L}\\p{N}])`, 'gu');
+};
 
 // Fork: params that name a player, for making ahead alerts naming one (see _prepareTts).
 const kTtsPlayerParams = ['player', 'target', 'name', 'tank', 'healer', 'partner'];
@@ -423,6 +435,12 @@ class TriggerOutputProxy {
               if (!map)
                 ttsSubstitutions.set(target.trigger, map = new Map<string, string>());
               map.set(str, tts);
+            }
+            if (ownTts && tts !== undefined && str.trim() !== '') {
+              let texts = userTtsTexts.get(target.trigger);
+              if (!texts)
+                userTtsTexts.set(target.trigger, texts = new Set<string>());
+              texts.add(str);
             }
           }
           return str;
@@ -1299,34 +1317,8 @@ export class PopupText {
   // Before TTS reads an alert: what reads badly aloud taken out (also for _prepareTts, so a text
   // fetched ahead is the same text said later).
   _ttsCleanup(text: string): string {
-    // Heuristics for auto tts.
-    // * Remove a bunch of chars.
-    text = text.replace(/[#!]/g, '');
-    // * slashes between mechanics
-    text = text.replace('/', ' ');
-    // * tildes at the end for emphasis
-    text = text.replace(/~+$/, '');
-    // * arrows helping visually simple to understand e.g. ↖ Front left / Back right ↘
-    text = text.replace(/[↖-↙]/g, '');
-    // * Korean TTS reads wrong with '1번째'
-    text = text.replace('1번째', '첫번째');
-    // * arrows at the front or the end are directions, e.g. "east =>"
-    text = text.replace(/[-=]+>\s*$/g, '');
-    text = text.replace(/^\s*<[-=]+/g, '');
-    // * arrows in the middle are a sequence, e.g. "in => out => spread"
-    const arrowReplacement = {
-      en: ' then ',
-      de: ' dann ',
-      fr: ' puis ',
-      ja: 'や',
-      cn: '然后',
-      ko: ' 그리고 ',
-      tc: '然後',
-    };
-    text = text.replace(/\s*(<[-=]|[=-]>)\s*/g, arrowReplacement[this.displayLang]);
-    // * Countdown substitution marker, if present
-    text = text.replaceAll('{{CD}}', '');
-    return text;
+    // Fork: in tts_cleanup.ts, for the config page's preview too.
+    return cleanupTtsText(text, this.displayLang);
   }
 
   ProcessTrigger(trigger: ProcessedTrigger | ProcessedTimelineTrigger): void {
@@ -1479,6 +1471,7 @@ export class PopupText {
       const triggerPostPromise = () => {
         // Fork: TTS texts of this instance's output strings only.
         ttsSubstitutions.get(triggerHelper.trigger)?.clear();
+        userTtsTexts.get(triggerHelper.trigger)?.clear();
         this._onTriggerInternalSound(triggerHelper);
         this._onTriggerInternalSoundVolume(triggerHelper);
         this._onTriggerInternalResponse(triggerHelper);
@@ -1808,6 +1801,9 @@ export class PopupText {
   }
 
   _onTriggerInternalTTS(triggerHelper: TriggerHelper): void {
+    // Fork: what is on screen that the user gave a TTS text of their own (before the trigger's
+    // tts, whose output strings are not on screen, is evaluated).
+    const userTexts = [...userTtsTexts.get(triggerHelper.trigger) ?? []];
     if (!triggerHelper.groupSpokenAlertsEnabled || typeof triggerHelper.ttsText === 'undefined') {
       let result = undefined;
       if (triggerHelper.triggerOptions.TTSText !== undefined) {
@@ -1832,20 +1828,27 @@ export class PopupText {
       } else {
         triggerHelper.ttsText = triggerHelper.defaultTTSText;
       }
+
+      // Fork: the user's own TTS text is said, even where the trigger says something else of
+      // its own (its own text, a fixed one) or nothing: then what is on screen is, with it, if
+      // that has it (not when the screen's text is another, e.g. alert and info both shown).
+      // Not over a user file's TTSText.
+      const said = triggerHelper.ttsText;
+      const screen = triggerHelper.defaultTTSText;
+      if (
+        userTexts.length > 0 && triggerHelper.triggerOptions.TTSText === undefined &&
+        screen !== undefined && screen.search(wordsPattern(userTexts)) >= 0 &&
+        (said === undefined || said.search(wordsPattern(userTexts)) < 0)
+      )
+        triggerHelper.ttsText = screen;
     }
 
-    // Fork: the user's TTS text for each output string the text was made from.
+    // Fork: the user's TTS text for each output string the text was made from, in one pass (what
+    // was put in is not replaced again).
     const substitutions = ttsSubstitutions.get(triggerHelper.trigger);
-    // One pass, the longest first: a text made of other outputs (e.g. "${inOut} + ${spread}")
-    // is replaced whole before its parts, and what was put in is not replaced again.  Only where
-    // it stands as a word of its own: "1" not inside "10", "북" not inside "북동" (a particle
-    // written onto it, "북으로", is then left as it is).
     if (substitutions && substitutions.size > 0 && triggerHelper.ttsText !== undefined) {
-      const keys = [...substitutions.keys()].sort((a, b) => b.length - a.length);
-      const escaped = keys.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
-      const pattern = new RegExp(`(?<![\\p{L}\\p{N}])(?:${escaped})(?![\\p{L}\\p{N}])`, 'gu');
       triggerHelper.ttsText = triggerHelper.ttsText.replace(
-        pattern,
+        wordsPattern(substitutions.keys()),
         (m) => substitutions.get(m) ?? m,
       );
     }

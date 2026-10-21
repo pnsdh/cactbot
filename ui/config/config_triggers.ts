@@ -234,7 +234,8 @@ const prefillFromDefault = (root: HTMLElement): void => {
     const input = e.target;
     if (!(input instanceof HTMLInputElement) || !input.matches(kPrefilled))
       return;
-    if (input.value !== '' || input.placeholder === '')
+    // Not from a placeholder that says what an empty one does (as "not read aloud").
+    if (input.value !== '' || input.placeholder === '' || input.dataset.noPrefill !== undefined)
       return;
     input.value = input.placeholder;
     input.dataset.prefilled = '';

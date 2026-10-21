@@ -305,6 +305,159 @@ const shownIds = (p) =>
   await p.close();
 }
 
+// 7. A trigger's own TTS, the same TTS boxes whatever it is: what an empty one says is in it
+// (not read aloud, a fixed text, the trigger's own text for TTS, which is no box of its own).
+// The same note for all.
+{
+  const p = await b.newPage();
+  await p.setViewport({ width: 1280, height: 900 });
+  const errors = [];
+  p.on('pageerror', (e) => errors.push(e.message));
+  await mockOverlayPlugin(p, {});
+  await p.evaluateOnNewDocument(() => {
+    try {
+      localStorage.clear();
+    } catch {}
+  });
+  await p.goto(pageUrl('config'), { waitUntil: 'load' });
+  await wait(2500);
+  await p.evaluate(() => document.querySelectorAll('.config-tab')[1].click());
+  await wait(300);
+  await p.evaluate(() =>
+    [...document.querySelectorAll('.config-active .config-view-switch button')][1].click()
+  );
+  await wait(800);
+  // Its expansion's chip, then the fight.
+  const look = async (expansion, fight, id) => {
+    await p.evaluate((expansion) => {
+      document.querySelector('.config-page .config-page-back')?.click();
+      [...document.querySelectorAll('.config-active .config-chip')]
+        .find((c) => c.textContent.startsWith(expansion))?.click();
+    }, expansion);
+    await wait(400);
+    await p.evaluate((name) => {
+      const c = [...document.querySelectorAll('.config-active .trigger-file-container')].find((x) =>
+        x.offsetParent !== null &&
+        x.querySelector('.trigger-file-header-part')?.textContent.trim().startsWith(name)
+      );
+      c.querySelector('.trigger-file-header').click();
+    }, fight);
+    await wait(600);
+    await tab(p, 1);
+    await wait(300);
+    return p.evaluate((id) => {
+      const row = [...document.querySelectorAll('.config-page .config-compact > .trigger')].find((
+        r,
+      ) => r.querySelector('.trigger-id').textContent === id);
+      if (row === undefined)
+        return null;
+      row.querySelector('.trigger-id').click();
+      const d = row.nextElementSibling;
+      d.querySelector('.trigger-tts-toggle')?.click();
+      // Not read aloud: nothing typed in on focus.
+      const first = d.querySelector('.trigger-ttsstring > input');
+      first?.focus();
+      const typed = first?.value;
+      first?.blur();
+      const labels = [...d.querySelectorAll('.trigger-outputstring-label')]
+        .filter((l) => l.offsetParent !== null);
+      return {
+        note: d.querySelector('.config-trigger-tts .config-help')?.getAttribute('data-config-tip'),
+        typed: typed,
+        labels: labels.map((l) => l.textContent),
+        ttsRows: labels.filter((l) => l.classList.contains('trigger-ttsstring-label'))
+          .map((l) => l.textContent.split(' · ')[0]),
+        placeholders: [...d.querySelectorAll('.trigger-ttsstring > input')].map((i) =>
+          i.placeholder
+        ),
+      };
+    }, id);
+  };
+  // Saying nothing on screen, only by TTS: its one output string still a box (not merged away).
+  const speaking = await look('공용 트리거', 'Cactbot 테스트 트리거', 'Test Clap');
+  check(
+    'own TTS only: its output string kept',
+    speaking?.labels.some((l) => l.startsWith('text')) === true,
+    JSON.stringify(speaking),
+  );
+  const off = await look('황금의 유산', kFight, 'FRU P3 Apoc Safe Early');
+  const kNote = '비우면 원래대로 읽습니다';
+  check(
+    'own TTS off: said in its boxes, not typed in',
+    off?.note?.includes(kNote) && off.placeholders.every((x) => x === '(원래 읽지 않음)') &&
+      off.typed === '',
+    JSON.stringify(off),
+  );
+  const fixed = await look('칠흑의 반역자', '절 알렉산더 토벌전', 'TEA Contact Prohibition');
+  check(
+    'own TTS fixed: said, its text in the TTS box',
+    fixed?.note?.includes(kNote) && fixed.placeholders.join() === '접촉금지',
+    JSON.stringify(fixed),
+  );
+  const own = await look('홍련의 해방자', '절 바하무트 토벌전', 'UCU Megaflare Tower');
+  check(
+    'own TTS texts: in the boxes of what is on screen, not boxes of their own',
+    own?.note?.includes(kNote) && !own.labels.some((l) => l.includes('towerTTS')) &&
+      own.ttsRows.length === 3 && own.placeholders.every((x) => x === '기둥'),
+    JSON.stringify(own),
+  );
+  // Heard: what an empty one says, then one typed in (its params by name, what reads badly out).
+  const heard = await p.evaluate(async () => {
+    window.__overlayCalls.length = 0;
+    const row = [...document.querySelectorAll('.config-page .config-compact > .trigger')].find((
+      r,
+    ) => r.querySelector('.trigger-id').textContent === 'UCU Megaflare Tower');
+    const box = row.nextElementSibling.querySelector('.trigger-ttsstring');
+    box.querySelector('.trigger-tts-play').click();
+    const input = box.querySelector('input');
+    input.value = '${player} => 기둥!';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    box.querySelector('.trigger-tts-play').click();
+    input.value = '';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 100));
+    return window.__overlayCalls.filter((c) => c.call === 'say' && c.text !== undefined)
+      .map((c) => `${c.text}|${c.lang}`);
+  });
+  check(
+    'listen: default, then typed',
+    heard.join() === '기둥|ko,player 그리고 기둥|ko',
+    heard.join(),
+  );
+  // Not read aloud by default and nothing typed in: nothing to hear.
+  await look('황금의 유산', kFight, 'FRU P3 Apoc Safe Early');
+  const silent = await p.evaluate(() => {
+    const row = [...document.querySelectorAll('.config-page .config-compact > .trigger')].find((
+      r,
+    ) => r.querySelector('.trigger-id').textContent === 'FRU P3 Apoc Safe Early');
+    return row.nextElementSibling.querySelector('.trigger-tts-play')?.disabled;
+  });
+  check('listen: off while nothing would be said', silent === true, `${silent}`);
+  // A response's trigger (Responses.tankBusterSwap: alarm for one tank, alert for others): heard,
+  // and colored in the list, as its most important kind (not info).
+  await look('황금의 유산', kFight, 'FRU P1 Powder Mark Trail');
+  const kind = await p.evaluate(async () => {
+    window.__overlayCalls.length = 0;
+    const row = [...document.querySelectorAll('.config-page .config-compact > .trigger')].find((
+      r,
+    ) => r.querySelector('.trigger-id').textContent === 'FRU P1 Powder Mark Trail');
+    row.nextElementSibling.querySelector('.trigger-tts-play').click();
+    await new Promise((r) => setTimeout(r, 100));
+    const said = window.__overlayCalls.find((c) => c.call === 'say' && c.text !== undefined);
+    return {
+      heard: said?.severity,
+      color: row.querySelector('.config-trigger-preview').className,
+    };
+  });
+  check(
+    'listen: a response\'s kind',
+    kind.heard === 'alarm' && kind.color.includes('config-trigger-alarm'),
+    JSON.stringify(kind),
+  );
+  check('no page errors (own TTS)', errors.length === 0, errors.join('; '));
+  await p.close();
+}
+
 // 8. "Changed only" as last set in another fight; a search result shown whatever the filters
 // (not under the bar); the view switch keeps the focus as it moves.
 {

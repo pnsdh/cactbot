@@ -927,6 +927,22 @@ html:not(.config-classic) {
   max-width: 560px;
 }
 
+/* A TTS text keeps its button on its line. */
+:root:not(.config-classic) .trigger-details > .trigger-ttsstring > input[type="text"] {
+  flex-basis: 120px;
+  min-width: 0;
+}
+
+/* Fork: hears a TTS text (raidboss_config.ts sayTts). */
+:root:not(.config-classic) .trigger-tts-play {
+  flex: none;
+  height: 28px;
+  padding: 0 11px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 :root:not(.config-classic) .config-trigger-was {
   flex: 0 1 auto;
   min-width: 0;
