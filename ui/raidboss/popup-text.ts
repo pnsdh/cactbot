@@ -43,6 +43,7 @@ import AutoplayHelper from './autoplay_helper';
 import BrowserTTSEngine from './browser_tts_engine';
 import { PerTriggerAutoConfig, PerTriggerOption, RaidbossOptions } from './raidboss_options';
 import { TimelineLoader } from './timeline';
+import { cleanupTtsText } from './tts_cleanup';
 
 const isRaidbossLooseTimelineTrigger = (
   trigger: ProcessedTrigger,
@@ -1316,34 +1317,8 @@ export class PopupText {
   // Before TTS reads an alert: what reads badly aloud taken out (also for _prepareTts, so a text
   // fetched ahead is the same text said later).
   _ttsCleanup(text: string): string {
-    // Heuristics for auto tts.
-    // * Remove a bunch of chars.
-    text = text.replace(/[#!]/g, '');
-    // * slashes between mechanics
-    text = text.replace('/', ' ');
-    // * tildes at the end for emphasis
-    text = text.replace(/~+$/, '');
-    // * arrows helping visually simple to understand e.g. ↖ Front left / Back right ↘
-    text = text.replace(/[↖-↙]/g, '');
-    // * Korean TTS reads wrong with '1번째'
-    text = text.replace('1번째', '첫번째');
-    // * arrows at the front or the end are directions, e.g. "east =>"
-    text = text.replace(/[-=]+>\s*$/g, '');
-    text = text.replace(/^\s*<[-=]+/g, '');
-    // * arrows in the middle are a sequence, e.g. "in => out => spread"
-    const arrowReplacement = {
-      en: ' then ',
-      de: ' dann ',
-      fr: ' puis ',
-      ja: 'や',
-      cn: '然后',
-      ko: ' 그리고 ',
-      tc: '然後',
-    };
-    text = text.replace(/\s*(<[-=]|[=-]>)\s*/g, arrowReplacement[this.displayLang]);
-    // * Countdown substitution marker, if present
-    text = text.replaceAll('{{CD}}', '');
-    return text;
+    // Fork: in tts_cleanup.ts, for the config page's preview too.
+    return cleanupTtsText(text, this.displayLang);
   }
 
   ProcessTrigger(trigger: ProcessedTrigger | ProcessedTimelineTrigger): void {

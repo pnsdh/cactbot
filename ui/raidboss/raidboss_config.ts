@@ -1,6 +1,7 @@
 import { isLang, Lang } from '../../resources/languages';
 import { buildNetRegexForTrigger } from '../../resources/netregexes';
 import { UnreachableCode } from '../../resources/not_reached';
+import { callOverlayHandler } from '../../resources/overlay_plugin_api';
 import PartyTracker, { jobLocalizedFull } from '../../resources/party';
 import Regexes from '../../resources/regexes';
 import { triggerOutputFunctions } from '../../resources/responses';
@@ -66,6 +67,7 @@ import {
   TimelineEntryEdit,
 } from './timeline_entries';
 import { TimelineParser } from './timeline_parser';
+import { cleanupTtsText } from './tts_cleanup';
 
 type RaidbossFileInfo = ConfigProcessedFile<ConfigLooseTriggerSet>;
 
@@ -116,6 +118,16 @@ const kTtsToggle = {
     cn: '隐藏TTS文本',
     ko: 'TTS 문구 숨기기',
     tc: '隱藏TTS文字',
+  },
+  // Hears a TTS text (or what TTS says by default).
+  play: {
+    en: 'Listen',
+    de: 'Anhören',
+    fr: 'Écouter',
+    ja: '聞く',
+    cn: '试听',
+    ko: '듣기',
+    tc: '試聽',
   },
   // An empty TTS text of a trigger that is not read aloud by default.
   notRead: {
@@ -1268,6 +1280,24 @@ class RaidbossConfigurator {
         // Fork: each one's TTS text, shown once asked for (or once one is set).
         const ttsRows: HTMLElement[] = [];
         const ttsPlan = ttsPlanOf(trig, Object.keys(outputStrings));
+        // Fork: a button to hear what TTS says for a box (see sayTts), off while that is nothing.
+        const severity: 'alarm' | 'alert' | 'info' = trig.alarmText !== undefined
+          ? 'alarm'
+          : trig.alertText !== undefined
+          ? 'alert'
+          : 'info';
+        const addPlay = (box: HTMLElement, said: () => string, ...inputs: HTMLInputElement[]) => {
+          const play = document.createElement('button');
+          play.type = 'button';
+          play.classList.add('trigger-tts-play');
+          play.innerText = `▶ ${this.base.translate(kTtsToggle.play)}`;
+          const update = () => play.disabled = said().trim() === '';
+          for (const input of inputs)
+            input.addEventListener('input', update);
+          update();
+          play.onclick = () => this.sayTts(said(), severity);
+          box.appendChild(play);
+        };
 
         for (const [key, outputString] of Object.entries(outputStrings)) {
           const optionKey = kOptionKeys.outputStrings;
@@ -1319,6 +1349,7 @@ class RaidbossConfigurator {
             label.classList.add('trigger-ttsstring-label');
             div.classList.add('trigger-ttsstring');
             ttsRows.push(label, div);
+            addPlay(div, () => input.value !== '' ? input.value : template, input);
           }
 
           // Fork: what TTS says for it, if not the same as the screen (same ${params}).  Not for
@@ -1365,6 +1396,12 @@ class RaidbossConfigurator {
             input.addEventListener('input', () => ttsInput.placeholder = shownText());
           }
           ttsInput.value = savedTts;
+          addPlay(
+            ttsDiv,
+            () => ttsInput.value !== '' ? ttsInput.value : ttsPlan.off ? '' : ttsInput.placeholder,
+            ttsInput,
+            input,
+          );
           const setTts = () =>
             this.base.setOption(
               'raidboss',
@@ -1445,6 +1482,29 @@ class RaidbossConfigurator {
   }
 
   // Build the top level timeline editing expandable container.
+  // Fork: says a TTS text as an alert of its kind would be (its language, its kind's volume, what
+  // reads badly taken out), its ${params} by their names.
+  sayTts(text: string, severity: 'alarm' | 'alert' | 'info'): void {
+    const volume = this.base.getOption(
+      'raidboss',
+      severity === 'alarm'
+        ? 'AlarmTtsVolume'
+        : severity === 'alert'
+        ? 'AlertTtsVolume'
+        : 'InfoTtsVolume',
+      1,
+    );
+    const lang = this.alertsLang === 'cn' || this.alertsLang === 'tc' ? 'zh' : this.alertsLang;
+    void callOverlayHandler({
+      call: 'say',
+      text: cleanupTtsText(text.replace(/\$\{\s*([^}]*?)\s*\}/g, '$1'), this.alertsLang),
+      severity: severity,
+      source: 'cactbot',
+      lang: lang,
+      volume: Math.max(0, Math.min(1, Number(volume))),
+    });
+  }
+
   // Fork: which version of a fight is chosen (trigger_set_variants.ts).
   chosenVariant(setId?: string): TriggerSetVariant {
     if (setId === undefined || !kVariantSetIds.has(setId))

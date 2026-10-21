@@ -394,6 +394,38 @@ const shownIds = (p) =>
       own.ttsRows.length === 3 && own.placeholders.every((x) => x === '기둥'),
     JSON.stringify(own),
   );
+  // Heard: what an empty one says, then one typed in (its params by name, what reads badly out).
+  const heard = await p.evaluate(async () => {
+    window.__overlayCalls.length = 0;
+    const row = [...document.querySelectorAll('.config-page .config-compact > .trigger')].find((
+      r,
+    ) => r.querySelector('.trigger-id').textContent === 'UCU Megaflare Tower');
+    const box = row.nextElementSibling.querySelector('.trigger-ttsstring');
+    box.querySelector('.trigger-tts-play').click();
+    const input = box.querySelector('input');
+    input.value = '${player} => 기둥!';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    box.querySelector('.trigger-tts-play').click();
+    input.value = '';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 100));
+    return window.__overlayCalls.filter((c) => c.call === 'say' && c.text !== undefined)
+      .map((c) => `${c.text}|${c.lang}`);
+  });
+  check(
+    'listen: default, then typed',
+    heard.join() === '기둥|ko,player 그리고 기둥|ko',
+    heard.join(),
+  );
+  // Not read aloud by default and nothing typed in: nothing to hear.
+  await look('황금의 유산', kFight, 'FRU P3 Apoc Safe Early');
+  const silent = await p.evaluate(() => {
+    const row = [...document.querySelectorAll('.config-page .config-compact > .trigger')].find((
+      r,
+    ) => r.querySelector('.trigger-id').textContent === 'FRU P3 Apoc Safe Early');
+    return row.nextElementSibling.querySelector('.trigger-tts-play')?.disabled;
+  });
+  check('listen: off while nothing would be said', silent === true, `${silent}`);
   check('no page errors (own TTS)', errors.length === 0, errors.join('; '));
   await p.close();
 }
