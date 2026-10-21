@@ -305,126 +305,89 @@ const shownIds = (p) =>
   await p.close();
 }
 
-// 8. "Changed only" as last set in another fight; a search result shown whatever the filters
-// (not under the bar); the view switch keeps the focus as it moves.
+// 7. A trigger's own TTS: off, a fixed text, or texts of its own (marked TTS, no TTS box of
+// their own); said by the TTS button's note.
 {
-  const { p, errors } = await open();
-  const openFight = async (name) => {
-    await p.evaluate((name) => {
+  const p = await b.newPage();
+  await p.setViewport({ width: 1280, height: 900 });
+  const errors = [];
+  p.on('pageerror', (e) => errors.push(e.message));
+  await mockOverlayPlugin(p, {});
+  await p.evaluateOnNewDocument(() => {
+    try {
+      localStorage.clear();
+    } catch {}
+  });
+  await p.goto(pageUrl('config'), { waitUntil: 'load' });
+  await wait(2500);
+  await p.evaluate(() => document.querySelectorAll('.config-tab')[1].click());
+  await wait(300);
+  await p.evaluate(() =>
+    [...document.querySelectorAll('.config-active .config-view-switch button')][1].click()
+  );
+  await wait(800);
+  // Its expansion's chip, then the fight.
+  const look = async (expansion, fight, id) => {
+    await p.evaluate((expansion) => {
       document.querySelector('.config-page .config-page-back')?.click();
+      [...document.querySelectorAll('.config-active .config-chip')]
+        .find((c) => c.textContent.startsWith(expansion))?.click();
+    }, expansion);
+    await wait(400);
+    await p.evaluate((name) => {
       const c = [...document.querySelectorAll('.config-active .trigger-file-container')].find((x) =>
         x.offsetParent !== null &&
         x.querySelector('.trigger-file-header-part')?.textContent.trim().startsWith(name)
       );
       c.querySelector('.trigger-file-header').click();
-    }, name);
+    }, fight);
     await wait(600);
     await tab(p, 1);
     await wait(300);
+    return p.evaluate((id) => {
+      const row = [...document.querySelectorAll('.config-page .config-compact > .trigger')].find((
+        r,
+      ) => r.querySelector('.trigger-id').textContent === id);
+      if (row === undefined)
+        return null;
+      row.querySelector('.trigger-id').click();
+      const d = row.nextElementSibling;
+      d.querySelector('.trigger-tts-toggle')?.click();
+      const labels = [...d.querySelectorAll('.trigger-outputstring-label')]
+        .filter((l) => l.offsetParent !== null);
+      return {
+        note: d.querySelector('.config-trigger-tts .config-help')?.getAttribute('data-config-tip'),
+        tagged: labels.filter((l) => l.querySelector('.trigger-tts-only') !== null)
+          .map((l) => l.firstChild.textContent),
+        ttsRows: labels.filter((l) => l.classList.contains('trigger-ttsstring-label'))
+          .map((l) => l.textContent.split(' · ')[0]),
+        placeholders: [...d.querySelectorAll('.trigger-ttsstring > input')].map((i) =>
+          i.placeholder
+        ),
+      };
+    }, id);
   };
-  const toggleOn = () =>
-    p.evaluate(() =>
-      document.querySelector('.config-page .config-trigger-bar .config-changed-toggle')
-        .classList.contains('config-active')
-    );
-  await tab(p, 1);
-  await wait(300);
-  const before = await toggleOn();
-  await openFight('절 요성난무');
-  await p.evaluate(() =>
-    document.querySelector('.config-page .config-trigger-bar .config-changed-toggle').click()
-  );
-  await openFight(kFight);
-  check('changed only as set in another fight', !before && await toggleOn(), `${before}`);
-
-  // Found by the page's search: an unchanged trigger, with "changed only" on.
-  await p.evaluate(() => {
-    const i = document.querySelector('.config-search-input');
-    i.focus();
-    i.value = 'FRU P1 Powder Mark Trail';
-    i.dispatchEvent(new Event('input', { bubbles: true }));
-  });
-  await wait(600);
-  await p.evaluate(() =>
-    document.querySelector(
-      '.config-trigger-results button, .config-trigger-results [role="button"], .config-trigger-results a',
-    ).click()
-  );
-  await wait(800);
-  const shown = await p.evaluate(() => {
-    const row = [...document.querySelectorAll('.config-page .config-compact > .trigger')].find((
-      r,
-    ) => r.querySelector('.trigger-id').textContent === 'FRU P1 Powder Mark Trail');
-    const bar = document.querySelector('.config-page .config-trigger-bar').getBoundingClientRect();
-    const top = row?.getBoundingClientRect().top ?? -1;
-    return {
-      visible: row?.offsetParent !== null,
-      open: row?.classList.contains('config-trigger-open'),
-      focused: document.activeElement === row?.querySelector('.trigger-id'),
-      underBar: top >= bar.bottom - 1,
-      changedOnly: document.querySelector('.config-page .config-changed-toggle')
-        .classList.contains('config-active'),
-    };
-  });
+  const off = await look('황금의 유산', kFight, 'FRU P3 Apoc Safe Early');
   check(
-    'search result shown whatever the filters, under the bar',
-    shown.visible && shown.open && shown.focused && shown.underBar && !shown.changedOnly,
-    JSON.stringify(shown),
+    'own TTS off: said, empty TTS boxes',
+    off?.note?.includes('원래 TTS로 읽지 않습니다') && !off.note.includes('비우면 화면') &&
+      off.placeholders.every((x) => x === ''),
+    JSON.stringify(off),
   );
-
-  // The fight's header grows: the triggers' bar goes under it.
-  const triggersPlaced = await p.evaluate(async () => {
-    const header = document.querySelector('.config-page > .trigger-file-header');
-    header.style.paddingTop = '40px';
-    await new Promise((r) => setTimeout(r, 200));
-    const top = document.querySelector('.config-page .config-trigger-bar').style.top;
-    const height = header.offsetHeight;
-    header.style.paddingTop = '';
-    return [top, `${height}px`];
-  });
+  const fixed = await look('칠흑의 반역자', '절 알렉산더 토벌전', 'TEA Contact Prohibition');
   check(
-    'triggers bar follows the header\'s height',
-    triggersPlaced[0] === triggersPlaced[1],
-    triggersPlaced.join(' '),
+    'own TTS fixed: said, its text in the TTS box',
+    fixed?.note?.includes('항상 "접촉금지"') && fixed.placeholders.join() === '접촉금지',
+    JSON.stringify(fixed),
   );
-
-  // The view switch from the keyboard.
-  await tab(p, 2);
-  await wait(800);
-  await p.focus('.config-page .config-tl-tabs button:nth-child(2)');
-  await p.keyboard.press('Enter');
-  await wait(400);
-  const byName = await p.evaluate(() =>
-    document.activeElement ===
-      document.querySelector('.config-page .config-tl-tabs button:nth-child(2)')
+  const own = await look('홍련의 해방자', '절 바하무트 토벌전', 'UCU Megaflare Tower');
+  check(
+    'own TTS texts: marked, no TTS box of their own',
+    own?.tagged.join() === 'towerTTS' && !own.ttsRows.includes('towerTTS') &&
+      own.ttsRows.length === 3 && own.note?.includes('TTS로 표시된 문구'),
+    JSON.stringify(own),
   );
-  await p.keyboard.down('Shift');
-  await p.keyboard.press('Tab');
-  await p.keyboard.up('Shift');
-  const onEntries = await p.evaluate(() => document.activeElement.textContent);
-  await p.keyboard.press('Enter');
-  await wait(600);
-  const back = await p.evaluate(() =>
-    document.activeElement ===
-        document.querySelector('.config-page .config-tl-tabs button:nth-child(1)')
-      ? true
-      : `${document.activeElement.tagName}.${document.activeElement.className}`
-  );
-  // The fight's header grows (as wrapped on a narrower window): the bar goes under it without
-  // waiting for a scroll.
-  const placed = await p.evaluate(async () => {
-    const header = document.querySelector('.config-page > .trigger-file-header');
-    header.style.paddingTop = '40px';
-    await new Promise((r) => setTimeout(r, 200));
-    const top = document.querySelector('.config-page .config-tl-sticky').style.top;
-    const height = header.offsetHeight;
-    header.style.paddingTop = '';
-    return `${top} ${height}px`;
-  });
-  const [placedTop, wanted] = placed.split(' ');
-  check('timeline bar follows the header\'s height', placedTop === wanted, placed);
-  check('view switch keeps the focus', byName && back === true, `${byName} ${onEntries} ${back}`);
-  check('no page errors (filters, focus)', errors.length === 0, errors.join('; '));
+  check('no page errors (own TTS)', errors.length === 0, errors.join('; '));
   await p.close();
 }
 

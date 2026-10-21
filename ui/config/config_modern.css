@@ -907,6 +907,17 @@ html:not(.config-classic) {
   color: var(--cfg-text);
 }
 
+/* Fork: an output string only the trigger's own TTS says (raidboss_config.ts ownTtsOf). */
+:root:not(.config-classic) .trigger-tts-only {
+  margin-left: 6px;
+  padding: 0 5px;
+  border: 1px solid var(--cfg-line-strong);
+  border-radius: 4px;
+  color: var(--cfg-muted);
+  font-size: 10.5px;
+  font-weight: 650;
+}
+
 :root:not(.config-classic) .trigger-tts-toggle-note {
   color: var(--cfg-muted);
   font-size: 0.9em;
