@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const kTests = ['behavior', 'fixes', 'small', 'fight-pages', 'fight-pages-2'];
+const kTests = ['behavior', 'fixes', 'small', 'fight-pages', 'fight-pages-2', 'fight-pages-3'];
 let failed = 0;
 for (const test of kTests) {
   const run = spawnSync(process.execPath, [path.join(here, `${test}.mjs`)], { encoding: 'utf8' });

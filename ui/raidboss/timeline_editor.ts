@@ -65,7 +65,6 @@ const t = {
   prevPart: { en: 'Previous section', ko: '이전 구간' },
   nextPart: { en: 'Next section', ko: '다음 구간' },
   movedFlag: { en: 'Time changed', ko: '시간 바뀜' },
-  editingFor: { en: 'Editing for ${job}', ko: '${job} 편집 중' },
   toCommon: { en: 'Use common', ko: '공통으로' },
   hiddenByNameShort: { en: 'Hidden by name', ko: '이름별에서 숨김' },
   details: { en: 'Details', ko: '자세히' },
@@ -305,7 +304,8 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
   parent.appendChild(editor);
 
   // Tabs: each entry, and by name (built when first shown).  The entries are rebuilt on coming
-  // back from by name, which changes what they show.
+  // back from by name, which changes what they show.  They go in the entries' bar (set as it is
+  // built), and on a line of their own over the names.
   const tabs = make('div', 'config-view-switch config-tl-tabs');
   const entriesButton = make('button', undefined, tr(t.entries));
   const byNameButton = make('button', undefined, tr(t.byName));
@@ -313,9 +313,14 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
   const entriesPane = make('div', 'config-tl-pane');
   const byNamePane = make('div', 'config-tl-pane config-hidden');
   editor.append(tabs, entriesPane, byNamePane);
+  let entriesBar: HTMLElement | undefined;
   let byNameBuilt = false;
   let entriesStale = true;
   const showPane = (entries: boolean) => {
+    if (entries)
+      entriesBar?.prepend(tabs);
+    else
+      byNamePane.before(tabs);
     entriesPane.classList.toggle('config-hidden', !entries);
     byNamePane.classList.toggle('config-hidden', entries);
     entriesButton.classList.toggle('config-active', entries);
@@ -552,13 +557,14 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
     const shownText = (e: Event) => edit(e).text ?? commonEdit(e).text ?? baseText(e);
     const isHidden = (e: Event) => hiddenByName(e) || (edit(e).hide ?? commonEdit(e).hide) === true;
 
-    // ---- The bar on top: the edited layer, search, filters, adding, colors; the parts ----
-    // What to edit and the colors on top; finding and going around stays in view.
-    const head = make('div', 'config-tl-toolbar config-tl-head');
+    // ---- The bar on top: the view, the edited layer, search, filters, adding, the parts,
+    // colors ----
+    // One bar that stays in view (a line on a wide page, wrapping on a narrow one).
     const sticky = make('div', 'config-tl-sticky');
     const toolbar = make('div', 'config-tl-toolbar');
     sticky.appendChild(toolbar);
-    pane.append(head, sticky);
+    pane.appendChild(sticky);
+    entriesBar = toolbar;
 
     const layerName = (l: Layer) => l === '' ? tr(t.common) : ctx.jobName(l);
     const withCount = (l: Layer) => {
@@ -576,6 +582,9 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
     }
     layerSelect.value = layer;
     layerSelect.setAttribute('aria-label', tr(t.layer));
+    // Which edits are made stands out while they are a job's (it is kept across fights and
+    // sessions).
+    layerSelect.classList.toggle('config-tl-layer-job', isJob);
     // A control's ⓘ goes on its name, not in the way of its control.
     const nameWithHelp = (text: LocaleText, html: () => string) => {
       const element = make('span', 'config-tl-part-label', tr(text));
@@ -596,8 +605,8 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
     editedOnly.setAttribute('role', 'switch');
     editedOnly.setAttribute('aria-checked', filters.onlyEdited ? 'true' : 'false');
     editedOnly.append(make('span', 'config-mini-switch'), tr(t.editedOnly), count);
-    const addButton = make('button', 'config-tl-tool', tr(t.add));
-    const colorsButton = make('button', 'config-tl-tool', tr(t.colors));
+    const addButton = make('button', 'config-tl-tool config-tl-add', tr(t.add));
+    const colorsButton = make('button', 'config-tl-tool config-tl-colors-button', tr(t.colors));
     colorsButton.classList.toggle('config-active', colorsOpen);
 
     // Copy another layer's edits (and entries added for it) here, leaving the ones here.
@@ -626,15 +635,10 @@ export const buildTimelineEditor = (parent: HTMLElement, ctx: TimelineEditorCont
       prevPart,
       nextPart,
     );
-    head.append(layerGroup, colorsButton);
-    // Which edits are made stays in view (it is kept across fights and sessions).
-    if (isJob)
-      toolbar.appendChild(
-        make('span', 'config-tl-editing', format(t.editingFor, { job: ctx.jobName(layer) })),
-      );
-    toolbar.append(search, editedOnly, addButton);
+    toolbar.append(tabs, layerGroup, search, editedOnly, addButton);
     if (sections.length > 0)
       toolbar.appendChild(partGroup);
+    toolbar.appendChild(colorsButton);
 
     const colorsBox = make('div', 'config-tl-colors');
     colorsBox.classList.toggle('config-hidden', !colorsOpen);

@@ -3,6 +3,7 @@ import { LocaleText } from '../../types/trigger';
 
 import { DefaultValue, setDefault } from './config_dirty';
 import { addTooltipsIn } from './config_rows';
+import { setTip } from './config_tooltip';
 
 // Fork: a browser over the trigger lists that raidboss_config.ts and oopsyraidsy_config.ts build
 // (expansion > file > trigger rows): expansions and content types as chips, files as cards that
@@ -55,6 +56,15 @@ const kBack: LocaleText = { en: 'List', ko: '목록' };
 const kTabTriggers: LocaleText = { en: 'Triggers', ko: '트리거' };
 const kTabTimeline: LocaleText = { en: 'Timeline', ko: '타임라인' };
 const kTabOptions: LocaleText = { en: 'Fight options', ko: '전투 옵션' };
+const kFindTrigger: LocaleText = { en: 'Find a trigger', ko: '트리거 이름·문구로 찾기' };
+const kNoTriggerMatch: LocaleText = { en: 'No trigger matches.', ko: '일치하는 트리거가 없습니다.' };
+const kNoTriggerChanged: LocaleText = {
+  en: 'No trigger has changes.',
+  ko: '변경한 트리거가 없습니다.',
+};
+const kWas: LocaleText = { en: 'Was: ${text}', ko: '원래: ${text}' };
+const kInfo: LocaleText = { en: 'Description', ko: '설명' };
+const kTriggerChangedKey = 'cactbot-config-trigger-changed';
 
 // A file's page shows one of these at a time.
 type PageTab = 'triggers' | 'timeline' | 'options';
@@ -292,19 +302,33 @@ const compactTriggers = (file: TriggerFile): void => {
   if (rows.length === 0)
     return;
   const entries = new Map(file.triggers.map((t) => [t.id, t]));
-  // Rows with more to open, and "open all" for them.
+  // Rows with more to open, and "open all" for the ones shown.
   const openable: HTMLElement[] = [];
   const all = document.createElement('button');
   all.type = 'button';
+  all.classList.add('config-tl-tool', 'config-tl-all');
+  const shownOpenable = () => openable.filter((r) => !r.classList.contains('config-hidden'));
   const updateAll = () => {
-    const open = openable.every((r) => r.classList.contains('config-trigger-open'));
+    const shown = shownOpenable();
+    const open = shown.length > 0 &&
+      shown.every((r) => r.classList.contains('config-trigger-open'));
     all.textContent = context.translate(open ? kCloseAll : kOpenAll);
+    all.disabled = shown.length === 0;
   };
   all.onclick = () => {
-    const open = !openable.every((r) => r.classList.contains('config-trigger-open'));
-    for (const row of openable)
+    const shown = shownOpenable();
+    const open = !shown.every((r) => r.classList.contains('config-trigger-open'));
+    for (const row of shown)
       openTriggerRow(row, open);
     updateAll();
+  };
+  // Each row, to find and count it.
+  const found: { row: HTMLElement; details: HTMLElement; entry?: TriggerEntry }[] = [];
+  const count = document.createElement('span');
+  count.classList.add('config-tl-count');
+  const updateCount = () => {
+    const n = rows.filter((r) => r.classList.contains('config-trigger-changed')).length;
+    count.textContent = n > 0 ? n.toString() : '';
   };
   let compacted = false;
   for (const row of rows) {
@@ -326,6 +350,7 @@ const compactTriggers = (file: TriggerFile): void => {
     const line = document.createElement('div');
     line.classList.add('config-trigger-line');
     const entry = entries.get(id.textContent ?? '');
+    found.push(entry !== undefined ? { row, details, entry } : { row, details });
     const dot = document.createElement('span');
     dot.classList.add('config-trigger-dot');
     const preview = document.createElement('span');
@@ -339,10 +364,12 @@ const compactTriggers = (file: TriggerFile): void => {
     if (output !== null)
       line.appendChild(output);
     row.prepend(line);
+    arrangeDetails(details);
     const update = () => {
       const changed = entry !== undefined &&
         isChange(context.readSaved(file.group, ['triggers', entry.id]));
       row.classList.toggle('config-trigger-changed', changed);
+      updateCount();
     };
     update();
     details.addEventListener('input', update);
@@ -377,13 +404,128 @@ const compactTriggers = (file: TriggerFile): void => {
   if (!compacted)
     return;
   options.classList.add('config-compact');
-  if (openable.length > 0) {
+
+  // A bar that stays in view, as the timeline's: search, "changed only" and "open all".
+  const bar = document.createElement('div');
+  bar.classList.add('config-tl-toolbar', 'config-trigger-bar');
+  const search = document.createElement('input');
+  search.type = 'text';
+  search.classList.add('config-tl-search');
+  search.placeholder = context.translate(kFindTrigger);
+  let changedOnly = storageGet(kTriggerChangedKey) === '1';
+  const changedToggle = document.createElement('button');
+  changedToggle.type = 'button';
+  changedToggle.classList.add('config-changed-toggle');
+  changedToggle.setAttribute('role', 'switch');
+  const knob = document.createElement('span');
+  knob.classList.add('config-mini-switch');
+  changedToggle.append(knob, context.translate(kChangedOnly), count);
+  bar.append(search, changedToggle);
+  if (openable.length > 0)
+    bar.appendChild(all);
+  options.before(bar);
+  const empty = document.createElement('div');
+  empty.classList.add('config-tl-empty', 'config-hidden');
+  options.appendChild(empty);
+
+  // A trigger changed back stays shown (not gone while it is edited) until the filters change.
+  const filter = () => {
+    const query = search.value.trim().toLowerCase();
+    let shown = 0;
+    for (const { row, details, entry } of found) {
+      const typed = [...details.querySelectorAll('input')].map((i) => i.value).join(' ');
+      const words = `${entry?.text ?? row.textContent ?? ''} ${typed}`.toLowerCase();
+      const hit = (query === '' || words.includes(query)) &&
+        (!changedOnly || row.classList.contains('config-trigger-changed'));
+      row.classList.toggle('config-hidden', !hit);
+      details.classList.toggle('config-hidden', !hit);
+      if (hit)
+        shown++;
+    }
+    changedToggle.classList.toggle('config-active', changedOnly);
+    changedToggle.setAttribute('aria-checked', changedOnly ? 'true' : 'false');
+    empty.textContent = context.translate(
+      changedOnly && query === '' ? kNoTriggerChanged : kNoTriggerMatch,
+    );
+    empty.classList.toggle('config-hidden', shown > 0);
     updateAll();
-    const tools = document.createElement('div');
-    tools.classList.add('config-trigger-tools');
-    tools.appendChild(all);
-    options.prepend(tools);
+  };
+  search.oninput = filter;
+  changedToggle.onclick = () => {
+    changedOnly = !changedOnly;
+    storageSet(kTriggerChangedKey, changedOnly ? '1' : '0');
+    filter();
+  };
+  filter();
+
+  // Under the fight's header, which stays in view too.
+  const header = file.container.querySelector<HTMLElement>(':scope > .trigger-file-header');
+  if (header !== null && typeof ResizeObserver !== 'undefined')
+    new ResizeObserver(() => bar.style.top = `${header.offsetHeight}px`).observe(header);
+};
+
+// An explanation behind an icon, as for options (config_rows.ts).
+const help = (text: string): HTMLElement => {
+  const icon = document.createElement('span');
+  icon.classList.add('config-help');
+  icon.textContent = 'i';
+  icon.tabIndex = 0;
+  icon.setAttribute('role', 'img');
+  icon.setAttribute('aria-label', context.translate(kInfo));
+  setTip(icon, text);
+  return icon;
+};
+
+// An opened trigger: each changed text says what it was (as the timeline's entries do), and the
+// TTS texts' button (its note behind an icon) and the source link share a line at the end.
+const arrangeDetails = (details: HTMLElement): void => {
+  const inputs = details.querySelectorAll<HTMLInputElement>(
+    ':scope > .trigger-outputstring:not(.trigger-ttsstring) > input',
+  );
+  for (const input of inputs) {
+    const was = document.createElement('span');
+    was.classList.add('config-trigger-was');
+    input.after(was);
+    const update = () => {
+      const changed = input.value !== '' && input.value !== input.placeholder;
+      was.textContent = changed
+        ? context.translate(kWas).replace('${text}', () => input.placeholder)
+        : '';
+      was.classList.toggle('config-hidden', !changed);
+    };
+    update();
+    input.addEventListener('input', update);
+    input.addEventListener('focusout', update);
   }
+  const tts = details.querySelector<HTMLElement>(
+    ':scope > .trigger-outputstring-label > .trigger-tts-toggle',
+  );
+  const source = details.querySelector<HTMLElement>(':scope > .trigger-source');
+  if (tts === null && source === null)
+    return;
+  const foot = document.createElement('div');
+  foot.classList.add('config-trigger-foot');
+  if (tts !== null) {
+    const label = tts.parentElement;
+    const note = label?.nextElementSibling;
+    const group = document.createElement('span');
+    group.classList.add('config-trigger-tts');
+    group.appendChild(tts);
+    if (note instanceof HTMLElement && note.classList.contains('trigger-tts-toggle-note')) {
+      group.appendChild(help(note.textContent ?? ''));
+      note.remove();
+    }
+    label?.remove();
+    foot.appendChild(group);
+  }
+  if (source !== null) {
+    // Not on a line of its own any more: no parentheses either.
+    const link = source.querySelector('a');
+    if (link !== null)
+      link.textContent = (link.textContent ?? '').replace(/^\((.*)\)$/, '$1');
+    foot.appendChild(source);
+  }
+  details.appendChild(foot);
 };
 
 export const buildTriggerBrowser = (group: string, groupDiv: HTMLElement): void => {
