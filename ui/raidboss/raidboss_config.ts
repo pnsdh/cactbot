@@ -154,6 +154,8 @@ type TtsPlan = {
   ttsOnly: Set<string>;
   hidden: Set<string>;
 };
+// Fork: the kinds of alert, the most important first.
+const kSeverities = ['alarm', 'alert', 'info'] as const;
 const outputsUsedBy = (f: unknown): string[] =>
   typeof f === 'function'
     ? [...f.toString().matchAll(/output\.(\w+)/g)].map((m) => m[1] ?? '')
@@ -184,7 +186,9 @@ const ttsPlanOf = (trig: ConfigLooseTrigger, keys: string[]): TtsPlan => {
     }
   }
   const [only] = unpaired;
-  if (only !== undefined && unpaired.length === 1 && plan.saidFor.size === 0) {
+  if (
+    only !== undefined && unpaired.length === 1 && plan.saidFor.size === 0 && onScreen.length > 0
+  ) {
     for (const k of onScreen)
       plan.saidFor.set(k, only);
     plan.hidden.add(only);
@@ -1281,11 +1285,8 @@ class RaidbossConfigurator {
         const ttsRows: HTMLElement[] = [];
         const ttsPlan = ttsPlanOf(trig, Object.keys(outputStrings));
         // Fork: a button to hear what TTS says for a box (see sayTts), off while that is nothing.
-        const severity: 'alarm' | 'alert' | 'info' = trig.alarmText !== undefined
-          ? 'alarm'
-          : trig.alertText !== undefined
-          ? 'alert'
-          : 'info';
+        const severity = kSeverities.find((s) => trig.configOutput?.[`${s}Text`] !== undefined) ??
+          kSeverities.find((s) => `${s}Text` in trig) ?? 'info';
         const addPlay = (box: HTMLElement, said: () => string, ...inputs: HTMLInputElement[]) => {
           const play = document.createElement('button');
           play.type = 'button';
@@ -1309,15 +1310,10 @@ class RaidbossConfigurator {
           // Fork: one only TTS says (ttsPlanOf): not here when another's TTS text stands for it
           // (unless it was changed), else a TTS text of its own.
           const ttsOnly = ttsPlan.ttsOnly.has(key);
-          if (
-            ttsPlan.hidden.has(key) &&
-            this.base.getStringOption(
-                'raidboss',
-                [kOptionKeys.triggers, trigId, optionKey, key],
-                '',
-              ) ===
-              ''
-          )
+          const setBefore = [optionKey, kOptionKeys.ttsStrings].some((k) =>
+            this.base.getStringOption('raidboss', [kOptionKeys.triggers, trigId, k, key], '') !== ''
+          );
+          if (ttsPlan.hidden.has(key) && !setBefore)
             continue;
           label.innerText = ttsOnly ? `${key} · ${this.base.translate(kTtsStringLabel)}` : key;
           label.classList.add('trigger-outputstring-label');

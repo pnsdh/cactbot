@@ -1830,14 +1830,17 @@ export class PopupText {
       }
 
       // Fork: the user's own TTS text is said, even where the trigger says something else of
-      // its own (its own text, a fixed one) or nothing: then what is on screen is, with it.  Not
-      // over a user file's TTSText.
+      // its own (its own text, a fixed one) or nothing: then what is on screen is, with it, if
+      // that has it (not when the screen's text is another, e.g. alert and info both shown).
+      // Not over a user file's TTSText.
       const said = triggerHelper.ttsText;
+      const screen = triggerHelper.defaultTTSText;
       if (
         userTexts.length > 0 && triggerHelper.triggerOptions.TTSText === undefined &&
+        screen !== undefined && screen.search(wordsPattern(userTexts)) >= 0 &&
         (said === undefined || said.search(wordsPattern(userTexts)) < 0)
       )
-        triggerHelper.ttsText = triggerHelper.defaultTTSText;
+        triggerHelper.ttsText = screen;
     }
 
     // Fork: the user's TTS text for each output string the text was made from, in one pass (what
