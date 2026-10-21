@@ -147,10 +147,17 @@ div {
 .death-report > div {
   padding: 5px;
   background-color: rgb(20 20 20 / 30%);
+
+  /* Fork: in a short window the title stays and only the rows scroll (minus the panel margin). */
+  box-sizing: border-box;
+  max-height: calc(100% - 10px);
+  display: flex;
+  flex-direction: column;
 }
 
 .death-title {
   display: flex;
+  flex: 0 0 auto;
   margin-bottom: 5px;
 }
 
@@ -178,6 +185,8 @@ div {
 .death-details {
   display: grid;
   grid-template-columns: max-content minmax(50px, max-content) minmax(10px, max-content) auto auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .death-row-hp {

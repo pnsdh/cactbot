@@ -110,20 +110,27 @@
 
 /* ===== Live list ===== */
 
-.flexcontainer .livelist::-webkit-scrollbar {
+.flexcontainer .livelist::-webkit-scrollbar,
+.flexcontainer .death-details::-webkit-scrollbar {
   width: 6px;
 }
 
 .flexcontainer .livelist::-webkit-scrollbar-track,
 .flexcontainer .livelist::-webkit-scrollbar-track:hover,
-.flexcontainer .livelist::-webkit-scrollbar-track:active {
+.flexcontainer .livelist::-webkit-scrollbar-track:active,
+.flexcontainer .death-details::-webkit-scrollbar-track,
+.flexcontainer .death-details::-webkit-scrollbar-track:hover,
+.flexcontainer .death-details::-webkit-scrollbar-track:active {
   background: transparent;
   border: 0;
 }
 
 .flexcontainer .livelist::-webkit-scrollbar-thumb,
 .flexcontainer .livelist::-webkit-scrollbar-thumb:hover,
-.flexcontainer .livelist::-webkit-scrollbar-thumb:active {
+.flexcontainer .livelist::-webkit-scrollbar-thumb:active,
+.flexcontainer .death-details::-webkit-scrollbar-thumb,
+.flexcontainer .death-details::-webkit-scrollbar-thumb:hover,
+.flexcontainer .death-details::-webkit-scrollbar-thumb:active {
   background: rgb(var(--cbkr-edge) / 25%);
   border: 0;
   border-radius: 3px;
@@ -212,6 +219,7 @@
 /* ===== Death report ===== */
 
 .flexcontainer .death-report > div {
+  max-height: calc(100% - 12px);
   margin: 6px;
   padding: 10px 12px;
   border-radius: 7px;

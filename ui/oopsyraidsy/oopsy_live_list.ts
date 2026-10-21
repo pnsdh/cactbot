@@ -142,6 +142,8 @@ export class DeathReportLive {
         event.text,
       );
     }
+    // Fork: the rows end at the death, so a report taller than the window starts scrolled there.
+    detailsDiv.scrollTop = detailsDiv.scrollHeight;
   }
 
   private AppendDetails(
