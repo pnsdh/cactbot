@@ -74,6 +74,29 @@ body {
   border: dashed 10px red;
 }
 
+/* Fork: a grip over the page in the corner OverlayPlugin resizes from: the background one is
+   faint on dark pages and covered by those that fill the window (e.g. oopsy's sample report). */
+.resize-handle body::after {
+  content: "";
+  position: fixed;
+  z-index: 2147483647;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  background:
+    linear-gradient(
+      135deg,
+      transparent 0 50%,
+      red 50% 62%,
+      white 62% 68%,
+      red 68% 80%,
+      white 80% 86%,
+      red 86%
+    );
+  pointer-events: none;
+}
+
 #cactbot-unlocked-text {
   position: fixed;
   bottom: 10px;
