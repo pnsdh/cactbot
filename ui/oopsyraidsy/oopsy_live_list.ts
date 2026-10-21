@@ -18,6 +18,11 @@ const kCopiedMessage = {
   tc: '已複製！',
 };
 
+// Fork: where the list's width from the unlocked handle is saved, and its range.
+const kLayoutKey = 'oopsyraidsy-layout';
+const kMinListWidth = 120;
+const kMaxListWidth = 1200;
+
 const errorMessageEnableACTWS = {
   en: 'Plugins -> OverlayPlugin WSServer -> Stream/Local Overlay -> Start',
   de: 'Plugins -> OverlayPlugin WSServer -> Stream/Local Overlay -> Start',
@@ -97,12 +102,19 @@ export class DeathReportLive {
     this.queueTimeoutHandle = 0;
   }
 
-  private setDeathReport(report: DeathReport) {
-    this.hide();
+  // Fork: the report in the unlocked preview instead (see OopsyLiveList.UpdatePreview).
+  public preview(elem: HTMLElement, report: DeathReport): void {
+    elem.replaceChildren();
+    this.setDeathReport(report, elem);
+  }
+
+  private setDeathReport(report: DeathReport, elem = this.reportElem) {
+    if (elem === this.reportElem)
+      this.hide();
 
     const container = document.createElement('div');
     container.classList.add('livelist-shadow');
-    this.reportElem.appendChild(container);
+    elem.appendChild(container);
 
     const titleDiv = document.createElement('div');
     titleDiv.classList.add('death-title');
@@ -199,6 +211,15 @@ export class OopsyLiveList implements MistakeObserver {
   private baseTime?: number;
   private deathReport?: DeathReportLive;
   private itemIdxToListener: { [itemIdx: number]: () => void } = {};
+  // Fork: the latest death's report, and the unlocked preview's parts (see SetUpPreview).
+  private lastReport?: DeathReport;
+  private preview?: {
+    list: HTMLElement;
+    listShadow: HTMLElement;
+    report: HTMLElement;
+    listSample: Node[];
+    reportSample: Node[];
+  };
 
   constructor(
     private options: OopsyOptions,
@@ -250,8 +271,111 @@ export class OopsyLiveList implements MistakeObserver {
       });
     });
 
+    this.SetUpPreview();
     this.Reset();
     this.SetInCombat(false);
+  }
+
+  // Fork: unlocked, the sample list and report show what is on screen when there is something
+  // (to size the window for it), and the handle between them sets how wide the list gets: a
+  // wider window then leaves room for the death report rather than widening the list.  The width
+  // is kept apart from the config page's options, which it saves whole.
+  private SetUpPreview(): void {
+    const helper = document.querySelector('.resize-helper');
+    const list = helper?.querySelector<HTMLElement>('.livelist');
+    const listShadow = list?.querySelector<HTMLElement>('.livelist-shadow');
+    const report = helper?.querySelector<HTMLElement>('.death-report');
+    const handle = helper?.querySelector<HTMLElement>('.width-handle');
+    if (!list || !listShadow || !report || !handle)
+      return;
+    this.preview = {
+      list: list,
+      listShadow: listShadow,
+      report: report,
+      listSample: [...listShadow.childNodes],
+      reportSample: [...report.childNodes],
+    };
+    document.addEventListener('onOverlayStateUpdate', (e) => {
+      if (!e.detail.isLocked)
+        this.UpdatePreview();
+    });
+
+    void callOverlayHandler({ call: 'cactbotLoadData', overlay: kLayoutKey }).then((e) => {
+      const data: unknown = e?.data;
+      if (typeof data === 'object' && data !== null && 'listWidth' in data) {
+        const width = (data as { listWidth: unknown }).listWidth;
+        if (typeof width === 'number')
+          this.SetListWidth(width);
+      }
+    });
+
+    let width: number | undefined;
+    handle.addEventListener('pointerenter', () => {
+      handle.dataset.width = `${Math.round(list.getBoundingClientRect().width)}px`;
+    });
+    handle.addEventListener('pointerdown', (e) => {
+      handle.setPointerCapture(e.pointerId);
+      handle.classList.add('dragging');
+    });
+    handle.addEventListener('pointermove', (e) => {
+      if (!handle.hasPointerCapture(e.pointerId))
+        return;
+      // The list's far edge stays: the handle is on its left, or with the report on the
+      // right (row-reverse) on its right.
+      const box = list.getBoundingClientRect();
+      const right = document.body.classList.contains('report-side-right');
+      // No wider than the window leaves it, or the width shown and saved isn't the one seen.
+      let room = list.parentElement?.getBoundingClientRect().width ?? Infinity;
+      for (const other of list.parentElement?.children ?? []) {
+        if (other !== list)
+          room -= other.getBoundingClientRect().width;
+      }
+      const wanted = right ? e.clientX - box.left : box.right - e.clientX;
+      width = this.SetListWidth(Math.min(wanted, room));
+      handle.dataset.width = `${width}px`;
+    });
+    handle.addEventListener('lostpointercapture', () => {
+      handle.classList.remove('dragging');
+      if (width === undefined)
+        return;
+      void callOverlayHandler({
+        call: 'cactbotSaveData',
+        overlay: kLayoutKey,
+        data: { listWidth: width },
+      });
+      width = undefined;
+    });
+  }
+
+  private SetListWidth(width: number): number {
+    const px = Math.round(Math.min(Math.max(width, kMinListWidth), kMaxListWidth));
+    document.documentElement.style.setProperty('--live-list-max-width', `${px}px`);
+    return px;
+  }
+
+  // Fork: see SetUpPreview.
+  private UpdatePreview(): void {
+    const preview = this.preview;
+    if (!preview || !document.documentElement.classList.contains('resize-handle'))
+      return;
+
+    const shown = this.items.filter((item) => !item.classList.contains('hide'));
+    if (shown.length > 0) {
+      preview.listShadow.replaceChildren(...shown.map((item) => {
+        const row = item.cloneNode(true);
+        if (row instanceof HTMLElement)
+          row.querySelector('.copied-msg')?.remove();
+        return row;
+      }));
+    } else {
+      preview.listShadow.replaceChildren(...preview.listSample);
+    }
+    preview.list.scrollTop = preview.list.scrollHeight;
+
+    if (this.lastReport && this.deathReport)
+      this.deathReport.preview(preview.report, this.lastReport);
+    else
+      preview.report.replaceChildren(...preview.reportSample);
   }
 
   SetInCombat(inCombat: boolean): void {
@@ -275,12 +399,15 @@ export class OopsyLiveList implements MistakeObserver {
       document.body.classList.add('out-of-combat');
       this.ShowAllItems();
     }
+    this.UpdatePreview();
   }
 
   OnMistakeObj(timestamp: number, m: OopsyMistake): void {
     const report = m.report ? new DeathReport(m.report) : undefined;
-    if (report)
+    if (report) {
       this.deathReport?.queue(report);
+      this.lastReport = report;
+    }
 
     const iconClass = m.type;
     const blame = m.name ?? m.blame;
@@ -342,6 +469,7 @@ export class OopsyLiveList implements MistakeObserver {
     this.container.classList.remove('hide');
     this.iconContainer.classList.remove('hide');
     this.scroller.scrollTop = this.scroller.scrollHeight;
+    this.UpdatePreview();
   }
 
   private MakeRow(): HTMLElement {
@@ -402,6 +530,8 @@ export class OopsyLiveList implements MistakeObserver {
     this.container.innerHTML = '';
     this.itemIdxToListener = {};
     this.deathReport?.hide();
+    this.lastReport = undefined;
+    this.UpdatePreview();
   }
 
   OnEvent(event: ViewEvent): void {
