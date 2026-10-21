@@ -89,43 +89,81 @@
 .resize-helper .width-handle {
   position: relative;
   display: flex;
-  flex: 0 0 14px;
+  flex: 0 0 18px;
   align-items: center;
   justify-content: center;
   cursor: col-resize;
   -webkit-app-region: no-drag;
 }
 
-/* A divider the window's height, with the grip in its middle. */
+/* A divider the window's height, a grip with a left-right arrow in its middle, and while pointed
+   at or dragged the list's width beside it. */
 .resize-helper .width-handle::before {
   content: "";
   position: absolute;
   top: 6px;
   bottom: 6px;
-  left: 6px;
+  left: 8px;
   width: 2px;
-  background: rgb(255 255 255 / 30%);
+  background: rgb(255 255 255 / 35%);
+}
+
+.resize-helper .width-grip {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 44px;
+  max-height: 60%;
+  border-radius: 9px;
+  background: rgb(255 255 255 / 92%);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 45%), 0 2px 6px rgb(0 0 0 / 40%);
+}
+
+.resize-helper .width-grip::before {
+  /* stylelint-disable-next-line font-family-no-missing-generic-family-keyword */
+  font-family: "Font Awesome 5 Free";
+  font-weight: 900;
+  font-size: 11px;
+  color: rgb(40 40 40);
+  text-shadow: none;
+  content: "\f337";
 }
 
 .resize-helper .width-handle::after {
-  content: "";
-  position: relative;
-  width: 6px;
-  height: 44px;
-  max-height: 50%;
-  border-radius: 3px;
-  background: rgb(255 255 255 / 85%);
-  box-shadow: 0 0 0 1px rgb(0 0 0 / 50%);
+  content: attr(data-width);
+  position: absolute;
+  top: calc(50% + 28px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: none;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgb(20 20 20 / 85%);
+  color: white;
+  font-size: 11px;
+  white-space: nowrap;
 }
 
 .resize-helper .width-handle:hover::before,
 .resize-helper .width-handle.dragging::before {
-  background: rgb(255 80 80 / 60%);
+  background: rgb(255 80 80 / 70%);
+}
+
+.resize-helper .width-handle:hover .width-grip,
+.resize-helper .width-handle.dragging .width-grip {
+  background: rgb(255 80 80);
+}
+
+.resize-helper .width-handle:hover .width-grip::before,
+.resize-helper .width-handle.dragging .width-grip::before {
+  color: white;
 }
 
 .resize-helper .width-handle:hover::after,
 .resize-helper .width-handle.dragging::after {
-  background: rgb(255 80 80);
+  display: block;
 }
 
 .livelist-shadow {

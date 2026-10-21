@@ -310,6 +310,9 @@ export class OopsyLiveList implements MistakeObserver {
     });
 
     let width: number | undefined;
+    handle.addEventListener('pointerenter', () => {
+      handle.dataset.width = `${Math.round(list.getBoundingClientRect().width)}px`;
+    });
     handle.addEventListener('pointerdown', (e) => {
       handle.setPointerCapture(e.pointerId);
       handle.classList.add('dragging');
@@ -322,6 +325,7 @@ export class OopsyLiveList implements MistakeObserver {
       const box = list.getBoundingClientRect();
       const right = document.body.classList.contains('report-side-right');
       width = this.SetListWidth(right ? e.clientX - box.left : box.right - e.clientX);
+      handle.dataset.width = `${width}px`;
     });
     handle.addEventListener('lostpointercapture', () => {
       handle.classList.remove('dragging');
