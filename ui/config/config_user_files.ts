@@ -64,6 +64,8 @@ export const buildUserFileNotice = (
     title.textContent = translate(kText.title);
     const list = document.createElement('ul');
     for (const problem of problems) {
+      // Spaces and ": " between the parts are text, so that a copied line reads as one (to paste in
+      // a bug report): "Raidboss raidboss.js:52: wd is not defined".
       const item = document.createElement('li');
       if (problem.overlay !== '') {
         const overlay = document.createElement('span');
@@ -75,8 +77,12 @@ export const buildUserFileNotice = (
       if (problem.file !== undefined) {
         const where = document.createElement('code');
         where.textContent = `${problem.file}${problem.at !== undefined ? `:${problem.at}` : ''}`;
+        if (item.childNodes.length > 0)
+          item.append(' ');
         item.append(where);
       }
+      if (item.childNodes.length > 0)
+        item.append(': ');
       const text = document.createElement('span');
       text.textContent = describe(problem, translate);
       item.append(text);
