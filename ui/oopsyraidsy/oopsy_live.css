@@ -63,8 +63,9 @@
 }
 
 .livelist {
-  flex: 1 0 300px;
-  min-width: 300px;
+  /* Fork: as narrow as the width set with the handle, even below 300px. */
+  flex: 1 0 min(300px, var(--live-list-max-width));
+  min-width: min(300px, var(--live-list-max-width));
   max-width: var(--live-list-max-width);
   height: 100%;
   overflow-x: hidden;
@@ -73,6 +74,58 @@
 
 .resize-helper .livelist {
   width: var(--live-list-max-width);
+}
+
+/* Fork: unlocked, the window moves from anywhere but the width handle, which sets how wide the
+   list gets (OverlayPlugin reads these regions: CEF, and WebView2 in the pnsdh fork). */
+.resize-handle {
+  -webkit-app-region: drag;
+}
+
+.width-handle {
+  display: none;
+}
+
+.resize-helper .width-handle {
+  position: relative;
+  display: flex;
+  flex: 0 0 14px;
+  align-items: center;
+  justify-content: center;
+  cursor: col-resize;
+  -webkit-app-region: no-drag;
+}
+
+/* A divider the window's height, with the grip in its middle. */
+.resize-helper .width-handle::before {
+  content: "";
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 6px;
+  width: 2px;
+  background: rgb(255 255 255 / 30%);
+}
+
+.resize-helper .width-handle::after {
+  content: "";
+  position: relative;
+  width: 6px;
+  height: 44px;
+  max-height: 50%;
+  border-radius: 3px;
+  background: rgb(255 255 255 / 85%);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 50%);
+}
+
+.resize-helper .width-handle:hover::before,
+.resize-helper .width-handle.dragging::before {
+  background: rgb(255 80 80 / 60%);
+}
+
+.resize-helper .width-handle:hover::after,
+.resize-helper .width-handle.dragging::after {
+  background: rgb(255 80 80);
 }
 
 .livelist-shadow {
