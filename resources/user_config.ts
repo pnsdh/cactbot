@@ -391,8 +391,11 @@ class UserConfig {
       if (overlayName === 'config')
         return;
       // Only for this overlay's own files: a reload loses what an overlay holds (oopsy's list
-      // and summary, eureka's timers).
-      if (!this.isOwnUserFile(e.file, overlayName))
+      // and summary, eureka's timers).  `files`: all changed together (a plugin from before it
+      // has only the last, `file`); null when unknown.
+      const files = 'files' in e ? e.files : [e.file];
+      const changed = Array.isArray(files) && files.length > 0 ? files : [undefined];
+      if (!changed.some((file) => this.isOwnUserFile(file, overlayName)))
         return;
       if (inCombat)
         changedInCombat = true;

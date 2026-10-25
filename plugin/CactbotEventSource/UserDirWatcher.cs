@@ -9,7 +9,8 @@ namespace Cactbot {
   // directories files were read from are watched, and in them only what the overlays read: the
   // files at the top and the folders named after overlays (see GetLocalUserFiles; not e.g. the
   // cactbot-types an update rewrites).  An editor writes a file in several steps, so changes are
-  // told once they stop for a moment.
+  // told once they stop for a moment, all files changed meanwhile together (each overlay reloads
+  // only for its own; null when what changed is unknown).
   public class UserDirWatcher {
     private const int QuietMs = 1500;
     // A directory that keeps failing (a flaky network drive) reloads the overlays at most this
@@ -18,17 +19,18 @@ namespace Cactbot {
     private static readonly HashSet<string> kExtensions =
         new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".js", ".ts", ".css", ".txt" };
 
-    private readonly Action<string> changed_;
+    private readonly Action<string[]> changed_;
     private readonly Dictionary<string, FileSystemWatcher> watchers_ =
         new Dictionary<string, FileSystemWatcher>(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> overlays_ = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     private readonly Timer timer_;
     private readonly object sync_ = new object();
-    private string last_file_;
+    private readonly HashSet<string> files_ = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    private bool unknown_;
     private bool stopped_;
     private DateTime last_error_notice_ = DateTime.MinValue;
 
-    public UserDirWatcher(Action<string> changed) {
+    public UserDirWatcher(Action<string[]> changed) {
       changed_ = changed;
       timer_ = new Timer(_ => Tell(), null, Timeout.Infinite, Timeout.Infinite);
     }
@@ -72,7 +74,7 @@ namespace Cactbot {
               return;
             var wait = Math.Min(ErrorNoticeMs, Math.Max(QuietMs, (last_error_notice_.AddMilliseconds(ErrorNoticeMs) - now).TotalMilliseconds));
             last_error_notice_ = now.AddMilliseconds(wait);
-            last_file_ = null;
+            unknown_ = true;
             timer_.Change((int)wait, Timeout.Infinite);
           }
         };
@@ -106,19 +108,21 @@ namespace Cactbot {
 
     private void Changed(string path) {
       lock (sync_) {
-        last_file_ = path;
+        files_.Add(path);
         timer_.Change(QuietMs, Timeout.Infinite);
       }
     }
 
     private void Tell() {
-      string file;
+      string[] files;
       lock (sync_) {
         if (stopped_)
           return;
-        file = last_file_;
+        files = unknown_ ? null : new List<string>(files_).ToArray();
+        files_.Clear();
+        unknown_ = false;
       }
-      changed_(file);
+      changed_(files);
     }
 
     // Until directories are watched again (as the overlays load their files).
