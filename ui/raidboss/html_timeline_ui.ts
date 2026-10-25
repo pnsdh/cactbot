@@ -494,6 +494,12 @@ export class HTMLTimelineUI extends TimelineUI {
     // Forced removals skip animations; otherwise a skin animating .timer-bar (e.g. on entry)
     // would leave a stale animationName and the bar would wait forever.
     if (force) {
+      // A bar already animating out (a keep-alive removal) isn't parked: reused, its pending
+      // removal would still take it off screen before its event.
+      if (div.classList.contains('animate-timer-bar-removed')) {
+        removeBar();
+        return;
+      }
       this.parkBar(e.id, activeBar);
       return;
     }
