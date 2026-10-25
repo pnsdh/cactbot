@@ -2380,9 +2380,11 @@ const processPerTriggerAutoConfig = (options: RaidbossOptions, savedConfig: Save
     )
       autoConfig[kOptionKeys.ttsStrings] = ttsStrings as { [key: string]: string };
 
+    // Fork: also a trigger with only "before seconds" or a delay adjustment set (upstream dropped
+    // those).
     if (
       typeof output === 'string' || duration || outputStrings !== undefined ||
-      autoConfig[kOptionKeys.ttsStrings] !== undefined
+      autoConfig[kOptionKeys.ttsStrings] !== undefined || beforeSeconds || delayAdjustSeconds
     )
       perTriggerAutoConfig[id] = autoConfig;
   }
