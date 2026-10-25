@@ -200,11 +200,12 @@ export class PlayerStateTracker {
     this.partyIds = new Set(this.partyTracker.partyIds);
   }
 
-  private Reset(): void {
+  private Reset(keepPets = false): void {
     // Deliberately do not clear currPartyInfo/combatantPartyInfo here.
     // Fork: buffs still being collected at a wipe were reported after it (the dead included).
     this.missedBuffCollector.Reset();
-    this.petIdToOwnerId = {};
+    if (!keepPets)
+      this.petIdToOwnerId = {};
     this.deadIds.clear();
     this.zeroHpTimes = {};
     this.trackedEvents = [];
@@ -593,8 +594,10 @@ export class PlayerStateTracker {
     });
   }
 
+  // Fork: a wipe echo comes with pets still out, and they don't show up (AddedCombatant) again:
+  // their owners are kept until the zone changes (new pets just add entries).
   OnWipe(): void {
-    this.Reset();
+    this.Reset(true);
   }
 
   private OnBuffCollected(timestamp: number, collected: CollectedBuff): void {
