@@ -35,6 +35,12 @@ const kText = {
     en: 'Replaces Options.${text} that earlier files added to (add with push instead).',
     ko: '앞의 파일들이 추가한 Options.${text}를 통째로 바꿉니다(push로 추가하세요).',
   },
+  sameSetId: {
+    en: 'Same trigger set id as an earlier user file: ${text}. Only the one in this file is ' +
+      'used (a leftover copy?).',
+    ko: '앞의 사용자 파일과 트리거 세트 ID가 같아 이 파일 것만 씁니다: ${text}. ' +
+      '남아 있는 옛 사본인지 확인하세요.',
+  },
 } as const;
 
 const kOverlays: { [overlay: string]: LocaleText } = {

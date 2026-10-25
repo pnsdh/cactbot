@@ -119,7 +119,7 @@ export type OptionsTemplate = {
 // line (or line:column) in `file`; `overlay` is '' for what is not any one overlay's.
 export type UserFileProblem = {
   overlay: string;
-  kind: 'error' | 'overwrite' | 'missingDir' | 'missingTimeline' | 'tooBig';
+  kind: 'error' | 'overwrite' | 'missingDir' | 'missingTimeline' | 'tooBig' | 'sameSetId';
   file?: string;
   at?: string;
   text: string;
@@ -134,6 +134,8 @@ class UserConfig {
   private userFileProblemListeners: (() => void)[] = [];
   // Problems found late (locateJsError) for files loaded before a clear are not kept.
   private userFileProblemGeneration = 0;
+  // Fork: the user folder, as cactbotLoadUser gave it (see isOwnUserFile).
+  private userLocation?: string;
 
   reportUserFileProblem(problem: UserFileProblem): void {
     const same = (p: UserFileProblem) =>
@@ -332,6 +334,24 @@ class UserConfig {
   // that extension that have `overlayName` either as their entire filename (no subdir)
   // or are inside a root-level subdirectory named `overlayName`/  The extension should
   // include the period separator, e.g. ".js".  All comparisons are case insensitive.
+  // Fork: whether a changed user file (a full path from UserDirWatcher) is one the overlay reads
+  // (see filterUserFiles): <overlay>.js/.ts/.css at the top, or anything in <overlay>/.  When it
+  // can't be told (no path, or not in the user folder), yes.
+  isOwnUserFile(file: unknown, overlayName: string): boolean {
+    if (typeof file !== 'string' || this.userLocation === undefined)
+      return true;
+    const normal = (path: string) => path.replace(/\//g, '\\').toLowerCase();
+    const root = normal(this.userLocation).replace(/\\+$/, '');
+    const path = normal(file);
+    if (!path.startsWith(`${root}\\`))
+      return true;
+    const relative = path.slice(root.length + 1);
+    const overlay = overlayName.toLowerCase();
+    if (relative.startsWith(`${overlay}\\`))
+      return true;
+    return !relative.includes('\\') && relative.replace(/\.[^.]*$/, '') === overlay;
+  }
+
   filterUserFiles(paths: string[], origOverlayName: string, origExtension: string) {
     const extension = origExtension.toLowerCase();
     const overlayName = origOverlayName.toLowerCase();
@@ -365,10 +385,14 @@ class UserConfig {
       if (!inCombat && changedInCombat)
         reloadOnce();
     });
-    addOverlayListener('onUserFileChanged', () => {
+    addOverlayListener('onUserFileChanged', (e) => {
       // The config page only looks at them again (config_user_files.ts): a reload would lose
       // where it was, and what was being typed.
       if (overlayName === 'config')
+        return;
+      // Only for this overlay's own files: a reload loses what an overlay holds (oopsy's list
+      // and summary, eureka's timers).
+      if (!this.isOwnUserFile(e.file, overlayName))
         return;
       if (inCombat)
         changedInCombat = true;
@@ -394,6 +418,7 @@ class UserConfig {
       // Linux (?!?), support any style of slashes elsewhere.
       // Fork: none when no user directory was found at all.
       const basePath = `${(e.detail.userLocation ?? '').replace(/[/\\]*$/, '')}\\`;
+      this.userLocation = e.detail.userLocation ?? undefined;
       const localFiles = e.detail.localUserFiles;
       const missingDir = e.detail.missingUserLocation;
       // The same for every overlay (a file at the top is read by all), so not told as any one's.
@@ -532,6 +557,35 @@ class UserConfig {
         });
         const cssFiles = loadCss ? this.filterUserFiles(sortedFiles, overlayName, '.css') : [];
 
+        // Fork: the user file each trigger set id came from.  Two user files with the same id are
+        // almost always a mistake (a leftover copy, e.g. p8s.ts next to the edited p8s.js): only
+        // the later one is used, so it is told on the config page.
+        const setIdFiles = new Map<string, string>();
+        const seenSets = new WeakSet<object>();
+        const checkSetIds = (jsFile: string) => {
+          const triggers: unknown = (options as { Triggers?: unknown }).Triggers;
+          if (!Array.isArray(triggers))
+            return;
+          for (const set of triggers as unknown[]) {
+            if (typeof set !== 'object' || set === null || seenSets.has(set))
+              continue;
+            seenSets.add(set);
+            const id: unknown = (set as { id?: unknown }).id;
+            if (typeof id !== 'string')
+              continue;
+            const earlier = setIdFiles.get(id);
+            if (earlier !== undefined && earlier !== jsFile) {
+              this.reportUserFileProblem({
+                overlay: overlayName,
+                kind: 'sameSetId',
+                file: jsFile,
+                text: `${id} (${earlier})`,
+              });
+            }
+            setIdFiles.set(id, jsFile);
+          }
+        };
+
         for (const jsFile of jsFiles) {
           try {
             printUserFile(`local user file: ${basePath}${jsFile}`);
@@ -562,6 +616,7 @@ class UserConfig {
               }
               variableTracker[field] = options[field];
             }
+            checkSetIds(jsFile);
 
             this.userFileCallbacks[overlayName]?.(jsFile, localFiles, options, basePath);
           } catch (e) {
