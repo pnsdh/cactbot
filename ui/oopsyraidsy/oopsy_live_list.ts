@@ -211,6 +211,9 @@ export class OopsyLiveList implements MistakeObserver {
   private baseTime?: number;
   private deathReport?: DeathReportLive;
   private itemIdxToListener: { [itemIdx: number]: () => void } = {};
+  // Fork: a new encounter clears the list only when it shows something or combat starts (see
+  // StartEncounter).
+  private resetPending = false;
   // Fork: the latest death's report, and the unlocked preview's parts (see SetUpPreview).
   private lastReport?: DeathReport;
   private preview?: {
@@ -393,6 +396,8 @@ export class OopsyLiveList implements MistakeObserver {
     this.inCombat = inCombat;
     if (inCombat) {
       document.body.classList.remove('out-of-combat');
+      if (this.resetPending)
+        this.Reset();
       this.HideOldItems();
     } else {
       // TODO: Add an X button to hide/clear the list.
@@ -403,6 +408,8 @@ export class OopsyLiveList implements MistakeObserver {
   }
 
   OnMistakeObj(timestamp: number, m: OopsyMistake): void {
+    if (this.resetPending)
+      this.Reset();
     const report = m.report ? new DeathReport(m.report) : undefined;
     if (report) {
       this.deathReport?.queue(report);
@@ -531,6 +538,7 @@ export class OopsyLiveList implements MistakeObserver {
     this.itemIdxToListener = {};
     this.deathReport?.hide();
     this.lastReport = undefined;
+    this.resetPending = false;
     this.UpdatePreview();
   }
 
@@ -548,7 +556,13 @@ export class OopsyLiveList implements MistakeObserver {
   }
 
   StartEncounter(timestamp: number): void {
-    this.Reset();
+    // Fork: an encounter now starts with a countdown (see DamageTracker.OnCountdown), so a
+    // cancelled one kept clearing the last pull's list.  Out of combat, it is cleared by the first
+    // thing this encounter shows or when combat starts.
+    if (this.inCombat)
+      this.Reset();
+    else
+      this.resetPending = true;
     this.baseTime = timestamp;
   }
 
