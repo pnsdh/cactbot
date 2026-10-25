@@ -1663,7 +1663,8 @@ export class PopupText {
       return;
 
     const adjust = triggerHelper.triggerAutoConfig.DelayAdjust ?? 0;
-    const adjustedDelay = Math.max(delay ?? 0 + adjust, 0);
+    // Fork: upstream's `delay ?? 0 + adjust` never added the adjustment (delay is a number here).
+    const adjustedDelay = Math.max(delay + adjust, 0);
 
     if (adjustedDelay <= 0)
       return;
