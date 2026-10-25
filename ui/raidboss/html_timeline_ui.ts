@@ -422,6 +422,14 @@ export class HTMLTimelineUI extends TimelineUI {
       delete this.activeBars[id];
     if (activeBar.soonTimeout !== undefined)
       window.clearTimeout(activeBar.soonTimeout);
+    // A bar already parked under this id goes now, or it would be lost from the map and stay on
+    // screen: a sync past an upcoming duration entry parks it, then the duration bar made for it
+    // (same id, already over) right after (e.g. TEA's Splash x6 when phase 1 ends early).
+    const earlier = this.parkedBars.get(id);
+    if (earlier !== undefined && earlier.bar !== activeBar.bar) {
+      const div = earlier.bar.parentNode;
+      div?.parentNode?.removeChild(div);
+    }
     this.parkedBars.set(id, activeBar);
     if (this.parkedFlushQueued)
       return;
