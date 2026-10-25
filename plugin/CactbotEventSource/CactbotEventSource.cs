@@ -87,9 +87,11 @@ namespace Cactbot {
       container.Register(new CactbotPathWarning(container));
 
       RegisterPresets();
-      user_dir_watcher_ = new UserDirWatcher((file) => DispatchEvent(JObject.FromObject(new {
+      // `file`, the last one, for overlays from before `files`.
+      user_dir_watcher_ = new UserDirWatcher((files) => DispatchEvent(JObject.FromObject(new {
         type = "onUserFileChanged",
-        file = file,
+        file = files != null && files.Length > 0 ? files[files.Length - 1] : null,
+        files = files,
       })));
 
       RegisterEventTypes(new List<string>()

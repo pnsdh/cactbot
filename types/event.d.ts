@@ -330,7 +330,9 @@ export interface EventMap {
 
   'onUserFileChanged': (ev: {
     type: 'onUserFileChanged';
-    file: string;
+    // Fork: null when what changed is unknown; `files` all changed together (newer plugin).
+    file: string | null;
+    files?: string[] | null;
   }) => void;
   // #endregion
 }
