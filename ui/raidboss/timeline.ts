@@ -113,6 +113,11 @@ export class TimelineUI {
   public OnSyncTime(_fightNow: number, _running: boolean): void {
     /* noop */
   }
+
+  // Fork: before a sync removes the bars, the time of the entry it matched (see SyncTo).
+  public OnSyncEntry(_time: number): void {
+    /* noop */
+  }
 }
 
 const initialNextEventState = {
@@ -235,7 +240,7 @@ export class Timeline {
     this.ui?.OnSyncTime(fightNow, false);
   }
 
-  protected SyncTo(fightNow: number, currentTime: number, _sync?: Sync): void {
+  protected SyncTo(fightNow: number, currentTime: number, sync?: Sync): void {
     // If we ever sync somewhere else, then remove any active overhanging windows from force jumps.
     this.activeLastForceJumpSync = undefined;
 
@@ -246,6 +251,9 @@ export class Timeline {
     if (Math.abs(newTimebase - this.timebase) <= 2)
       return;
     this.timebase = newTimebase;
+    // Fork: the bars of the matched entry happened, if early (the UI lands them, not drops them).
+    if (sync !== undefined)
+      this.ui?.OnSyncEntry(sync.time);
 
     this.nextEventState = { ...initialNextEventState };
     this.nextText = 0;

@@ -1,6 +1,7 @@
 // cbkr timeline bars around syncs, recorded with the screencast: an early sync (the ability comes
-// before its bar reaches 0), a late one (after), and a jump.  Checks that the bar an early sync
-// (or the jump's sync) came for lands like one that runs out instead of vanishing, and writes
+// before its bar reaches 0), a late one (after), a jump, and a phase pushed early (a sync far
+// ahead).  Checks that the bars of the entry an early sync (or the jump's sync) matched land like
+// ones that run out instead of vanishing, while bars a sync skipped go at once, and writes
 // contact sheets of frames around each event and the bar log to out/sync-anim/.
 //
 // node timeline-sync-anim.mjs [page]
@@ -29,6 +30,9 @@ hideall "--sync--"
 112.0 "뮤"
 116.0 "뉴"
 120.0 "크시"
+200.0 "--sync--" Ability { id: "AAA4" } window 100,5
+204.0 "오미크론"
+208.0 "파이"
 `;
 const userFile = `Options.Triggers.push({
   id: 'SyncAnimProbe',
@@ -98,7 +102,9 @@ const fire = async (label, ms, id, name) => {
 await fire('early', 7600, 'AAA1', '알파');
 await fire('late', 12200, 'AAA2', '베타');
 await fire('jump', 19900, 'AAA3', '델타');
-await at(23000);
+// A phase pushed early: a sync far ahead while 뮤 (112) is about to come.
+await fire('push', 31500, 'AAA4', '푸시');
+await at(34000);
 await cdp.send('Page.stopScreencast');
 const log = await page.evaluate(() => window.__log);
 fs.writeFileSync(
@@ -165,6 +171,10 @@ const checks = [
   [
     'jump: the skipped bars go at once',
     !log.some((l) => Number(l.split(' ')[0]) >= events[2].t && /엡실론|제타|에타/.test(l)),
+  ],
+  [
+    'push: a bar the sync skipped goes at once, even about to come',
+    !log.some((l) => Number(l.split(' ')[0]) >= events[3].t && l.includes('뮤')),
   ],
   ['no page errors', errors.length === 0],
 ];

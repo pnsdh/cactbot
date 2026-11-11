@@ -10,9 +10,6 @@ import { highlightColor, rgbChannels, rgbChannelsLight } from './timeline_entrie
 import { Event } from './timeline_parser';
 
 const kBig = 1000000000; // Something bigger than any fight length in seconds.
-// Fork: a bar a sync drops with at most this many seconds left lands (its ability came that
-// early); one with more was skipped by the sync or a jump and goes at once.
-const kLandSeconds = 1.5;
 
 const timelineInstructions = {
   en: [
@@ -94,6 +91,8 @@ export type ActiveBar = {
   sortKey?: number;
   endTime?: number;
   channeling?: boolean;
+  // Fork: the timeline time of its entry, to tell the bars of a sync's entry (see OnSyncEntry).
+  time?: number;
 };
 
 export class HTMLTimelineUI extends TimelineUI {
@@ -114,6 +113,8 @@ export class HTMLTimelineUI extends TimelineUI {
   // Parked bars a sync came early for, shown at 0 for KeepExpiredTimerBarsForSeconds before they
   // animate out like bars that run out (see leaveParkedBar).
   private landingBars = new Map<ActiveBar, number>();
+  // The time of the entry the current sync matched, until its parked bars are dealt with.
+  private syncEntryTime?: number;
 
   private debugElement: HTMLElement | null = null;
   private debugFightTimer: TimerBar | null = null;
@@ -422,6 +423,7 @@ export class HTMLTimelineUI extends TimelineUI {
       sortKey: e.sortKey,
       endTime: Date.now() + (e.time - fightNow) * 1000,
       channeling: channeling,
+      time: e.time,
     };
     this.updateNextBar();
   }
@@ -450,23 +452,25 @@ export class HTMLTimelineUI extends TimelineUI {
       for (const [parkedId, parked] of this.parkedBars)
         this.leaveParkedBar(parkedId, parked);
       this.parkedBars.clear();
+      this.syncEntryTime = undefined;
       this.updateNextBar();
     });
   }
 
-  // A parked bar no event took back.  One a sync came early for (its ability went off just before
-  // its time) lands the way a bar that runs out does: it reaches 0 now, stays for
-  // KeepExpiredTimerBarsForSeconds, then animates out.  Dropping it at once looked abrupt: the
-  // bar the eye follows vanished without its landing, rows below snapped up, and the next bar grew
-  // only after the wait meant for a removal animation.  Bars a sync or jump skipped still go at
-  // once: animated out, they would hold their rows and push the new bars out of view meanwhile.
+  // A parked bar no event took back.  One of the entry a sync matched (its ability went off before
+  // its time, often by a fraction of a second) lands the way a bar that runs out does: it reaches
+  // 0 now, stays for KeepExpiredTimerBarsForSeconds, then animates out.  Dropping it at once
+  // looked abrupt: the bar the eye follows vanished without its landing, rows below snapped up,
+  // and the next bar grew only after the wait meant for a removal animation.  Bars a sync or jump
+  // skipped (e.g. a phase's enrage when the next phase starts) still go at once: animated out,
+  // they would hold their rows and push the new bars out of view meanwhile.
   private leaveParkedBar(id: string, parked: ActiveBar): void {
     const div = parked.bar.parentElement;
     if (!div)
       return;
-    const remain = ((parked.endTime ?? 0) - Date.now()) / 1000;
+    const synced = this.syncEntryTime !== undefined && parked.time === this.syncEntryTime;
     // Also when a new bar with the same id took its row (e.g. its duration bar).
-    if (this.activeBars[id] !== undefined || remain > kLandSeconds) {
+    if (this.activeBars[id] !== undefined || !synced) {
       div.remove();
       return;
     }
@@ -565,6 +569,10 @@ export class HTMLTimelineUI extends TimelineUI {
     }
     this.animateOut(div, removeBar);
     this.updateNextBar();
+  }
+
+  public override OnSyncEntry(time: number): void {
+    this.syncEntryTime = time;
   }
 
   public override OnShowInfoText(text: string, currentTime: number): void {
