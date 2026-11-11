@@ -273,9 +273,9 @@ hideall "--sync--"
 967.7 "--targetable--"
 976.8 "Solar Ray 1" Ability { id: "81AD", source: "Omega-M" }
 979.9 "Solar Ray 2" Ability { id: "7B02", source: "Omega-M" }
-988.2 "--sync--" Ability { id: "7B43", source: "Omega-M" }
-998.5 "Blind Faith" Ability { id: "7B87", source: "Omega-M" }
-999.7 "Blind Faith Enrage" Ability { id: "7F73", source: "Omega-F" }
+987.6 "--sync--" Ability { id: "7B43", source: "Omega-M" }
+998.9 "Blind Faith" Ability { id: "7B87", source: "Omega-M" }
+1000.1 "Blind Faith Enrage" Ability { id: "7F73", source: "Omega-F" }
 
 
 ### P6: Alpha Omega
@@ -301,69 +301,69 @@ hideall "--sync--"
 
 1215.4 "Unlimited Wave Cannon" Ability { id: "7BAC", source: "Alpha Omega" }
 1223.4 "Wave Cannon Puddle 1" #Ability { id: "7BAF", source: "Alpha Omega" }
-1225.2 "Wave Cannon Puddle 2" #Ability { id: "7BAF", source: "Alpha Omega" }
-1227.1 "Wave Cannon Puddle 3" #Ability { id: "7BAF", source: "Alpha Omega" }
-1229.0 "Wave Cannon Puddle 4" #Ability { id: "7BAF", source: "Alpha Omega" }
-1230.9 "Wave Cannon Puddle 5" #Ability { id: "7BAF", source: "Alpha Omega" }
-1232.9 "Wave Cannon Puddle 6" #Ability { id: "7BAF", source: "Alpha Omega" }
-1236.0 "Wave Cannon 1" #Ability { id: "7BAB", source: "Alpha Omega" }
-1238.0 "Wave Cannon 2" #Ability { id: "7BAB", source: "Alpha Omega" }
-1243.9 "--sync--" Ability { id: "7BA9", source: "Alpha Omega" }
-1244.3 "Wave Cannon (Wild Charge)" #Ability { id: "7BAA", source: "Alpha Omega" }
-1248.4 "--sync--" Ability { id: "7C03", source: "Alpha Omega" }
-1249.3 "Flash Gale 1" Ability { id: "7DDF", source: "Alpha Omega" }
-1251.6 "--sync--" Ability { id: "7C03", source: "Alpha Omega" }
-1252.5 "Flash Gale 2" Ability { id: "7DDF", source: "Alpha Omega" }
+1225.4 "Wave Cannon Puddle 2" #Ability { id: "7BAF", source: "Alpha Omega" }
+1227.4 "Wave Cannon Puddle 3" #Ability { id: "7BAF", source: "Alpha Omega" }
+1229.5 "Wave Cannon Puddle 4" #Ability { id: "7BAF", source: "Alpha Omega" }
+1231.5 "Wave Cannon Puddle 5" #Ability { id: "7BAF", source: "Alpha Omega" }
+1233.5 "Wave Cannon Puddle 6" #Ability { id: "7BAF", source: "Alpha Omega" }
+1236.6 "Wave Cannon 1" #Ability { id: "7BAB", source: "Alpha Omega" }
+1238.6 "Wave Cannon 2" #Ability { id: "7BAB", source: "Alpha Omega" }
+1244.5 "--sync--" Ability { id: "7BA9", source: "Alpha Omega" }
+1244.9 "Wave Cannon (Wild Charge)" #Ability { id: "7BAA", source: "Alpha Omega" }
+1249.0 "--sync--" Ability { id: "7C03", source: "Alpha Omega" }
+1249.9 "Flash Gale 1" Ability { id: "7DDF", source: "Alpha Omega" }
+1252.2 "--sync--" Ability { id: "7C03", source: "Alpha Omega" }
+1253.1 "Flash Gale 2" Ability { id: "7DDF", source: "Alpha Omega" }
 
-1258.7 "Cosmo Arrow" Ability { id: "7BA2", source: "Alpha Omega" } duration 14
-1269.9 "Wave Cannon 1" #Ability { id: "7BAB", source: "Alpha Omega" }
-1271.9 "Wave Cannon 2" #Ability { id: "7BAB", source: "Alpha Omega" }
-1277.8 "--sync--" Ability { id: "7BA9", source: "Alpha Omega" }
-1278.2 "Wave Cannon (Wild Charge)" #Ability { id: "7BAA", source: "Alpha Omega" }
-1282.3 "--sync--" Ability { id: "7C03", source: "Alpha Omega" }
-1283.2 "Flash Gale 1" Ability { id: "7DDF", source: "Alpha Omega" }
-1285.5 "--sync--" Ability { id: "7C03", source: "Alpha Omega" }
-1286.4 "Flash Gale 2" Ability { id: "7DDF", source: "Alpha Omega" }
+1259.3 "Cosmo Arrow" Ability { id: "7BA2", source: "Alpha Omega" } duration 14
+1270.5 "Wave Cannon 1" #Ability { id: "7BAB", source: "Alpha Omega" }
+1272.5 "Wave Cannon 2" #Ability { id: "7BAB", source: "Alpha Omega" }
+1278.4 "--sync--" Ability { id: "7BA9", source: "Alpha Omega" }
+1278.8 "Wave Cannon (Wild Charge)" #Ability { id: "7BAA", source: "Alpha Omega" }
+1282.9 "--sync--" Ability { id: "7C03", source: "Alpha Omega" }
+1283.8 "Flash Gale 1" Ability { id: "7DDF", source: "Alpha Omega" }
+1286.1 "--sync--" Ability { id: "7C03", source: "Alpha Omega" }
+1287.0 "Flash Gale 2" Ability { id: "7DDF", source: "Alpha Omega" }
 
-1291.7 "Unlimited Wave Cannon" Ability { id: "7BAC", source: "Alpha Omega" }
-1299.7 "Wave Cannon Puddle 1" #Ability { id: "7BAF", source: "Alpha Omega" }
-1301.5 "Wave Cannon Puddle 2" #Ability { id: "7BAF", source: "Alpha Omega" }
-1303.4 "Wave Cannon Puddle 3" #Ability { id: "7BAF", source: "Alpha Omega" }
-1305.3 "Wave Cannon Puddle 4" #Ability { id: "7BAF", source: "Alpha Omega" }
-1307.2 "Wave Cannon Puddle 5" #Ability { id: "7BAF", source: "Alpha Omega" }
-1309.2 "Wave Cannon Puddle 6" #Ability { id: "7BAF", source: "Alpha Omega" }
-1310.0 "Cosmo Dive" Ability { id: "7BA6", source: "Alpha Omega" }
-1312.4 "Cosmo Dive Far" #Ability { id: "7BA8", source: "Alpha Omega" }
-1312.4 "Cosmo Dive Near x2" #Ability { id: "7BA7", source: "Alpha Omega" }
-1319.2 "--sync--" Ability { id: "7C03", source: "Alpha Omega" }
-1320.1 "Flash Gale 1" Ability { id: "7DDF", source: "Alpha Omega" }
-1322.4 "--sync--" Ability { id: "7C03", source: "Alpha Omega" }
-1323.2 "Flash Gale 2" Ability { id: "7DDF", source: "Alpha Omega" }
+1292.3 "Unlimited Wave Cannon" Ability { id: "7BAC", source: "Alpha Omega" }
+1300.3 "Wave Cannon Puddle 1" #Ability { id: "7BAF", source: "Alpha Omega" }
+1302.3 "Wave Cannon Puddle 2" #Ability { id: "7BAF", source: "Alpha Omega" }
+1304.3 "Wave Cannon Puddle 3" #Ability { id: "7BAF", source: "Alpha Omega" }
+1306.4 "Wave Cannon Puddle 4" #Ability { id: "7BAF", source: "Alpha Omega" }
+1308.4 "Wave Cannon Puddle 5" #Ability { id: "7BAF", source: "Alpha Omega" }
+1310.4 "Wave Cannon Puddle 6" #Ability { id: "7BAF", source: "Alpha Omega" }
+1311.1 "Cosmo Dive" Ability { id: "7BA6", source: "Alpha Omega" }
+1313.5 "Cosmo Dive Far" #Ability { id: "7BA8", source: "Alpha Omega" }
+1313.5 "Cosmo Dive Near x2" #Ability { id: "7BA7", source: "Alpha Omega" }
+1320.3 "--sync--" Ability { id: "7C03", source: "Alpha Omega" }
+1321.2 "Flash Gale 1" Ability { id: "7DDF", source: "Alpha Omega" }
+1323.5 "--sync--" Ability { id: "7C03", source: "Alpha Omega" }
+1324.3 "Flash Gale 2" Ability { id: "7DDF", source: "Alpha Omega" }
 
 # Range/Caster Brilliant Dynamis Checks
-1331.6 "Cosmo Meteor" Ability { id: "7BB0", source: "Alpha Omega" }
-1335.6 "Cosmo Meteor Baits" Ability { id: "7BB2", source: "Alpha Omega" }
+1332.7 "Cosmo Meteor" Ability { id: "7BB0", source: "Alpha Omega" }
+1336.7 "Cosmo Meteor Baits" Ability { id: "7BB2", source: "Alpha Omega" }
 
-1336.7 "Cosmo Meteor 1 x4" #Ability { id: "7FBB", source: "Alpha Omega" }
-1337.7 "Cosmo Meteor 2 x4" #Ability { id: "7FBB", source: "Alpha Omega" }
+1337.8 "Cosmo Meteor 1 x4" #Ability { id: "7FBB", source: "Alpha Omega" }
+1338.8 "Cosmo Meteor 2 x4" #Ability { id: "7FBB", source: "Alpha Omega" }
 # TODO: Adjust targetable
-1339.3 "--adds targetable--"
-1342.7 "Cosmo Meteor 1 x4" #Ability { id: "7FBB", source: "Alpha Omega" }
-1343.7 "Cosmo Meteor 2 x4" #Ability { id: "7FBB", source: "Alpha Omega" }
+1340.4 "--adds targetable--"
+1343.8 "Cosmo Meteor 1 x4" #Ability { id: "7FBB", source: "Alpha Omega" }
+1344.8 "Cosmo Meteor 2 x4" #Ability { id: "7FBB", source: "Alpha Omega" }
 
-1354.7 "Cosmo Meteor Stack" Ability { id: "7BB3", source: "Alpha Omega" }
-1354.7 "Cosmo Meteor Flare x3" Ability { id: "7BB4", source: "Alpha Omega" }
-1355.7 "Cosmo Meteor" Ability { id: "7BB1", source: "Alpha Omega" }
-1357.0 "Cosmo Meteor Enrage" Ability { id: "7BB5", source: "Cosmo Meteor" }
+1355.8 "Cosmo Meteor Stack" Ability { id: "7BB3", source: "Alpha Omega" }
+1355.8 "Cosmo Meteor Flare x3" Ability { id: "7BB4", source: "Alpha Omega" }
+1356.8 "Cosmo Meteor" Ability { id: "7BB1", source: "Alpha Omega" }
+1358.1 "Cosmo Meteor Enrage" Ability { id: "7BB5", source: "Cosmo Meteor" }
 
 # Tank 1 and Healer 1 Brilliant Dynamis Checks
-1361.7 "--sync--" StartsUsing { id: "7BB6", source: "Alpha Omega" } window 5,5
-1366.7 "Magic Number" Ability { id: "7BB6", source: "Alpha Omega" }
+1362.8 "--sync--" StartsUsing { id: "7BB6", source: "Alpha Omega" } window 5,5
+1367.8 "Magic Number" Ability { id: "7BB6", source: "Alpha Omega" }
 
 # Tank 2 and Healer 2 Brilliant Dynamis Checks
-1377.8 "--sync--" StartsUsing { id: "7BB6", source: "Alpha Omega" } window 5,5
-1382.8 "Magic Number" Ability { id: "7BB6", source: "Alpha Omega" }
+1378.9 "--sync--" StartsUsing { id: "7BB6", source: "Alpha Omega" } window 5,5
+1383.9 "Magic Number" Ability { id: "7BB6", source: "Alpha Omega" }
 
-1391.9 "--sync--" StartsUsing { id: "7BA0", source: "Alpha Omega" } window 50,50
+1393.0 "--sync--" StartsUsing { id: "7BA0", source: "Alpha Omega" } window 50,50
 # The cast bar and logs say "16 seconds" but it appears to be ~30s in practice.
-1421.9 "Run: ****mi* Enrage" Ability { id: "7BA0", source: "Alpha Omega" }
+1423.0 "Run: ****mi* Enrage" Ability { id: "7BA0", source: "Alpha Omega" }
